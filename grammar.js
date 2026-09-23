@@ -45,6 +45,12 @@ module.exports = grammar({
       /[rR][eE][mM]([ \t][^\r\n]*)?/,
     )),
 
+    // BS-TYPE-001: one rule for parameter and return types.
+    type: _ => choice(
+      kw('integer'), kw('float'), kw('double'), kw('boolean'), kw('string'),
+      kw('object'), kw('dynamic'), kw('function'), kw('void'),
+    ),
+
     // --------------------------------------------------- literals (§3)
     // BS-LIT-003, 005-012: decimal (fraction, exponent `e`/`d`, suffix) and hex.
     // A digit run followed by `.` and a letter is `number` then `.` (BS-LIT-014).
