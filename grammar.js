@@ -41,8 +41,8 @@ function endKw(word) {
 }
 
 /** Directive word: `#` immediately followed by the word (BS-COND-005, 008). */
-function directive(word) {
-  return alias(token(new RegExp(`#${ci(word)}`)), `#${word}`);
+function directive(word, precedence = 0) {
+  return alias(token(prec(precedence, new RegExp(`#${ci(word)}`))), `#${word}`);
 }
 
 function commaSep1(rule) {
@@ -504,31 +504,55 @@ module.exports = grammar({
       field('value', choice($.identifier, $.true, $.false)),
     ),
 
+    // BS-COND-007: a literal `false` branch is opaque `inactive_text`
+    // (ADR-0004 spike, design V1; grammar-design §11).
     if_directive: $ => seq(
-      directive('if'),
-      field('condition', $._cc_condition),
-      field('consequence', $.block),
+      directive('if', 1),
+      choice(
+        seq(field('condition', $._cc_condition), field('consequence', $.block)),
+        seq(field('condition', $.false), field('consequence', $.inactive_text)),
+      ),
       repeat(field('alternative', $.else_if_directive)),
       optional(field('alternative', $.else_directive)),
-      directive('end'),
+      directive('end', 1),
       kw('if'),
     ),
 
     else_if_directive: $ => seq(
-      directive('else'),
+      directive('else', 1),
       kw('if'),
-      field('condition', $._cc_condition),
-      field('consequence', $.block),
+      choice(
+        seq(field('condition', $._cc_condition), field('consequence', $.block)),
+        seq(field('condition', $.false), field('consequence', $.inactive_text)),
+      ),
     ),
 
-    else_directive: $ => seq(directive('else'), field('body', $.block)),
+    else_directive: $ => seq(directive('else', 1), field('body', $.block)),
 
     error_directive: $ => seq(directive('error'), optional(field('message', $.error_message))),
 
     // BS-COND-004: free text to the end of the line, apostrophes included.
     error_message: _ => token(prec(1, /[^ \t\r\n][^\r\n]*/)),
 
-    _cc_condition: $ => choice($.identifier, $.true, $.false),
+    _cc_condition: $ => choice($.identifier, $.true),
+
+    // Region lines are hidden `_inactive_line` tokens. Lines starting with `'`
+    // or whole-word REM match `comment` at equal length and precedence, and
+    // `comment` is declared first, so they stay `comment` children. Nested
+    // `#if` blocks are balanced by `_inactive_if`; `#if`, `#else` and `#end`
+    // have lexical precedence 1 so they are recognised inside the region.
+    inactive_text: $ => seq($._newline, repeat($._inactive_item)),
+
+    _inactive_item: $ => choice($._inactive_line, $._newline, $._inactive_if),
+
+    _inactive_line: _ => token(prec(0, choice(/[^ \t\r\n#][^\r\n]*/, /#[^\r\n]*/))),
+
+    _inactive_if: $ => seq(
+      directive('if', 1), optional($._inactive_line), $._newline,
+      repeat($._inactive_item),
+      repeat(seq(directive('else', 1), optional($._inactive_line), $._newline, repeat($._inactive_item))),
+      directive('end', 1), kw('if'),
+    ),
 
     // BS-LEX-015, 017, 018: the designator is part of the identifier. Defined
     // last: an equal-length match goes to the earlier token, so every keyword

@@ -739,6 +739,10 @@
           {
             "type": "block",
             "named": true
+          },
+          {
+            "type": "inactive_text",
+            "named": true
           }
         ]
       }
@@ -967,6 +971,10 @@
           {
             "type": "block",
             "named": true
+          },
+          {
+            "type": "inactive_text",
+            "named": true
           }
         ]
       }
@@ -1011,6 +1019,11 @@
         ]
       }
     }
+  },
+  {
+    "type": "inactive_text",
+    "named": true,
+    "fields": {}
   },
   {
     "type": "index_expression",

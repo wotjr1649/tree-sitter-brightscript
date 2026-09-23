@@ -133,7 +133,7 @@ ID (V3), and date. A result for one identity is never reused for another.
 
 | ID | State | Requirement | Behaviour | Demonstrating fixture |
 |---|---|---|---|---|
-| KL-001 | contingent: active only if the ADR-0004 literal-`false` spike fails; otherwise retired unused | BS-COND-007 | A literal-`false` conditional branch whose text is not BrightScript (the documented block-comment idiom) produces `ERROR` nodes | `BS-COND-007: block comment with prose` and the spike fixtures S3, S5–S8, S10–S12, asserted with `:error` |
+| KL-001 | retired (unused): the ADR-0004 spike passed with design V1 on 2026-09-23 | BS-COND-007 | A literal-`false` conditional branch whose text is not BrightScript (the documented block-comment idiom) produces `ERROR` nodes | `BS-COND-007: block comment with prose` and the spike fixtures S3, S5–S8, S10–S12, asserted with `:error` |
 
 ## Fixture rules
 

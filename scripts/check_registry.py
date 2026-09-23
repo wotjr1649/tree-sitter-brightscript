@@ -198,6 +198,12 @@ def full_tree(cell):
     return sexp(m.group(1)) if m and "…" not in m.group(1) else None
 
 
+# ADR-0004 status line decides which literal-false column applies.
+adr4 = (ROOT / "docs/design/decisions/ADR-0004-conditional-compilation-representation.md").read_text(encoding="utf-8")
+status = re.search(r"^Status: (.+)$", adr4, re.M).group(1)
+SPIKE = "V1" if "adopted (V1)" in status else "V2" if "adopted (V2)" in status else "FAIL" if "failed" in status else None
+if SPIKE is None:
+    fail.append(f"ADR-0004 status does not state the spike outcome: {status}")
 catalogue = {}  # name -> dict(input=bytes, trees=set|None, error=bool)
 for c in table_rows(section(WM.read_text(encoding="utf-8"), "Corpus fixture catalogue")):
     m = re.fullmatch(r"`(BS-[A-Z]+-\d{3}: [^`]+)`", c[0]) if c else None
@@ -212,15 +218,16 @@ for c in table_rows(section(WM.read_text(encoding="utf-8"), "Corpus fixture cata
         entry["error"] = c[2] == "`:error`"
         tree = full_tree(c[2])
         entry["trees"] = {tree} if tree else None
-    elif len(c) == 4:  # literal-false table: PASS (V1) and FAIL columns
-        variants = set()
-        for cell in (c[2], c[3] if c[3] != "same as PASS" else c[2]):
-            tree = full_tree(cell)
-            if tree:
-                variants |= {tree, sexp(re.sub(r"\(inactive_text( \(comment\))+\)", "(inactive_text)", tree))}
-        entry["trees"] = variants or None
-        entry["error_allowed"] = "`:error`" in (c[2], c[3])
-        entry["error"] = None  # decided by the spike outcome
+    elif len(c) == 4:  # literal-false table: the column of the ADR-0004 spike outcome
+        cell = c[3] if SPIKE == "FAIL" else c[2]
+        if cell == "same as PASS":
+            cell = c[2]
+        tree = full_tree(cell)
+        if tree and SPIKE == "V2":
+            tree = sexp(re.sub(r"\(inactive_text( \(comment\))+\)", "(inactive_text)", tree))
+        entry["trees"] = {tree} if tree else None
+        entry["error"] = cell.startswith("`:error`")
+        entry["error_allowed"] = entry["error"]
     if name in catalogue:
         fail.append(f"duplicate catalogue row {name}")
     catalogue[name] = entry

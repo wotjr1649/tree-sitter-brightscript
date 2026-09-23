@@ -149,9 +149,9 @@ or more. Unnamed children are named nodes without a field.
 | `error_message` | — | — | BS-COND-004 | highlight |
 | `inactive_text` | — | `comment`* (other text is hidden) | BS-COND-007 | highlight |
 
-`inactive_text` exists only if the ADR-0004 spike passes
-([grammar-design.md §11](grammar-design.md#11-conditional-compilation));
-otherwise it is removed from this section and never becomes public. Counts:
+`inactive_text` depended on the ADR-0004 spike
+([grammar-design.md §11](grammar-design.md#11-conditional-compilation)); the
+spike passed with design V1, so it is part of the schema. Counts:
 53 unconditional node types (`true` and `false` counted separately), 1
 conditional, 2 supertypes, 33 field names.
 
@@ -388,7 +388,7 @@ hidden rules or anonymous children).
 | BS-COND-004 | S | `error_directive`, `error_message` |
 | BS-COND-005 | L | directive tokens |
 | BS-COND-006 | S | `if_directive` as a `statement` |
-| BS-COND-007 | S | `if_directive` with `inactive_text` (PASS) or KL-001 (FAIL) |
+| BS-COND-007 | S | `if_directive` with `inactive_text` |
 | BS-COND-008 | L | directive tokens and line terminators |
 | BS-COND-012 | S | `if_directive` inside `block` |
 

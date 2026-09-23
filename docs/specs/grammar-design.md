@@ -521,8 +521,13 @@ the spike; every baseline COND fixture still passes.
 
 | Outcome | Grammar | Schema | Fixtures | Records |
 |---|---|---|---|---|
-| PASS | the adopted design (V1 or V2) | `inactive_text` becomes public | every spike fixture takes its PASS expectation for the adopted design; E1–E6 stay in W10 | ADR-0004 status "literal-false opaque bodies adopted (V1 or V2)" with the C1–C5 evidence; KL-001 set to retired (unused) in validation.md |
+| PASS (taken) | the adopted design (V1 or V2) | `inactive_text` becomes public | every spike fixture takes its PASS expectation for the adopted design; E1–E6 stay in W10 | ADR-0004 status "literal-false opaque bodies adopted (V1 or V2)" with the C1–C5 evidence; KL-001 set to retired (unused) in validation.md |
 | FAIL | spike rules removed; baseline kept (`false` is an ordinary `_cc_condition`) | no `inactive_text` | every spike fixture takes its FAIL expectation: inputs with non-BrightScript text assert `:error` and are listed as KL-001 demonstrating fixtures; code-only inputs stay positive; R1–R3 stay recovery fixtures; E1–E6 are recorded with the spike evidence and not added to W10 | ADR-0004 status "spike failed; baseline retained" with the failing criteria; KL-001 set to active, listing its fixtures |
+
+Result (Session 03, WP15): PASS with design V1 at its first attempt; the
+evidence is in [ADR-0004](../design/decisions/ADR-0004-conditional-compilation-representation.md#spike-result).
+`false` is no longer a `_cc_condition`: after `#if` or `#else if` it selects
+the `inactive_text` form.
 
 ## 12. Rule families
 

@@ -414,7 +414,8 @@ The last input line, just before the divider, ends with LF alone
 
 ADR-0004 literal-false fixtures (grammar-design §11). The PASS column applies
 to design V1; under V2 every `(comment)` inside `inactive_text` is absent. On
-FAIL, `:error` fixtures are listed as KL-001 demonstrating fixtures.
+FAIL, `:error` fixtures are listed as KL-001 demonstrating fixtures. Outcome:
+the spike passed with design V1, so the corpus uses the PASS column.
 
 | Fixture | Input | PASS (V1) | FAIL |
 |---|---|---|---|

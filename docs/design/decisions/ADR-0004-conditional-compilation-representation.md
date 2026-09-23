@@ -1,6 +1,6 @@
 # ADR-0004 — Conditional compilation representation
 
-Status: Accepted (literal-`false` opaque bodies pending a feasibility spike)
+Status: Accepted; literal-`false` opaque bodies adopted (V1), spike passed 2026-09-23
 Date: 2026-09-23
 
 ## Context
@@ -69,6 +69,24 @@ The optional extension to the `#else` branch of a literal `true` condition is
 not attempted. The spike result updates this ADR's status line; the failure
 path activates known limitation KL-001 in
 [validation.md](../../validation/validation.md).
+
+## Spike result
+
+2026-09-23 (Session 03, WP15), generator tree-sitter 0.27.0, ABI 15: design
+V1 qualified at its first attempt, so V2 was not tried. Evidence:
+
+| Criterion | Evidence | Result |
+|---|---|---|
+| C1 | fixtures S3, S4, S5, S12 | pass |
+| C2 | fixtures `block comment with prose`, S6, S7, S11 | pass |
+| C3 | fixture S8 | pass |
+| C4 | `scripts/check_spike.py`: in R1 and R2 the only `ERROR` lies in the malformed line and every later node matches the repaired parse; R3 has an error and no crash | pass |
+| C5 | `scripts/check_incremental.py` E1–E6: the final `parse --edits` tree equals a fresh parse (default and CST output) | pass |
+
+All fifteen literal-false fixtures take their PASS (V1) expectation; every
+baseline COND fixture still passes; no `conflicts` entry and no external
+scanner. `inactive_text` is public, E1–E6 stay in workload W10, and KL-001
+is retired unused.
 
 ## Validation / enforcement
 
