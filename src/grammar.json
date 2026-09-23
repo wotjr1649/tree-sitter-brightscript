@@ -43,6 +43,42 @@
         ]
       }
     },
+    "number": {
+      "type": "TOKEN",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "PATTERN",
+            "value": "(\\d+(\\.\\d+)?|\\.\\d+)([eEdD][+-]?\\d+)?[%!#&]?"
+          },
+          {
+            "type": "PATTERN",
+            "value": "&[hH][0-9a-fA-F]+&?"
+          }
+        ]
+      }
+    },
+    "string": {
+      "type": "PATTERN",
+      "value": "\"([^\"\\r\\n]|\"\")*\""
+    },
+    "true": {
+      "type": "PATTERN",
+      "value": "[tT][rR][uU][eE]"
+    },
+    "false": {
+      "type": "PATTERN",
+      "value": "[fF][aA][lL][sS][eE]"
+    },
+    "invalid": {
+      "type": "PATTERN",
+      "value": "[iI][nN][vV][aA][lL][iI][dD]"
+    },
+    "source_literal": {
+      "type": "PATTERN",
+      "value": "[lL][iI][nN][eE]_[nN][uU][mM]"
+    },
     "identifier": {
       "type": "PATTERN",
       "value": "[A-Za-z_][A-Za-z0-9_]*[$%!#&]?"

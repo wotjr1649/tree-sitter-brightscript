@@ -45,6 +45,23 @@ module.exports = grammar({
       /[rR][eE][mM]([ \t][^\r\n]*)?/,
     )),
 
+    // --------------------------------------------------- literals (§3)
+    // BS-LIT-003, 005-012: decimal (fraction, exponent `e`/`d`, suffix) and hex.
+    // A digit run followed by `.` and a letter is `number` then `.` (BS-LIT-014).
+    number: _ => token(choice(
+      /(\d+(\.\d+)?|\.\d+)([eEdD][+-]?\d+)?[%!#&]?/,
+      /&[hH][0-9a-fA-F]+&?/,
+    )),
+
+    // BS-LIT-015-017: one line; `""` is the only escape.
+    string: _ => /"([^"\r\n]|"")*"/,
+
+    // BS-LIT-001, 002, 019.
+    true: _ => new RegExp(ci('true')),
+    false: _ => new RegExp(ci('false')),
+    invalid: _ => new RegExp(ci('invalid')),
+    source_literal: _ => new RegExp(ci('line_num')),
+
     // BS-LEX-015, 017, 018: the designator is part of the identifier. Defined
     // last: an equal-length match goes to the earlier token, so every keyword
     // token wins its tie with `identifier` (grammar-design §4).
