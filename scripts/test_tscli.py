@@ -8,16 +8,20 @@ Usage: python scripts/test_tscli.py
 3. The check scripts still work through the shared path.
 4. No other script or CI step runs the CLI directly, so the check does not
    depend on CI running check_generated.py first.
+5. has_error() agrees with the full --cst root line, hidden MISSING
+   included, and stays fast on a deep tree (S04-H5).
 """
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 import tscli
+from corpus import read_corpus
 
 SCRIPTS = Path(__file__).resolve().parent
 
@@ -57,6 +61,24 @@ class VerifiedCli(unittest.TestCase):
             r = subprocess.run([sys.executable, str(SCRIPTS / script)], capture_output=True, text=True,
                                encoding="utf-8")
             self.assertEqual(r.returncode, 0, f"{script}: {r.stdout[-500:]}{r.stderr[-500:]}")
+
+    def test_has_error_reads_the_root_line_only(self):
+        # Recovery fixtures whose MISSING node the default output does not show, and valid inputs.
+        corpus, _ = read_corpus()
+        names = ["BS-EXP-002: unclosed parenthesis", "BS-STMT-001: assignment missing its value",
+                 "BS-ARRAY-001: array literal missing its closing bracket",
+                 "BS-AA-001: associative array missing its closing brace", "BS-LEX-005: one statement per line"]
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "input.brs"
+            for name in names:
+                path.write_bytes(corpus[name]["input"])
+                self.assertEqual(tscli.has_error(path), tscli.cst(path)[0], name)
+                self.assertEqual(tscli.has_error(path), ":error" in corpus[name]["attrs"], name)
+            # Tree depth about 20,000: the full --cst output would be about 400 MB.
+            path.write_bytes(("x = " + "+".join(["1"] * 20000)).encode())
+            start = time.monotonic()
+            self.assertFalse(tscli.has_error(path, timeout=30))
+            self.assertLess(time.monotonic() - start, 10)
 
     def test_no_direct_cli_run(self):
         # The binary path built outside tscli: tscli.EXE, a join onto the package directory, a bare name.

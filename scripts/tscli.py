@@ -17,6 +17,8 @@ error in the tree or a failure to run (missing input, unloadable language), so
 `parse` accepts a run only if a tree was printed. The error state of a tree is
 the root line of `--cst` output (`•` marks has_error): it alone also reports
 hidden MISSING nodes, which the exit status and the default output omit.
+`has_error()` reads only that line (S04-H5), so a deep tree costs its parse,
+not the depth-squared rest of the CST output.
 """
 import atexit
 import hashlib
@@ -28,6 +30,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 
 from corpus import ROOT
 
@@ -100,6 +103,40 @@ def cst(path, *args, cwd=ROOT, timeout=120):
     """Parse one file with --cst; return (root has_error, output)."""
     out = parse(path, "--cst", *args, cwd=cwd, timeout=timeout)
     return CST_LINE.match(out.lstrip()).group(5) == "•", out
+
+
+def has_error(path, cwd=ROOT, timeout=120):
+    """Root has_error of one file from the first node line of `--cst` output, without the rest.
+
+    The CLI prints the finished tree's root line first; the rest of the CST
+    output grows with depth squared (indentation and a parent lookup per node,
+    crates/cli/src/parse.rs @ v0.27.0), so the child is stopped once the root
+    line has been read. Only that child, started here, is ever terminated.
+    """
+    with tempfile.TemporaryFile() as err:
+        proc = popen("parse", "--cst", path, cwd=cwd, stdout=subprocess.PIPE, stderr=err)
+        expired = threading.Event()
+        timer = threading.Timer(timeout, lambda: (expired.set(), proc.kill()))
+        timer.start()
+        try:
+            line = b""
+            while not line.strip():
+                line = proc.stdout.readline()
+                if not line:
+                    break
+            if proc.poll() is None:
+                proc.kill()
+            proc.communicate()
+        finally:
+            timer.cancel()
+        m = CST_LINE.match(line.decode("utf-8", "replace").strip())
+        if not m and expired.is_set():
+            raise subprocess.TimeoutExpired(f"tree-sitter parse --cst {path}", timeout)
+        if not m:
+            err.seek(0)
+            raise RuntimeError(f"tree-sitter parse --cst {path} printed no tree (exit {proc.returncode}): "
+                               f"{err.read().decode('utf-8', 'replace').strip()[-500:]}")
+        return m.group(5) == "•"
 
 
 def cst_nodes(out):

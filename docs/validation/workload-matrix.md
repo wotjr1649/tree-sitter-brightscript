@@ -68,6 +68,7 @@ implementation; the files themselves are not committed.
 | block IF with ELSE IF clauses | 1,000 clauses |
 | nested IF / FOR / WHILE / TRY | depth 100 each |
 | nested parentheses | depth 500 |
+| binary-operator chain `1+1+…` (tree depth ≈ operand count; S04-H5) | 100,000 operands |
 | postfix chain `a.b.c…` with calls and indexes | 2,000 links |
 | string literal | 1 MiB |
 | file of functions | 50,000 lines |

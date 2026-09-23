@@ -16,7 +16,8 @@ Usage: python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N] 
   its output, so its output is scanned.
 Crash = a timeout, an exit status other than 0 or 1, or status 1 without the
 CLI's parse-error summary line (status 1 also reports failures to run). Error
-state comes from `--cst` (scripts/tscli.py); the timed run uses `--quiet`.
+state is the root line of `--cst` output, read by scripts/tscli.py `has_error`
+without the rest (S04-H5); the timed run uses `--quiet`.
 Stdlib only.
 """
 import os
@@ -27,7 +28,7 @@ import time
 from pathlib import Path
 
 from corpus import read_corpus
-from tscli import cli, cst, popen
+from tscli import cli, cst, has_error, popen
 TIME_LIMIT = 10.0
 MEMORY_LIMIT = 1 << 30
 
@@ -49,6 +50,7 @@ def w06():
         ("nested-try-100", "\n".join("try" for _ in range(100)) + "\nx = 1\n"
          + "\n".join("catch e\nend try" for _ in range(100)) + "\n", True),
         ("parens-500", "x = " + "(" * 500 + "1" + ")" * 500 + "\n", True),
+        ("binary-chain-100000", "x = " + "+".join(["1"] * 100000) + "\n", True),
         ("postfix-2000", "x = a" + "".join((".m", "(1)", "[2]")[i % 3] for i in range(2000)) + "\n", True),
         ("string-1mib", 's = "' + "x" * (1 << 20) + '"\n', True),
         ("functions-50000-lines", lines(f"function f{i}(a as Integer) as Integer\n  b = a + {i}\n  return b\nend function\n"
@@ -165,10 +167,10 @@ def check(name, data, want_clean, want_error, tmp, fail):
     elif code is not None and peak < 0:
         problems.append("peak memory not measured")
     if (want_clean or want_error) and code in (0, 1):
-        has_error = cst(path, timeout=TIME_LIMIT * 3)[0]
-        if want_clean and has_error:
+        error = has_error(path, timeout=TIME_LIMIT * 3)
+        if want_clean and error:
             problems.append("ERROR or MISSING in a valid input")
-        if want_error and not has_error:
+        if want_error and not error:
             problems.append("no error in an invalid input")
     print(f"  {name}: {len(data):,} bytes, {secs:.2f} s, {peak / 2**20:.0f} MiB, exit {code}"
           f"{' FAIL ' + ', '.join(problems) if problems else ''}")

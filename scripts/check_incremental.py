@@ -18,7 +18,7 @@ import tempfile
 from pathlib import Path
 
 from corpus import ROOT, read_corpus
-from tscli import cst, parse
+from tscli import has_error, parse
 
 # The catalogue describes I01-I12 in words; these are the concrete edits.
 SCRIPTS = {
@@ -74,7 +74,7 @@ def run(name, base, edits, tmp):
         fresh = parse(final_file, *mode, cwd=GRAMMAR).replace(str(final_file), "FILE")
         if incremental != fresh:
             problems.append(f"incremental != fresh{' (cst)' if mode else ''}")
-    if cst(final_file, cwd=GRAMMAR)[0]:
+    if has_error(final_file, cwd=GRAMMAR):
         problems.append("final text does not parse cleanly")
     return problems
 

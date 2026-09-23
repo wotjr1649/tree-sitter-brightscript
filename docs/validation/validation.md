@@ -146,6 +146,10 @@ same for a manual run used as evidence. "No error" means
 the root has-error state is unset, read from `--cst` output: the CLI's exit
 status and default output omit hidden `MISSING` nodes, and exit status 1 also
 reports failures to run, so a check accepts a run only if a tree was printed.
+Where only that state is needed, `has_error` in `scripts/tscli.py` reads the
+root line and stops the CLI, because the rest of the `--cst` output grows with
+tree depth squared (S04-H5; the full output is still read where every node is
+compared).
 
 ## Failures and known limitations
 
