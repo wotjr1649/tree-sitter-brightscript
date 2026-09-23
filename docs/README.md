@@ -21,6 +21,7 @@ link to it rather than restate it.
 | [reports/0.1.0-release-audit.md](reports/0.1.0-release-audit.md) | Independent audit of the candidate, evidence remediation, reverification and promotion verdict | Checking the Session 04 audit |
 | [reports/0.1.0-performance.md](reports/0.1.0-performance.md) | Measured parse, recovery, incremental, query and memory baseline of 0.1.0 | Judging performance or a performance change |
 | [reports/0.1.0-comparative-conformance.md](reports/0.1.0-comparative-conformance.md) | 0.1.0 against the legacy grammar and BrighterScript, under official evidence | Claiming an improvement over earlier grammars |
+| [reports/0.1.0-release.md](reports/0.1.0-release.md) | Final 0.1.0 release record: identity, gates, dispositions, limitations, verdict | Consuming or auditing the 0.1.0 release |
 
 Repository-wide operating rules for contributors and coding agents are in
 `AGENTS.md` at the repository root.

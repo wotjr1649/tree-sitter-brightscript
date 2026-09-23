@@ -2,15 +2,16 @@
 
 ## Current maturity
 
-Grammar version 0.1.0, release candidate (Session 03), independently
+Grammar version 0.1.0: release candidate (Session 03), independently
 audited in Session 04 ([reports/0.1.0-release-audit.md](reports/0.1.0-release-audit.md)),
-verdict `PROMOTION_READY` for `main`; no tag or release.
-Phases 1–5 have their exit evidence in
-[reports/0.1.0-release-candidate.md](reports/0.1.0-release-candidate.md);
-Phase 6 was carried out on a local `go-treesitter` branch that is neither
-merged nor pushed; it did not pass V9 (recovery-tree differences in the Go
-runtime), so no pin change is proposed there. Nothing has been tagged or published; the release itself
-and Phase 7 are later work.
+release-frozen in Session 05 ([reports/0.1.0-release.md](reports/0.1.0-release.md)).
+The 0.1.0 release is the commit tagged `v0.1.0` and its GitHub Release; no
+package is published. Phases 1–5 have their exit evidence in
+[reports/0.1.0-release-candidate.md](reports/0.1.0-release-candidate.md) and
+the release record. Phase 6 was tried on a local `go-treesitter` branch that
+is neither merged nor pushed; it did not pass V9 (recovery-tree differences in
+the Go runtime), so no pin change is proposed there, and it is the next piece
+of work, in that repository, on the released identity. Phase 7 is later work.
 
 ## Phases
 

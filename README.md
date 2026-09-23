@@ -11,7 +11,7 @@ This project aims to provide a current, well-tested BrightScript syntax grammar 
 
 ## Status
 
-Grammar version 0.1.0 is implemented (Session 03): `grammar.js`, the generated parser in `src/`, the conformance corpus, `queries/highlights.scm` and the check scripts. Every `documented`, `provisional`, `tolerated` and `invalid` requirement in the [registry](docs/specs/language-conformance.md) has passing fixtures; `unresolved` and `out-of-scope` requirements are not claimed. The release-candidate evidence and verdict are in [docs/reports/0.1.0-release-candidate.md](docs/reports/0.1.0-release-candidate.md); the independent release audit and promotion verdict are in [docs/reports/0.1.0-release-audit.md](docs/reports/0.1.0-release-audit.md). Nothing has been tagged or published. See [docs/roadmap.md](docs/roadmap.md).
+Grammar version 0.1.0: `grammar.js`, the generated parser in `src/`, the conformance corpus, `queries/highlights.scm` and the check scripts. Every `documented`, `provisional`, `tolerated` and `invalid` requirement in the [registry](docs/specs/language-conformance.md) has passing fixtures; `unresolved` and `out-of-scope` requirements are not claimed. The 0.1.0 release is the commit tagged `v0.1.0` and its GitHub Release; its record is [docs/reports/0.1.0-release.md](docs/reports/0.1.0-release.md), which links the release-candidate evidence, the independent audit, and the performance and comparative-conformance reports. No package is published to npm or any other registry, and no language binding or WASM artifact is provided. See [docs/roadmap.md](docs/roadmap.md).
 
 No compatibility or completeness claim should be inferred until the corresponding release gate in [docs/validation/validation.md](docs/validation/validation.md) is met.
 
@@ -69,7 +69,7 @@ The authoritative validation contract is [docs/validation/validation.md](docs/va
 
 This repository is intended to be the grammar producer for `go-treesitter`.
 
-`go-treesitter` converts a pinned, generated `src/parser.c` into its CGO-free grammar representation, so the Go integration path does not depend on any cgo language binding. Its released `main` still pins a different, legacy BrightScript grammar. Session 03 switched it to this grammar on a local integration branch in that repository; the result is recorded in the release-candidate report.
+`go-treesitter` converts a pinned, generated `src/parser.c` into its CGO-free grammar representation, so the Go integration path does not depend on any cgo language binding. Its released `main` still pins a different, legacy BrightScript grammar. Session 03 switched it to this grammar on a local integration branch in that repository; the result is recorded in the release-candidate report. That downstream check (V9) did not pass, so no `go-treesitter` compatibility is claimed; the integration is separate work in that repository.
 
 Each release will bind its grammar identity to the source commit, generated parser identity, Tree-sitter generator identity, and validation evidence.
 
