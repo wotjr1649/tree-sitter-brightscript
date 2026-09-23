@@ -93,6 +93,9 @@ downstream results if run; review findings and their disposition; the verdict.
 4. License metadata is MIT everywhere it appears.
 5. Tracked text files contain no CR bytes and end with a newline, except
    files under paths marked `-text` in `.gitattributes` (byte fixtures).
+   Generator-owned files (item 6) are exempt from the final-newline rule: the
+   generator writes `src/grammar.json` and `src/node-types.json` without one,
+   and item 6 checks them byte for byte.
 6. Once a grammar exists: regeneration with the pinned generator reproduces
    every generated file byte for byte, and no `src/scanner.c` exists without
    an accepted ADR.

@@ -51,11 +51,38 @@ Known limitations of this snapshot:
 | Reference clone | `master` @ `659cda7c7f86ebe31cc825dc5da59e9add172dc7` (development toward 0.28; not a pin candidate) |
 | ABI | generator emits ABI 14–15, default 15; ABI 15 embeds the `tree-sitter.json` version in `parser.c` metadata |
 | Open issues relevant to pin selection | #5910 error-recovery regression in the 0.27.0 runtime; #5925 lexical conflicts can change keyword tokenization |
-| Selected generator | **not yet selected** — chosen when grammar implementation begins, per [ADR-0002](../design/decisions/ADR-0002-generator-pin-and-generated-artifacts.md) |
+| Selected generator | **0.27.0**, adopted 2026-09-23 by the [ADR-0002](../design/decisions/ADR-0002-generator-pin-and-generated-artifacts.md) adoption procedure (record below) |
 
 Structural references (conventions only, nothing copied):
 `tree-sitter/tree-sitter-json` @ `254c42a6476413b776221e03982ac8ae159eeb72`,
 `tree-sitter/tree-sitter-python` @ `26855eabccb19c6abf499fbc5b8dc7cc9ab8bc64`.
+
+### Adopted generator
+
+Adoption record (ADR-0002 "Adoption procedure"), 2026-09-23.
+
+| Step | Result |
+|---|---|
+| 1. Eligible releases | GitHub releases that are not drafts or pre-releases, ≥ 0.26.0, with the same `tree-sitter-cli` version on npm, descending: 0.27.0, 0.26.13, 0.26.12, 0.26.11, 0.26.10, 0.26.9, 0.26.8, 0.26.7, 0.26.6, 0.26.5, 0.26.3 (0.26.4 and 0.26.1 are GitHub pre-releases; 0.26.0–0.26.2 are not on npm). No stable release newer than `v0.27.0`, so no Level 3 re-read was needed. Candidate: 0.27.0 |
+| 2. Issue review | #5910 open — runtime error-recovery regression in 0.27.0 (labels `c-library`, `error-recovery`; runtime). #5925 open — "lib: lexical conflicts can change keyword tokenization" (label `parser`; runtime lexer). No other open issue names 0.27.0 in its title. Neither rejects the candidate; materiality is decided by ADR-0002 step 6 |
+| 3. Identity | `tree-sitter-cli@0.27.0` exact devDependency; lockfile integrity `sha512-E42kR0og1mFlZBxPj7K4fBXCTjxPTGe19U9RXGWNq0FQKzXOxIp8bhCYFMKhddiVZUsJwW35MYGU9Q1oVYtpbA==`; release asset digests and decompressed binaries in the table below; the windows-x64 installed binary equals its decompressed asset byte for byte |
+| 4. Capability smoke | `--abi 15` bootstrap grammar; `BS-LEX-006: CRLF between comment lines`, `BS-LEX-008: empty file`, `BS-LEX-008: only comments and blank lines` pass |
+| 5. Determinism | two generations from a clean `src/` are byte-identical |
+
+Tag `v0.27.0` → annotated tag object `3e719425fc48f5b4cdb25c580e44023882f5e2a7` →
+commit `6070dbfefd326bd735e5683eb128cc1b57dad0c0`; release published
+2026-08-30T17:16:26Z. Generated ABI: 15 (`LANGUAGE_VERSION 15`).
+
+npm 12 blocks dependency install scripts unless `package.json` `allowScripts`
+lists them. The entry `tree-sitter-cli@0.27.0` (pinned to the reviewed version)
+lets the package's `install.js` run; it downloads the release asset below and
+decompresses it, nothing else. `scripts/check_generated.py` compares the
+installed binary with this table on every platform that runs it.
+
+| Release asset | Asset SHA-256 (equals the release `digest`) | Decompressed binary SHA-256 |
+|---|---|---|
+| `tree-sitter-windows-x64.gz` | `2d6c014b4e91d3d302ba7b30b3b625914027c3861ae7817e068a273e3f034550` | `9fbc4f285c876b1a38c7e9d5223a51fb7842255285cdd7db3ffb0ba3934f2662` |
+| `tree-sitter-linux-x64.gz` | `20a1f39ec1c45f2211492dcb8881c802b643b554bb196869a29ac3778277fa77` | `5a228811cdb3a01b7e4dd493c5fc5e05b0040a49ffede94e866c4c58ff2605db` |
 
 ### Precedents and references cited by decisions
 

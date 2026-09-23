@@ -1,6 +1,7 @@
 # ADR-0002 — Generator pin and generated artifacts
 
-Status: Accepted (generator version selection deferred to the first generation)
+Status: Accepted; generator 0.27.0 adopted 2026-09-23 by the adoption procedure
+(record in [upstream-sources.md](../../provenance/upstream-sources.md#adopted-generator))
 Date: 2026-09-23
 
 ## Context
