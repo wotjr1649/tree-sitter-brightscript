@@ -514,8 +514,24 @@ text alternative. A longer word (`#ifdef`, `#iffy`, `#elsewhere`,
 the completed directive word, and the line is hidden text. Without lookahead
 the exclusion of `elseif`/`endif` cannot tell a word that ends early at the
 line end, so a line consisting of exactly `#endi` or `#elsei` still lexes as
-the directive word and yields a local `ERROR`. Fixture:
+the directive word. Fixture:
 `BS-COND-007: directive-like words inside a false region`.
+
+The word boundary is `[A-Za-z0-9_]`: a region line whose first word is exactly
+`#if`, `#else` or `#end`, followed by any other character or by the line end,
+is a directive, as the design requires (S6–S9), with these consequences for
+text that is not a directive (the review's probes; no requirement states
+otherwise):
+
+- `#if` alone, or followed by a character such as `-`, `.`, `(`, `:`, `'`,
+  `$` or a non-ASCII letter (`#if-then-else notes`), opens a nested block that
+  needs its own `#end if`; without one the region runs to the end of the file.
+- `#else` in the same position (`#else:`, `#else what`, `#elsei`) closes the
+  region and the following lines are parsed as code, with or without `ERROR`.
+- `#end` in the same position (`#end.`, `#end region`, `#endi`) yields a local
+  `ERROR`; the region continues.
+
+These inputs are W13 seeds (robustness only).
 
 Design V2, tried only if V1 fails a criterion: as V1, but `_inactive_line` has
 lexical precedence 1 and `#if`, `#else`, `#end` precedence 2, so every region
@@ -523,9 +539,9 @@ line, including `'` and REM lines, is hidden text and `inactive_text` has no
 `comment` children.
 
 No other design is tried. A design is adopted when it meets C1–C5 and the
-PASS expectation, for that design, of all fifteen fixtures in the
+PASS expectation, for that design, of the fifteen spike fixtures in the
 literal-false table of the workload-matrix catalogue (the two registry
-fixtures and S3–S12, R1–R3). Each design first gets the §15 allowance of three
+fixtures and S3–S12, R1–R3; the table's later rows postdate the spike). Each design first gets the §15 allowance of three
 attempts for implementation defects; V1 is judged first, then V2; if neither
 qualifies, the result is FAIL. No question is asked. V1's tie
 analysis above assumes `comment` is a single token (REM mechanism 1 or 3,
@@ -550,7 +566,8 @@ Acceptance criteria (ADR-0004 decision 3), all required:
 C4 check (`scripts/check_spike.py`): parse R1 and R2 with `tree-sitter parse
 --cst` and parse their repaired versions (the malformed line replaced by
 `x = 1`). C4 holds when the repaired version has no error, every `ERROR` or
-`MISSING` node lies within the malformed line, and every node that ends before
+`MISSING` node (a named `MISSING` node prints as a zero-width node with the
+has-error mark) lies within the malformed line, and every node that ends before
 that line or starts after it has the same kind, start and end row and column,
 and has-error mark in both parses (so an error hidden elsewhere also fails).
 At the spike the check compared only the nodes after the line; the Session 03

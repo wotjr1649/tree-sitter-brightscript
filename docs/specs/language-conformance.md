@@ -405,7 +405,7 @@ identifier list (`a`, `boy5`, `super_man$`); elisions and placeholders (PS
 backtrace from `CATCH e`, which parses inside a TRY, and RF
 `&hFC==ERR_NORMAL_END`); the SS list of statement types; program output and
 console transcripts in PS §PRINT item list, CA, EH, RF (`20`) and RN 7.1
-(`a from ' {...}`).
+(`a from ' {...}`); the XML data listings in CA.
 
 ### Research inventory → requirements
 

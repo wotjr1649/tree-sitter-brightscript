@@ -63,8 +63,8 @@ docs/validation/   validation, workload-matrix, known-regressions
 ```
 
 Added only when justified: language bindings or WASM artifacts (per consumer
-demand), `queries/tags.scm` (before 1.0) and other queries, fuzzing tools,
-further validation and report documents.
+demand), `queries/tags.scm` (before 1.0) and other queries, fuzzing tools
+beyond `tree-sitter fuzz`, further validation and report documents.
 
 Local only and Git-ignored: `_ref/` (reference evidence), `docs/prompts/`,
 `docs/plans/`, `artifacts/` (validation output, handoffs), `.work/`.
