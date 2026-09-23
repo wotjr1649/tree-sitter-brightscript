@@ -138,3 +138,189 @@ m.top.observeField("x", "onX")
     arguments: (argument_list
       (string)
       (string))))
+
+================================================================================
+BS-STMT-024: PRINT separators and trailing semicolon
+================================================================================
+print 25; " is equal to"; x^2
+print "zone 1","zone 2"
+print a$;a$,a$;" ";a$
+print "no newline";
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (number)
+    (string)
+    (binary_expression
+      left: (identifier)
+      right: (number)))
+  (print_statement
+    (string)
+    (string))
+  (print_statement
+    (identifier)
+    (identifier)
+    (identifier)
+    (string)
+    (identifier))
+  (print_statement
+    (string)))
+
+================================================================================
+BS-STMT-024: question-mark PRINT with separators
+================================================================================
+? 25; " is"; x^2
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (number)
+    (string)
+    (binary_expression
+      left: (identifier)
+      right: (number))))
+
+================================================================================
+BS-STMT-025: adjacent PRINT items
+================================================================================
+print "this is a five " 5 "!!"
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (string)
+    (number)
+    (string)))
+
+================================================================================
+BS-STMT-025: TAB and POS items
+================================================================================
+print tab(5)"tabbed 5";tab(25)"tabbed 25"
+print tab(40) pos(0)
+print "these" tab(pos(0)+5)"words"
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number)))
+    (string)
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number)))
+    (string))
+  (print_statement
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number)))
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number))))
+  (print_statement
+    (string)
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (binary_expression
+          left: (call_expression
+            function: (identifier)
+            arguments: (argument_list
+              (number)))
+          right: (number))))
+    (string)))
+
+================================================================================
+BS-STMT-026: ambiguous adjacent PRINT items
+================================================================================
+print a -1
+print a (1)
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (binary_expression
+      left: (identifier)
+      right: (number)))
+  (print_statement
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number)))))
+
+================================================================================
+BS-STMT-039: PRINT with no items
+================================================================================
+print
+?
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement)
+  (print_statement))
+
+================================================================================
+BS-STMT-027: GOTO a label
+================================================================================
+start:
+goto start
+--------------------------------------------------------------------------------
+
+(source_file
+  (label_statement
+    name: (identifier))
+  (goto_statement
+    label: (identifier)))
+
+================================================================================
+BS-STMT-037: EXIT FOR outside a loop is not rejected
+================================================================================
+exit for
+--------------------------------------------------------------------------------
+
+(source_file
+  (exit_statement))
+
+================================================================================
+BS-LEX-028: label followed by a comment
+================================================================================
+start: ' entry point
+goto start
+--------------------------------------------------------------------------------
+
+(source_file
+  (label_statement
+    name: (identifier))
+  (comment)
+  (goto_statement
+    label: (identifier)))
+
+================================================================================
+BS-LEX-031: question-mark PRINT alias forms
+================================================================================
+?("Hello")
+?.1
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (parenthesized_expression
+      (string)))
+  (print_statement
+    (number)))
+
+================================================================================
+BS-LEX-035: question mark followed by a bracket at statement start
+================================================================================
+?[1]
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (array_literal
+      (number))))

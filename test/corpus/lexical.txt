@@ -18,6 +18,26 @@ myvar = 3
     right: (number)))
 
 ================================================================================
+BS-LEX-005: one statement per line
+================================================================================
+x = 1
+y = 2
+print x + y
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (print_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+================================================================================
 BS-LEX-008: final line without a line terminator
 ================================================================================
 x = 1
@@ -59,6 +79,23 @@ REM b
 (source_file
   (comment)
   (comment))
+
+================================================================================
+BS-LEX-010: colon-separated statements
+================================================================================
+x=5:print 25; " is"; x^2
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (print_statement
+    (number)
+    (string)
+    (binary_expression
+      left: (identifier)
+      right: (number))))
 
 ================================================================================
 BS-LEX-011: repeated, leading and trailing colons
@@ -235,6 +272,56 @@ id& = 9876543210&
   (assignment_statement
     left: (identifier)
     right: (number)))
+
+================================================================================
+BS-LEX-022: reserved built-in function calls
+================================================================================
+o = CreateObject("roList")
+t = Type(o)
+b = Box(1)
+g = GetGlobalAA()
+e = GetLastRunCompileError()
+print tab(5) pos(0)
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (string))))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (identifier))))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number))))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list)))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list)))
+  (print_statement
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number)))
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number)))))
 
 ================================================================================
 BS-LEX-024: keywords as member names

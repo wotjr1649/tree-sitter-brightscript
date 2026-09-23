@@ -243,3 +243,35 @@ q = "naïve ✓"
   (assignment_statement
     left: (identifier)
     right: (string)))
+
+================================================================================
+BS-LIT-019: LINE_NUM source literal
+================================================================================
+print LINE_NUM
+x = line_num + 1
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (source_literal))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (source_literal)
+      right: (number))))
+
+================================================================================
+BS-LIT-020: function name used as a value
+================================================================================
+fivevar = five
+print fivevar()
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (identifier))
+  (print_statement
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list))))

@@ -12,6 +12,7 @@
 
 // grammar-design §5 (internal mapping of the official precedence table).
 const PREC = {
+  LIST: -1,
   OR: 1,
   AND: 2,
   NOT: 3,
@@ -75,12 +76,24 @@ module.exports = grammar({
       /[rR][eE][mM]([ \t][^\r\n]*)?/,
     )),
 
+    // BS-STMT-035: a block starts with the terminator that ends its header.
+    block: $ => seq($._terminator, repeat($._line)),
+
     // ------------------------------------------------------------ statements
     statement: $ => choice(
       $.assignment_statement,
       $.update_statement,
       alias($._stmt_call, $.call_expression),
+      $.exit_statement,
+      $.continue_statement,
+      $.return_statement,
+      $.print_statement,
       $.dim_statement,
+      $.goto_statement,
+      $.label_statement,
+      $.end_statement,
+      $.stop_statement,
+      $.library_statement,
     ),
 
     // Statement-level chains (grammar-design §6): an identifier head, then
@@ -126,6 +139,20 @@ module.exports = grammar({
       field('operator', choice('++', '--')),
     ),
 
+    // BS-STMT-018-020, 037.
+    exit_statement: $ => choice(seq(kw('exit'), choice(kw('for'), kw('while'))), kw('exitwhile')),
+
+    continue_statement: $ => seq(kw('continue'), choice(kw('for'), kw('while'))),
+
+    // BS-STMT-023.
+    return_statement: $ => seq(kw('return'), optional(field('value', $.expression))),
+
+    // BS-STMT-024-026, 039, BS-LEX-031, 035: an item extends as far as the
+    // expression grammar allows (LIST precedence is below every operator).
+    print_statement: $ => seq(choice(kw('print'), '?'), repeat($._print_item)),
+
+    _print_item: $ => prec(PREC.LIST, choice($.expression, ',', ';')),
+
     // BS-ARRAY-004, 005: brackets or parentheses, one declarator.
     dim_statement: $ => seq(
       kw('dim'),
@@ -135,6 +162,19 @@ module.exports = grammar({
         seq('(', commaSep1(field('dimension', $.expression)), ')'),
       ),
     ),
+
+    // BS-STMT-027, BS-LEX-027, 028: a label is a whole statement.
+    goto_statement: $ => seq(kw('goto'), field('label', $.identifier)),
+
+    label_statement: $ => seq(field('name', $.identifier), ':'),
+
+    // BS-STMT-029, 030: `end` alone; the `end X` terminators are single tokens.
+    end_statement: _ => kw('end'),
+
+    stop_statement: _ => kw('stop'),
+
+    // BS-STMT-031, 032.
+    library_statement: $ => seq(kw('library'), field('path', $.string)),
 
     // ---------------------------------------------------- expressions (§5)
     expression: $ => choice(

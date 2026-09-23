@@ -82,7 +82,43 @@
         "named": true
       },
       {
+        "type": "continue_statement",
+        "named": true
+      },
+      {
         "type": "dim_statement",
+        "named": true
+      },
+      {
+        "type": "end_statement",
+        "named": true
+      },
+      {
+        "type": "exit_statement",
+        "named": true
+      },
+      {
+        "type": "goto_statement",
+        "named": true
+      },
+      {
+        "type": "label_statement",
+        "named": true
+      },
+      {
+        "type": "library_statement",
+        "named": true
+      },
+      {
+        "type": "print_statement",
+        "named": true
+      },
+      {
+        "type": "return_statement",
+        "named": true
+      },
+      {
+        "type": "stop_statement",
         "named": true
       },
       {
@@ -431,6 +467,11 @@
     }
   },
   {
+    "type": "continue_statement",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "dim_statement",
     "named": true,
     "fields": {
@@ -445,6 +486,32 @@
         ]
       },
       "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "end_statement",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "exit_statement",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "goto_statement",
+    "named": true,
+    "fields": {
+      "label": {
         "multiple": false,
         "required": true,
         "types": [
@@ -496,6 +563,38 @@
           },
           {
             "type": "parenthesized_expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "label_statement",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "library_statement",
+    "named": true,
+    "fields": {
+      "path": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string",
             "named": true
           }
         ]
@@ -572,6 +671,37 @@
     }
   },
   {
+    "type": "print_statement",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "return_statement",
+    "named": true,
+    "fields": {
+      "value": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "source_file",
     "named": true,
     "root": true,
@@ -586,6 +716,11 @@
         }
       ]
     }
+  },
+  {
+    "type": "stop_statement",
+    "named": true,
+    "fields": {}
   },
   {
     "type": "unary_expression",
@@ -720,6 +855,10 @@
     "named": false
   },
   {
+    "type": ";",
+    "named": false
+  },
+  {
     "type": "<",
     "named": false
   },
@@ -757,6 +896,10 @@
   },
   {
     "type": ">>=",
+    "named": false
+  },
+  {
+    "type": "?",
     "named": false
   },
   {
@@ -809,12 +952,36 @@
     "extra": true
   },
   {
+    "type": "continue",
+    "named": false
+  },
+  {
     "type": "dim",
+    "named": false
+  },
+  {
+    "type": "end",
+    "named": false
+  },
+  {
+    "type": "exit",
+    "named": false
+  },
+  {
+    "type": "exitwhile",
     "named": false
   },
   {
     "type": "false",
     "named": true
+  },
+  {
+    "type": "for",
+    "named": false
+  },
+  {
+    "type": "goto",
+    "named": false
   },
   {
     "type": "identifier",
@@ -823,6 +990,10 @@
   {
     "type": "invalid",
     "named": true
+  },
+  {
+    "type": "library",
+    "named": false
   },
   {
     "type": "mod",
@@ -841,8 +1012,20 @@
     "named": false
   },
   {
+    "type": "print",
+    "named": false
+  },
+  {
+    "type": "return",
+    "named": false
+  },
+  {
     "type": "source_literal",
     "named": true
+  },
+  {
+    "type": "stop",
+    "named": false
   },
   {
     "type": "string",
@@ -851,6 +1034,10 @@
   {
     "type": "true",
     "named": true
+  },
+  {
+    "type": "while",
+    "named": false
   },
   {
     "type": "{",

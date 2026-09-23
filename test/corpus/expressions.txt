@@ -1,4 +1,42 @@
 ================================================================================
+BS-EXP-003: call forms
+================================================================================
+print five()
+print fivevar()
+print array[1]()
+obj.add()
+m.f(1, 2)
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list)))
+  (print_statement
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list)))
+  (print_statement
+    (call_expression
+      function: (index_expression
+        object: (identifier)
+        index: (number))
+      arguments: (argument_list)))
+  (call_expression
+    function: (member_expression
+      object: (identifier)
+      property: (identifier))
+    arguments: (argument_list))
+  (call_expression
+    function: (member_expression
+      object: (identifier)
+      property: (identifier))
+    arguments: (argument_list
+      (number)
+      (number))))
+
+================================================================================
 BS-EXP-004: member access chains
 ================================================================================
 i.ifInt.SetInt(5)
