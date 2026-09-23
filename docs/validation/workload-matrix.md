@@ -25,7 +25,7 @@ identity and are recorded in the release-candidate report, not here.
 | W09 conditional compilation | V3, V5 | BS-COND fixtures including the spike fixtures; E1–E6 | baseline fixtures pass; spike decided PASS or FAIL by grammar-design §11 | — |
 | W10 incremental edits | V5 | edit scripts below | the final tree of `tree-sitter parse --edits` equals a fresh parse of the final text (default and `--cst` output); every script ends on text with no error (root has-error state) | — |
 | W11 highlights | V4 | `queries/highlights.scm`, `test/highlight/*.brs` | query compiles; every capture assertion passes | — |
-| W12 native oracle | V6 | all corpus inputs and `test/samples/*.brs` | output recorded per identity (validation.md identity binding) | — |
+| W12 native oracle | V6 | all corpus inputs and `test/samples/*.brs` | output recorded per identity (validation.md identity binding); two recordings of one identity on one platform give byte-identical `inputs/`, `trees/`, `cst/` and `manifest.json` (timings, the date and the compiled-library hash are kept out of them, in `run.json`) | — |
 | W13 fuzz and pathological | V10 | `tree-sitter fuzz` over the corpus; W06 inputs; seeds below | no crash, no hang, no runaway memory | fuzz: 1,000 iterations × 10 edits per fixture at release candidates, with a recorded seed (default 1) |
 | W14 downstream parity | V9 (in `go-treesitter`) | W12 inputs and W10 edits for the same grammar identity | ordered trees equal the native V6 records; `CGO_ENABLED=0` build and tests pass | run only when that work is authorized |
 
