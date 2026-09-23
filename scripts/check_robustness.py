@@ -252,15 +252,14 @@ def main():
         start = time.monotonic()
         code, stdout, stderr = cli("fuzz", "--iterations", iterations, "--edits", "10", timeout=3600,
                                    env={"TREE_SITTER_SEED": seed})
-        r = subprocess.CompletedProcess([], code)
         out = stdout + stderr
         markers = [m for m in ("Incorrect parse", "Unexpected scope change", "failed fuzzing", "leak", "panicked")
                    if m.lower() in out.lower()]
         tests = out.count(". brightscript - corpus")
-        print(f"  {tests} corpus tests fuzzed in {time.monotonic() - start:.0f} s, exit {r.returncode}, "
+        print(f"  {tests} corpus tests fuzzed in {time.monotonic() - start:.0f} s, exit {code}, "
               f"failure markers: {markers or 'none'}")
-        if r.returncode or markers or tests == 0:
-            fail.append(f"fuzz: exit {r.returncode}, markers {markers}, tests {tests}")
+        if code or markers or tests == 0:
+            fail.append(f"fuzz: exit {code}, markers {markers}, tests {tests}")
             sys.stdout.buffer.write(out[-4000:].encode("utf-8"))
     if fail:
         print("FAIL")

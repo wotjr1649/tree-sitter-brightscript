@@ -128,13 +128,19 @@ Every recorded result names: grammar commit, generator version, ABI,
 SHA-256 of the generated files, runtime version (V5, V6, V9), Level 1 snapshot
 ID (V3), and date. A result for one identity is never reused for another.
 
-Every check script runs the CLI only through `scripts/tscli.py`, which first
-compares the binary's SHA-256 with its record in
-[upstream-sources.md](../provenance/upstream-sources.md) and never runs a
-binary that differs (so the check does not depend on the order of CI steps);
-`python scripts/tscli.py test` is the verified form of `tree-sitter test`. The
-`generate` and `test` scripts in `package.json` call the npm-installed binary
-directly and are conveniences, not evidence.
+Every check script runs the CLI only through `scripts/tscli.py` (so the check
+does not depend on the order of CI steps), and every CI step runs only
+`npm ci`, a check script or git (`scripts/test_tscli.py` enforces both).
+Once per process `tscli.py` copies the installed binary into a private
+directory, compares the copy's SHA-256 with its record in
+[upstream-sources.md](../provenance/upstream-sources.md) and its version with
+the pin, and from then on runs only that copy: a binary that differs is never
+run, a binary replaced or retargeted after the check is not run by that
+process, and no DLL beside the installed binary is loaded. Out of scope:
+another process of the same user writing into the private directory during
+the run. `python scripts/tscli.py test` is the verified form of
+`tree-sitter test`. The `generate` and `test` scripts in `package.json` call
+the npm-installed binary directly and are conveniences, not evidence.
 
 The Tree-sitter CLI caches a compiled parser by grammar name alone, so a
 parser compiled from another checkout can be loaded silently. Every check

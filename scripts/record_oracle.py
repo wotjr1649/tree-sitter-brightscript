@@ -53,6 +53,7 @@ def git(*args):
 def main():
     if git("status", "--porcelain"):
         sys.exit("refusing to record: the working tree is not clean")
+    verify()  # before anything is written: a wrong binary leaves no partial recording
     commit = git("rev-parse", "HEAD")
     out = Path(next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--out=")), ROOT / "artifacts/oracle" / commit[:12]))
     for sub in ("inputs", "trees", "cst"):
