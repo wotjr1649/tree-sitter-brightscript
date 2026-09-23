@@ -13,7 +13,7 @@ This project aims to provide a current, well-tested BrightScript syntax grammar 
 
 Pre-implementation.
 
-The repository currently contains its foundation contracts only. The grammar, generated parser, conformance corpus, queries and downstream `go-treesitter` integration do not exist yet, and no BrightScript syntax support is claimed. See [docs/roadmap.md](docs/roadmap.md).
+The repository contains its foundation contracts and a frozen implementation specification: the requirement registry, the grammar design, the planned tree schema and the fixture catalogue. The grammar, generated parser, conformance corpus, queries and downstream `go-treesitter` integration do not exist yet, and no BrightScript syntax support is claimed. See [docs/roadmap.md](docs/roadmap.md).
 
 No compatibility or completeness claim should be inferred until the corresponding release gate in [docs/validation/validation.md](docs/validation/validation.md) is met.
 

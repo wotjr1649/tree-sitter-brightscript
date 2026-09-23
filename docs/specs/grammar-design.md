@@ -18,7 +18,7 @@ Token spellings are described, not written as grammar code.
 |---|---|---|
 | External scanner | Forbidden. No `externals`, no `src/scanner.c`. | [ADR-0005](../design/decisions/ADR-0005-external-scanner-policy.md) |
 | Generator | Exact stable release, `--abi 15`, selected by the adoption procedure. | [ADR-0002](../design/decisions/ADR-0002-generator-pin-and-generated-artifacts.md) |
-| DSL features | Only features present in every eligible stable release (0.25.0 or later): `word`, `supertypes`, `extras`, `inline`, `prec*`, `alias`, `field`, `token`, `token.immediate`. `eof()` (0.27 only) and `reserved` word sets are not used by the primary design. | Tree-sitter docs @ `v0.26.13`, `v0.27.0` (Level 3) |
+| DSL features | Only features present in every eligible stable release (0.26.0 or later, ADR-0002 adoption procedure): `word`, `supertypes`, `extras`, `inline`, `prec*`, `alias`, `field`, `token`, `token.immediate`. `eof()` (0.27 only) and `reserved` word sets are not used by the primary design. | Tree-sitter docs @ `v0.26.13`, `v0.27.0` (Level 3) |
 | Conflicts | `conflicts` starts empty. An entry is added only under §14. | this document |
 | Superset | One grammar, no version modes; `since` is metadata. | [ADR-0003](../design/decisions/ADR-0003-current-language-superset-grammar.md) |
 | Conditions | Never evaluated. | [ADR-0004](../design/decisions/ADR-0004-conditional-compilation-representation.md) |
