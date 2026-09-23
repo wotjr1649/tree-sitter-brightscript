@@ -138,6 +138,23 @@ day.
 | `crates/cli/npm/install.js` in `tree-sitter/tree-sitter` @ `v0.27.0` | tag `v0.27.0` | npm CLI downloads its binary without checksum verification (ADR-0002) |
 | `go-treesitter` `docs/design/decisions/ADR-0014-separate-gpl-grammar-distribution.md` | `0f3e720bf7ed2f776f8384f40d4b126f798c6cb4` | Grammar scanners carried as Go code downstream (ADR-0005) |
 
+### Hosted CI actions
+
+`.github/workflows/ci.yml` pins each action by commit (Session 04). Observed
+2026-09-23 (UTC) with the GitHub API: each release tag is a lightweight tag on
+the commit below, the latest release of its `v7` line, and the moving tag `v7`
+resolved to the same commit (the commits the Session 03 runs downloaded).
+
+| Action | Release | Commit |
+|---|---|---|
+| `actions/checkout` | `v7.0.1` | `3d3c42e5aac5ba805825da76410c181273ba90b1` |
+| `actions/setup-node` | `v7.0.0` | `820762786026740c76f36085b0efc47a31fe5020` |
+| `actions/setup-python` | `v7.0.0` | `5fda3b95a4ea91299a34e894583c3862153e4b97` |
+
+The runner images (`ubuntu-latest`, `windows-latest`), Node 24.x and Python 3.x
+are not pinned; the generator binary is compared with the table above before it
+runs (`scripts/check_generated.py`).
+
 ## Level 4 — Comparative
 
 | Source | Identity (observed 2026-09-23) | Notes |

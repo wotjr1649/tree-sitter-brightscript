@@ -4,7 +4,8 @@ Usage: python scripts/check_generated.py [--no-regenerate]
 
 1. The generator is pinned exactly (package.json, lockfile, installed CLI version).
 2. The installed CLI binary's SHA-256 equals the decompressed release asset
-   recorded for this platform in docs/provenance/upstream-sources.md.
+   recorded for this platform in docs/provenance/upstream-sources.md; the
+   binary is not run before this holds.
 3. No external scanner exists (ADR-0005), and src/ holds only the files the
    generator writes.
 4. Unless --no-regenerate: `tree-sitter generate --abi 15` run twice reproduces
@@ -36,9 +37,6 @@ exe = ROOT / "node_modules/tree-sitter-cli" / ("tree-sitter.exe" if sys.platform
 if not exe.is_file():
     print(f"FAIL\n  - generator binary missing: {exe} (run npm ci)")
     sys.exit(1)
-version = subprocess.run([str(exe), "--version"], capture_output=True, text=True).stdout.strip()
-if version != f"tree-sitter {pinned}":
-    fail.append(f"installed CLI reports {version!r}, pinned {pinned}")
 
 os_name = {"win32": "windows", "linux": "linux", "darwin": "macos"}.get(sys.platform, sys.platform)
 arch = {"amd64": "x64", "x86_64": "x64", "arm64": "arm64", "aarch64": "arm64"}.get(platform.machine().lower(), platform.machine().lower())
@@ -51,6 +49,14 @@ if asset not in recorded:
     fail.append(f"no recorded binary identity for {asset} in upstream-sources.md (installed SHA-256 {digest})")
 elif recorded[asset] != digest:
     fail.append(f"{asset}: installed binary SHA-256 {digest} != recorded {recorded[asset]}")
+if recorded.get(asset) != digest:
+    print("FAIL (the binary was not run)")
+    for x in fail:
+        print("  -", x)
+    sys.exit(1)
+version = subprocess.run([str(exe), "--version"], capture_output=True, text=True).stdout.strip()
+if version != f"tree-sitter {pinned}":
+    fail.append(f"installed CLI reports {version!r}, pinned {pinned}")
 
 if (SRC / "scanner.c").exists():
     fail.append("src/scanner.c exists without an accepted scanner ADR (ADR-0005)")
