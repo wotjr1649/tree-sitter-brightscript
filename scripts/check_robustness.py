@@ -96,6 +96,7 @@ def w07_w13_seeds():
         ("W13 10000 open parentheses", b"x = " + b"(" * 10000),
         ("W13 10000 colons", b":" * 10000),
         ("W13 #if without #end if", b"#if false\nprose\n#if A\n"),
+        ("W13 directive-like region lines at line end", b"#if false\n#elsei\n#endi\n#if-then-else notes\n#else:\nx = 1\n#end if\ny = 2\n"),
     ]
 
 

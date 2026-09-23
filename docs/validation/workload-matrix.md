@@ -145,8 +145,9 @@ Bare CR line endings (BS-LEX-007); non-ASCII identifiers (BS-LEX-016); NUL
 bytes and invalid UTF-8 (BS-LEX-034); line breaks in argument lists, after
 `(` of a parameter list and after binary operators (BS-EXP-023, 024,
 BS-FUNC-007); lone `"`, `#`, `?`, `&h`; 10,000 `(`; 10,000 `:`; `#if` without
-`#end if`; every other unresolved form listed in the registry. Only the
-robustness criterion applies to them.
+`#end if`; directive-like region lines that end at a word boundary
+(grammar-design §11); every other unresolved form listed in the registry. Only
+the robustness criterion applies to them.
 
 ## Automation
 

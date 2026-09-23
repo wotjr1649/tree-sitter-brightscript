@@ -38,7 +38,9 @@ def main():
             repaired = cst_nodes(repaired)
             if repaired_error:
                 fail.append(f"{rid}: the repaired input has an error")
-            errors = [n for n in broken if n[5] == "ERROR" or n[5].startswith("MISSING")]
+            # A named MISSING node prints as a zero-width node with the has-error mark.
+            errors = [n for n in broken if n[5] == "ERROR" or n[5].startswith("MISSING")
+                      or (n[4] and n[:2] == n[2:4])]
             if not errors:
                 fail.append(f"{rid}: no error node")
             for n in errors:

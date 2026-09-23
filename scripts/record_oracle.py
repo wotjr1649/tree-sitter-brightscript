@@ -29,7 +29,10 @@ sha = lambda b: hashlib.sha256(b).hexdigest()  # noqa: E731
 
 
 def git(*args):
-    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    r = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
+    if r.returncode:
+        sys.exit(f"git {args[0]} failed: {r.stderr.strip()}")
+    return r.stdout.strip()
 
 
 def main():

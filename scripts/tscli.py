@@ -2,7 +2,9 @@
 
 The CLI caches a compiled parser by grammar name alone, so every process gets
 its own parser-library directory (TREE_SITTER_LIBDIR) and compiles the grammar
-of its working directory on first use. Exit status 1 means either a visible
+of its working directory on first use. An empty private configuration
+directory (TREE_SITTER_DIR) keeps a user's `parser-directories` from selecting
+another grammar for `.brs` files. Exit status 1 means either a visible
 error in the tree or a failure to run (missing input, unloadable language), so
 `parse` accepts a run only if a tree was printed. The error state of a tree is
 the root line of `--cst` output (`•` marks has_error): it alone also reports
@@ -20,10 +22,12 @@ from corpus import ROOT
 
 EXE = ROOT / "node_modules/tree-sitter-cli" / ("tree-sitter.exe" if sys.platform == "win32" else "tree-sitter")
 LIBDIR = tempfile.mkdtemp(prefix="tree-sitter-lib-")
+CONFIGDIR = tempfile.mkdtemp(prefix="tree-sitter-config-")
 atexit.register(shutil.rmtree, LIBDIR, True)
-ENV = {**os.environ, "TREE_SITTER_LIBDIR": LIBDIR, "NO_COLOR": "1"}
+atexit.register(shutil.rmtree, CONFIGDIR, True)
+ENV = {**os.environ, "TREE_SITTER_LIBDIR": LIBDIR, "TREE_SITTER_DIR": CONFIGDIR, "NO_COLOR": "1"}
 # A node line of --cst output: range, indentation, field, has_error mark, kind.
-# Continuation lines of multi-line leaf text start with a backtick and never match.
+# Lines that hold only node text (hidden-text rows) start with a backtick and never match.
 CST_LINE = re.compile(r"^(\d+):(\d+)\s*-\s*(\d+):(\d+)\s+(?:[a-z_]+: )?(•?)(\"(?:[^\"\\]|\\.)*\"|[^\s`]\S*)", re.M)
 
 

@@ -123,8 +123,10 @@ ID (V3), and date. A result for one identity is never reused for another.
 The Tree-sitter CLI caches a compiled parser by grammar name alone, so a
 parser compiled from another checkout can be loaded silently. Every check
 script therefore runs the CLI with a private parser-library directory
-(`TREE_SITTER_LIBDIR`, `scripts/tscli.py`), and a manual `tree-sitter test`
-used as evidence is run the same way or with `--rebuild`. "No error" means
+(`TREE_SITTER_LIBDIR`, `scripts/tscli.py`) and an empty private configuration
+directory (`TREE_SITTER_DIR`), so that a user's `parser-directories` cannot
+select another grammar for `.brs` files; a manual `tree-sitter test` used as
+evidence is run the same way. "No error" means
 the root has-error state is unset, read from `--cst` output: the CLI's exit
 status and default output omit hidden `MISSING` nodes, and exit status 1 also
 reports failures to run, so a check accepts a run only if a tree was printed.
