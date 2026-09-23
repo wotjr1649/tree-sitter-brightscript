@@ -12,6 +12,15 @@
 
 // grammar-design §5 (internal mapping of the official precedence table).
 const PREC = {
+  OR: 1,
+  AND: 2,
+  NOT: 3,
+  COMPARE: 4,
+  SHIFT: 5,
+  ADDITIVE: 6,
+  MULTIPLICATIVE: 7,
+  UNARY: 8,
+  EXPONENT: 9,
   POSTFIX: 10,
 };
 
@@ -72,6 +81,8 @@ module.exports = grammar({
       $.invalid,
       $.source_literal,
       $.parenthesized_expression,
+      $.unary_expression,
+      $.binary_expression,
       $.call_expression,
       $.member_expression,
       $.index_expression,
@@ -117,6 +128,30 @@ module.exports = grammar({
       choice('@', '?@'),
       field('attribute', $.identifier),
     )),
+
+    // BS-EXP-012, 018, 027, BS-LIT-004: a prefix operator binds its operand at
+    // its own level, also as the right operand of a tighter operator.
+    unary_expression: $ => choice(
+      prec(PREC.UNARY, seq(field('operator', choice('-', '+')), field('operand', $.expression))),
+      prec(PREC.NOT, seq(field('operator', kw('not')), field('operand', $.expression))),
+    ),
+
+    // BS-EXP-011, 013-017, 019, 020.
+    binary_expression: $ => choice(
+      prec.right(PREC.EXPONENT, seq(
+        field('left', $.expression), field('operator', '^'), field('right', $.expression),
+      )),
+      ...[
+        [PREC.MULTIPLICATIVE, choice('*', '/', kw('mod'), '\\')],
+        [PREC.ADDITIVE, choice('+', '-')],
+        [PREC.SHIFT, choice('<<', '>>')],
+        [PREC.COMPARE, choice('=', '<>', '<', '>', '<=', '>=')],
+        [PREC.AND, kw('and')],
+        [PREC.OR, kw('or')],
+      ].map(([p, operator]) => prec.left(p, seq(
+        field('left', $.expression), field('operator', operator), field('right', $.expression),
+      ))),
+    ),
 
     // BS-TYPE-001: one rule for parameter and return types.
     type: _ => choice(
