@@ -1,4 +1,42 @@
 ================================================================================
+BS-LEX-006: CRLF line endings
+================================================================================
+x = 1
+y = 2
+z = 3
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-006: mixed LF and CRLF line endings
+================================================================================
+x = 1
+y = 2
+z = 3
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
 BS-LEX-006: CRLF between comment lines
 ================================================================================
 ' a
@@ -10,3 +48,14 @@ BS-LEX-006: CRLF between comment lines
   (comment)
   (comment)
   (comment))
+
+================================================================================
+BS-LEX-033: leading byte-order mark
+================================================================================
+﻿x = 1
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number)))

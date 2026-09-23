@@ -163,6 +163,9 @@ Details:
   3. Exclude exactly `rem` (any case) from the identifier pattern by
      construction (an alternation that matches every identifier except that
      word).
+
+  Adopted: mechanism 1. Every BS-LEX-013 and BS-LEX-014 fixture passes with it
+  from WP7 on; mechanisms 2 and 3 were not needed.
 - `#error` text: `error_message` consumes the rest of the line, including
   apostrophes (BS-COND-004).
 

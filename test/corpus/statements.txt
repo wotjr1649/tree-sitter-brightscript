@@ -1,0 +1,140 @@
+================================================================================
+BS-STMT-001: assignment to variables, members and indexes
+================================================================================
+a$ = "a rose"
+aa.newkey = "v"
+array[2] = "two"
+c[x, y, z] = k
+f(x).y = 1
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (string))
+  (assignment_statement
+    left: (member_expression
+      object: (identifier)
+      property: (identifier))
+    right: (string))
+  (assignment_statement
+    left: (index_expression
+      object: (identifier)
+      index: (number))
+    right: (string))
+  (assignment_statement
+    left: (index_expression
+      object: (identifier)
+      index: (identifier)
+      index: (identifier)
+      index: (identifier))
+    right: (identifier))
+  (assignment_statement
+    left: (member_expression
+      object: (call_expression
+        function: (identifier)
+        arguments: (argument_list
+          (identifier)))
+      property: (identifier))
+    right: (number)))
+
+================================================================================
+BS-STMT-002: compound assignment operators
+================================================================================
+x+=1
+x-=1
+x*=3
+x/=2
+x\=2
+x<<=8
+x>>=4
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-STMT-003: increment and decrement statements
+================================================================================
+x++
+x--
+counter++
+--------------------------------------------------------------------------------
+
+(source_file
+  (update_statement
+    operand: (identifier))
+  (update_statement
+    operand: (identifier))
+  (update_statement
+    operand: (identifier)))
+
+================================================================================
+BS-STMT-004: increment and decrement on member and index targets
+================================================================================
+a.b++
+a[0]--
+--------------------------------------------------------------------------------
+
+(source_file
+  (update_statement
+    operand: (member_expression
+      object: (identifier)
+      property: (identifier)))
+  (update_statement
+    operand: (index_expression
+      object: (identifier)
+      index: (number))))
+
+================================================================================
+BS-STMT-005: call statements
+================================================================================
+HandleButton(msg.GetInt())
+cavemen.push("fred")
+m.top.observeField("x", "onX")
+--------------------------------------------------------------------------------
+
+(source_file
+  (call_expression
+    function: (identifier)
+    arguments: (argument_list
+      (call_expression
+        function: (member_expression
+          object: (identifier)
+          property: (identifier))
+        arguments: (argument_list))))
+  (call_expression
+    function: (member_expression
+      object: (identifier)
+      property: (identifier))
+    arguments: (argument_list
+      (string)))
+  (call_expression
+    function: (member_expression
+      object: (member_expression
+        object: (identifier)
+        property: (identifier))
+      property: (identifier))
+    arguments: (argument_list
+      (string)
+      (string))))

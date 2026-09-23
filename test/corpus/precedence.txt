@@ -1,0 +1,363 @@
+================================================================================
+BS-EXP-002: parentheses override precedence
+================================================================================
+x = (a + b) * c
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (parenthesized_expression
+        (binary_expression
+          left: (identifier)
+          right: (identifier)))
+      right: (identifier))))
+
+================================================================================
+BS-EXP-011: exponentiation is right associative
+================================================================================
+x = 2^3^2
+y = a.b ^ 2
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (number)
+      right: (binary_expression
+        left: (number)
+        right: (number))))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (member_expression
+        object: (identifier)
+        property: (identifier))
+      right: (number))))
+
+================================================================================
+BS-EXP-012: unary minus against postfix and exponent
+================================================================================
+a = -5.tostr()
+b = -2^2
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (unary_expression
+      operand: (call_expression
+        function: (member_expression
+          object: (number)
+          property: (identifier))
+        arguments: (argument_list))))
+  (assignment_statement
+    left: (identifier)
+    right: (unary_expression
+      operand: (binary_expression
+        left: (number)
+        right: (number)))))
+
+================================================================================
+BS-EXP-012: unary operators against multiplication
+================================================================================
+a = -x * y
+c = +x
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (unary_expression
+        operand: (identifier))
+      right: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (unary_expression
+      operand: (identifier))))
+
+================================================================================
+BS-EXP-013: multiplicative operators are left associative
+================================================================================
+x = a / b mod c \ d * e
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (binary_expression
+          left: (binary_expression
+            left: (identifier)
+            right: (identifier))
+          right: (identifier))
+        right: (identifier))
+      right: (identifier))))
+
+================================================================================
+BS-EXP-014: integer division
+================================================================================
+x = 7 \ 2
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (number)
+      right: (number))))
+
+================================================================================
+BS-EXP-015: additive operators against multiplicative
+================================================================================
+x = a + b * c
+y = a - b - c
+s = "a" + b + "c"
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (string)
+        right: (identifier))
+      right: (string))))
+
+================================================================================
+BS-EXP-016: shifts between additive and comparison
+================================================================================
+x = a << b + c
+y = a < b << c
+z = 7 >> 1
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (number)
+      right: (number))))
+
+================================================================================
+BS-EXP-017: comparison operators and chains
+================================================================================
+x = a < b < c
+y = a = b <> c
+z = a <= b and c >= d
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier)))))
+
+================================================================================
+BS-EXP-018: NOT below comparison and above AND
+================================================================================
+x = not a = b
+y = not a and b
+z = not not a
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (unary_expression
+      operand: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (unary_expression
+        operand: (identifier))
+      right: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (unary_expression
+      operand: (unary_expression
+        operand: (identifier)))))
+
+================================================================================
+BS-EXP-019: AND binds tighter than OR
+================================================================================
+x = a or b and c
+y = a or b or c
+z = a = c and not (b > 40)
+w = not a <> b and c or d
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (unary_expression
+        operand: (parenthesized_expression
+          (binary_expression
+            left: (identifier)
+            right: (number))))))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (unary_expression
+          operand: (binary_expression
+            left: (identifier)
+            right: (identifier)))
+        right: (identifier))
+      right: (identifier))))
+
+================================================================================
+BS-EXP-021: mixed postfix chain
+================================================================================
+x = a?.b.c?[0]?(1)
+y = f(1)[2].g(3)
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (index_expression
+        object: (member_expression
+          object: (member_expression
+            object: (identifier)
+            property: (identifier))
+          property: (identifier))
+        index: (number))
+      arguments: (argument_list
+        (number))))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (member_expression
+        object: (index_expression
+          object: (call_expression
+            function: (identifier)
+            arguments: (argument_list
+              (number)))
+          index: (number))
+        property: (identifier))
+      arguments: (argument_list
+        (number)))))
+
+================================================================================
+BS-EXP-021: attribute operator inside a member chain
+================================================================================
+x = e@y.z
+w = a.b@c
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (member_expression
+      object: (attribute_expression
+        object: (identifier)
+        attribute: (identifier))
+      property: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (attribute_expression
+      object: (member_expression
+        object: (identifier)
+        property: (identifier))
+      attribute: (identifier))))
+
+================================================================================
+BS-EXP-027: prefix operators as right operands
+================================================================================
+a = 2^-2
+b = x * -y
+c = a < not b
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (number)
+      right: (unary_expression
+        operand: (number))))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (identifier)
+      right: (unary_expression
+        operand: (identifier))))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (identifier)
+      right: (unary_expression
+        operand: (identifier)))))

@@ -1,0 +1,245 @@
+================================================================================
+BS-LIT-001: boolean literals
+================================================================================
+a = true : b = FALSE : c = True
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (true))
+  (assignment_statement
+    left: (identifier)
+    right: (false))
+  (assignment_statement
+    left: (identifier)
+    right: (true)))
+
+================================================================================
+BS-LIT-003: decimal integers
+================================================================================
+x = 0 : y = 255 : z = 2147483647
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LIT-004: negative number is unary negation
+================================================================================
+x = -5
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (unary_expression
+      operand: (number))))
+
+================================================================================
+BS-LIT-005: hex integers with either prefix case
+================================================================================
+a = &HFF : b = &hFF : c = &h28
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LIT-006: lowercase hex digits
+================================================================================
+a = &hff : b = &hFe
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LIT-007: float literal forms
+================================================================================
+a = 2.01 : b = 1.23456E+30 : c = 2! : d = 125! : e = 1.5E-3
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LIT-008: lowercase unsigned exponent and leading-dot fraction
+================================================================================
+a = 1e1000000 : b = .1 : c = 0.5e3
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LIT-009: double literal forms
+================================================================================
+a = 1.23456789D-12 : b = 2.3# : c = 125#
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LIT-010: lowercase d exponent
+================================================================================
+a = 1.5d-3
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LIT-011: LongInteger literals
+================================================================================
+a = 9876543210& : b = &hFEDCBA9876543210&
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LIT-012: integer suffix on a literal
+================================================================================
+a = 125% : b = 100%
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LIT-014: method call on a string literal
+================================================================================
+x = "5".toint() + 5
+y = "01234567".left(3)
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (call_expression
+        function: (member_expression
+          object: (string)
+          property: (identifier))
+        arguments: (argument_list))
+      right: (number)))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (member_expression
+        object: (string)
+        property: (identifier))
+      arguments: (argument_list
+        (number)))))
+
+================================================================================
+BS-LIT-015: string literals
+================================================================================
+a = "this is a string" : b = "" : c = " "
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (string))
+  (assignment_statement
+    left: (identifier)
+    right: (string))
+  (assignment_statement
+    left: (identifier)
+    right: (string)))
+
+================================================================================
+BS-LIT-016: doubled quotation marks
+================================================================================
+s = """"
+t = "say ""hi"""
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (string))
+  (assignment_statement
+    left: (identifier)
+    right: (string)))
+
+================================================================================
+BS-LIT-017: backslash and non-ASCII text in strings
+================================================================================
+p = "C:\path\n"
+q = "naïve ✓"
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (string))
+  (assignment_statement
+    left: (identifier)
+    right: (string)))

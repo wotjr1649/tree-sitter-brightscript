@@ -1,4 +1,46 @@
 ================================================================================
+BS-LEX-001: identifier spellings differing only in case
+================================================================================
+myVar = 1
+MYVAR = 2
+myvar = 3
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-008: final line without a line terminator
+================================================================================
+x = 1
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-008: final line with a line terminator
+================================================================================
+x = 1
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
 BS-LEX-008: empty file
 ================================================================================
 --------------------------------------------------------------------------------
@@ -19,6 +61,63 @@ REM b
   (comment))
 
 ================================================================================
+BS-LEX-011: repeated, leading and trailing colons
+================================================================================
+: x = 1 :: y = 2 :
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-012: apostrophe comment lines
+================================================================================
+' first
+'second
+x = 1
+--------------------------------------------------------------------------------
+
+(source_file
+  (comment)
+  (comment)
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-012: comment after code on the same line
+================================================================================
+x = 1 ' set x
+y = 2'no space
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (comment)
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (comment))
+
+================================================================================
+BS-LEX-012: apostrophe inside a string
+================================================================================
+s = "don't stop"
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (string)))
+
+================================================================================
 BS-LEX-013: REM comments in mixed case
 ================================================================================
 REM upper
@@ -30,3 +129,225 @@ Rem ** mixed **
   (comment)
   (comment)
   (comment))
+
+================================================================================
+BS-LEX-014: identifiers beginning with rem
+================================================================================
+remark = 1
+rem1 = 2
+rem_x = remark + rem1
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+================================================================================
+BS-LEX-014: REM after code and after a colon
+================================================================================
+x = 1 rem note
+y = 2 : REM note
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (comment)
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (comment))
+
+================================================================================
+BS-LEX-014: bare REM line
+================================================================================
+x = 1
+REM
+y = 2
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (comment)
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-015: identifier forms
+================================================================================
+a = boy5 + super_man$ + _x + a_very_long_identifier_name_123
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          right: (identifier))
+        right: (identifier))
+      right: (identifier))))
+
+================================================================================
+BS-LEX-017: variables with type designators
+================================================================================
+a = 1 : a$ = "s" : a% = 2 : a! = 1.5 : a# = 2.5
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (string))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-018: LongInteger designator on a variable
+================================================================================
+id& = 9876543210&
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-024: keywords as member names
+================================================================================
+list.next()
+player.stop()
+x = obj.end + obj.if + obj.print
+--------------------------------------------------------------------------------
+
+(source_file
+  (call_expression
+    function: (member_expression
+      object: (identifier)
+      property: (identifier))
+    arguments: (argument_list))
+  (call_expression
+    function: (member_expression
+      object: (identifier)
+      property: (identifier))
+    arguments: (argument_list))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (member_expression
+          object: (identifier)
+          property: (identifier))
+        right: (member_expression
+          object: (identifier)
+          property: (identifier)))
+      right: (member_expression
+        object: (identifier)
+        property: (identifier)))))
+
+================================================================================
+BS-LEX-025: non-reserved keyword words as identifiers
+================================================================================
+mod = 3
+x = mod + in + as + integer + string
+y = a mod b
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (binary_expression
+          left: (binary_expression
+            left: (identifier)
+            right: (identifier))
+          right: (identifier))
+        right: (identifier))
+      right: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+================================================================================
+BS-LEX-026: identifiers beginning with keywords
+================================================================================
+iffy = 1 : endpoint = 2 : format = 3 : printer = 4 : nextItem = 5 : stepSize = 6 : notify = 7 : order = 8 : android = 9 : returnValue = 10 : falsey = 11
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-033: UTF-8 text in comments and strings
+================================================================================
+' café ☕
+s = "Grüße, 世界"
+--------------------------------------------------------------------------------
+
+(source_file
+  (comment)
+  (assignment_statement
+    left: (identifier)
+    right: (string)))

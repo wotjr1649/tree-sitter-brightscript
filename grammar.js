@@ -51,13 +51,17 @@ module.exports = grammar({
   // BS-LEX-026: keyword boundaries (grammar-design §3, §4).
   word: $ => $.identifier,
 
-  supertypes: $ => [$.expression],
+  supertypes: $ => [$.statement, $.expression],
 
-  inline: $ => [$._postfix_operand],
+  inline: $ => [$._postfix_operand, $._assignment_target, $._stmt_chain],
 
   rules: {
-    // BS-LEX-008 (grammar-design §2).
-    source_file: $ => repeat($._terminator),
+    // ---------------------------------------------------------------- lines
+    // BS-LEX-005, 008-011, BS-STMT-033 (grammar-design §2, §7): the last
+    // statement needs no terminator.
+    source_file: $ => seq(repeat($._line), optional($.statement)),
+
+    _line: $ => choice(seq($.statement, $._terminator), $._terminator),
 
     // BS-LEX-005, 006, 010.
     _terminator: $ => choice($._newline, ':'),
@@ -70,6 +74,56 @@ module.exports = grammar({
       /'[^\r\n]*/,
       /[rR][eE][mM]([ \t][^\r\n]*)?/,
     )),
+
+    // ------------------------------------------------------------ statements
+    statement: $ => choice(
+      $.assignment_statement,
+      $.update_statement,
+      alias($._stmt_call, $.call_expression),
+    ),
+
+    // Statement-level chains (grammar-design §6): an identifier head, then
+    // `.`, index access and `(` calls only (BS-STMT-001, 005, BS-EXP-008-010).
+    _stmt_chain: $ => choice(
+      $.identifier,
+      alias($._stmt_member, $.member_expression),
+      alias($._stmt_index, $.index_expression),
+      alias($._stmt_call, $.call_expression),
+    ),
+
+    _stmt_member: $ => seq(field('object', $._stmt_chain), '.', field('property', $.identifier)),
+
+    _stmt_index: $ => seq(
+      field('object', $._stmt_chain),
+      '[', commaSep1(field('index', $.expression)), ']',
+    ),
+
+    _stmt_call: $ => seq(
+      field('function', $._stmt_chain),
+      field('arguments', alias($._stmt_arguments, $.argument_list)),
+    ),
+
+    _stmt_arguments: $ => seq('(', commaSep($.expression), ')'),
+
+    _assignment_target: $ => choice(
+      $.identifier,
+      alias($._stmt_member, $.member_expression),
+      alias($._stmt_index, $.index_expression),
+    ),
+
+    // BS-STMT-001, 002, BS-EXP-020: `=` here is assignment; inside an
+    // expression it is comparison.
+    assignment_statement: $ => seq(
+      field('left', $._assignment_target),
+      field('operator', choice('=', '+=', '-=', '*=', '/=', '\\=', '<<=', '>>=')),
+      field('right', $.expression),
+    ),
+
+    // BS-STMT-003, 004.
+    update_statement: $ => seq(
+      field('operand', $._assignment_target),
+      field('operator', choice('++', '--')),
+    ),
 
     // ---------------------------------------------------- expressions (§5)
     expression: $ => choice(
