@@ -1,8 +1,10 @@
 # Grammar design
 
-The planned implementation structure of `grammar.js`: tokens, rule families,
+The implementation structure of `grammar.js`: tokens, rule families,
 precedence, statement boundaries, the conditional-compilation spike and the
-implementation order. **Nothing here is implemented yet.** Requirements and
+implementation order. Designed in Session 02 and implemented as designed in
+Session 03 (grammar version 0.1.0); §3, §4 and §11 record what the
+implementation established. Requirements and
 their statuses are in [language-conformance.md](language-conformance.md);
 acceptance policy in [grammar-contract.md](grammar-contract.md); node and field
 names in [tree-schema.md](tree-schema.md) (planned public schema). Where this
@@ -231,6 +233,9 @@ after confirming the fixture matches this document:
 
 The fallback rejects more invalid programs (`step = 1`) and changes no tree of
 a documented or provisional form. Record its adoption in this section.
+
+Not adopted: every fixture listed above passes with the primary strategy
+(Session 03).
 
 ## 5. Expression precedence
 
