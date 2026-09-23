@@ -11,11 +11,11 @@ This project aims to provide a current, well-tested BrightScript syntax grammar 
 
 ## Status
 
-Pre-release.
+Pre-implementation.
 
-The grammar, syntax coverage matrix, conformance corpus, generated-artifact checks, and downstream `go-treesitter` integration are still being established.
+The repository currently contains its foundation contracts only. The grammar, generated parser, conformance corpus, queries and downstream `go-treesitter` integration do not exist yet, and no BrightScript syntax support is claimed. See [docs/roadmap.md](docs/roadmap.md).
 
-No compatibility or completeness claim should be inferred until the corresponding release gate is marked complete in `docs/validation/`.
+No compatibility or completeness claim should be inferred until the corresponding release gate in [docs/validation/validation.md](docs/validation/validation.md) is met.
 
 ## Goals
 
@@ -36,17 +36,19 @@ This repository defines syntax. Roku APIs, SceneGraph APIs, runtime type behavio
 
 The normative language authority is Roku's official BrightScript developer documentation.
 
-The detailed source hierarchy, snapshot dates, and provenance requirements are recorded under `docs/provenance/`.
+The detailed source hierarchy, citation rules and snapshot identities are recorded in [docs/provenance/](docs/provenance/source-policy.md).
 
 Community implementations such as BrighterScript may be used for differential testing. They do not override documented Roku syntax.
 
 ## Repository model
 
-`grammar.js` is the canonical grammar source.
+Once implementation begins, `grammar.js` is the canonical grammar source.
 
-Generated Tree-sitter artifacts under `src/`, including `parser.c`, `grammar.json`, and `node-types.json`, are committed to the repository and must be reproducible from the pinned Tree-sitter toolchain.
+Generated Tree-sitter artifacts under `src/`, including `parser.c`, `grammar.json`, and `node-types.json`, are committed to the repository and must be reproducible from the pinned Tree-sitter generator, an exact stable release.
 
 Changes to the grammar must update the relevant corpus and conformance tests in the same verified work unit.
+
+No language bindings are shipped initially; consumers use the generated `src/` files directly.
 
 ## Validation
 
@@ -63,26 +65,24 @@ Validation is layered and includes:
 - native Tree-sitter oracle comparison where required;
 - downstream `go-treesitter` integration checks where required.
 
-The authoritative validation contract is `docs/validation/validation.md`.
+The authoritative validation contract is [docs/validation/validation.md](docs/validation/validation.md).
 
 ## go-treesitter integration
 
-This repository is the grammar producer.
+This repository is intended to be the grammar producer for `go-treesitter`.
 
-`go-treesitter` consumes a pinned generated grammar artifact and converts the native Tree-sitter parse tables into its CGO-free grammar representation.
+`go-treesitter` converts a pinned, generated `src/parser.c` into its CGO-free grammar representation, so the Go integration path does not depend on any cgo language binding. It currently pins a different, legacy BrightScript grammar; switching it to this repository is future work in that repository.
 
-The Go integration path therefore does not depend on this repository's optional Go/cgo language binding.
-
-Grammar identity is bound to the source commit, generated parser identity, Tree-sitter generator identity, and validation evidence.
+Each release will bind its grammar identity to the source commit, generated parser identity, Tree-sitter generator identity, and validation evidence.
 
 ## Documentation
 
-Start with `AGENTS.md` for repository operating rules and `docs/README.md` for the documentation map.
+Start with [docs/README.md](docs/README.md) for the documentation map. Contributors and coding agents follow [AGENTS.md](AGENTS.md).
 
-Canonical specifications live in `docs/specs/`, architectural decisions in `docs/design/`, provenance in `docs/provenance/`, and release validation contracts in `docs/validation/`.
+Canonical specifications live in `docs/specs/`, architecture and decisions in `docs/design/`, provenance in `docs/provenance/`, and validation contracts in `docs/validation/`.
 
 Session prompts, temporary plans, raw evidence, local reference repositories, and development artifacts are intentionally excluded from Git.
 
 ## License
 
-This project is licensed under the MIT License. See `LICENSE`.
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
