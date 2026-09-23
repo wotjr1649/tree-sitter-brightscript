@@ -17,3 +17,8 @@ read-only; nothing was copied.
 | KR-004 | `AND` and `OR` at one level (`a or b and c` parsed as `(a or b) and c`) | legacy `grammar.js` @ `0c534d56`: one logical rule for both operators | fixture `BS-EXP-019: AND binds tighter than OR` | yes — guarded by W04 |
 | KR-005 | Any block terminator closed any block (`function … end if` accepted) | legacy `grammar.js` @ `0c534d56`: one shared terminator choice used by every block | fixtures `BS-STMT-036: nested blocks close with their own terminators`, `BS-STMT-036: END IF closing a FOR body` | yes — if terminators are shared |
 | KR-006 | Documented syntax missing: `:` separators, labels, `DIM`, hex and suffixed numbers, type designators | legacy `grammar.js` @ `0c534d56` (ADR-0001 context) | fixtures of BS-LEX-010, BS-LEX-017, BS-LEX-027, BS-ARRAY-004, BS-LIT-005, BS-LIT-011, BS-LIT-012 | no — each is a documented requirement with fixtures |
+
+Session 05 reran every entry on both legacy identities and on grammar
+version 0.1.0 with one Tree-sitter runtime: each defect is present in the
+legacy grammar (KR-001 only at `253fdfaa`) and absent from 0.1.0
+([0.1.0-comparative-conformance.md](../reports/0.1.0-comparative-conformance.md)).
