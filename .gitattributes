@@ -1,0 +1,13 @@
+* text=auto eol=lf
+
+# Generated Tree-sitter sources
+src/*.json linguist-generated
+src/parser.c linguist-generated
+src/tree_sitter/* linguist-generated
+
+# Generated/package bindings if added later
+bindings/** linguist-generated
+binding.gyp linguist-generated
+
+# Lock files
+package-lock.json linguist-generated
