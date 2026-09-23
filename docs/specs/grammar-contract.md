@@ -2,7 +2,7 @@
 
 What the grammar promises, as policy. Individual language requirements live
 in [language-conformance.md](language-conformance.md); tree shape policy in
-[tree-schema.md](tree-schema.md); evidence levels and gates in
+[tree-schema.md](tree-schema.md); validation levels and gates in
 [validation.md](../validation/validation.md).
 
 ## 1. Scope
@@ -33,12 +33,14 @@ is recorded as a known incompatibility.
 **Requirement.**
 
 1. Every syntactic form documented at Level 1 (status `documented`) must parse
-   without `ERROR` or `MISSING` nodes.
+   without `ERROR` or `MISSING` nodes. The only exception is a disclosed known
+   limitation (`KL-NNN`, see validation), which never counts as coverage.
 2. A form is asserted invalid (negative fixture) only when Level 1 or Level 2
    evidence states that it is invalid or unsupported.
 3. An undocumented variant may be accepted only as `tolerated`: it needs
-   Level 4 or Level 2 evidence, must not change the tree of any documented
-   form, and is recorded in the registry.
+   Level 2 evidence, or Level 4 evidence showing the variant accepted as plain
+   BrightScript (BrighterScript-only extensions never qualify); it must not
+   change the tree of any documented form, and is recorded in the registry.
 4. A form with neither kind of evidence is `unresolved`: the grammar makes no
    contractual claim about it either way.
 5. A grammar choice made for an ambiguity that needs Level 2 evidence is

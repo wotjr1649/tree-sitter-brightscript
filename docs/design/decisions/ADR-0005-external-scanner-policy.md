@@ -7,9 +7,10 @@ Date: 2026-09-23
 
 An external scanner is C code with its own state that must be serialized for
 incremental parsing. `go-treesitter` runs grammars on a pure-Go runtime and
-carries grammar scanners as Go code (its ADR-0014 refers to "their Go
-scanners"), so a scanner here also implies a port and a parity burden
-downstream. BrightScript's documented features — case-insensitive keywords
+carries grammar scanners as Go code (its ADR-0014 at `0f3e720b` refers to
+"their Go scanners"; see
+[upstream-sources.md](../../provenance/upstream-sources.md#precedents-and-references-cited-by-decisions)),
+so a scanner here also implies a port and a parity burden downstream. BrightScript's documented features — case-insensitive keywords
 (Tree-sitter supports inline regex flags such as `(?i)`), line-oriented
 statements and colon separators — are expected to be expressible with
 ordinary grammar rules, but that is not yet demonstrated.

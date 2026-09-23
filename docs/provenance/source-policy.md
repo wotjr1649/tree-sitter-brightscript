@@ -13,7 +13,7 @@ Current source identities: [upstream-sources.md](upstream-sources.md).
 | 1 | Normative | Roku official BrightScript documentation (`developer.roku.com`) | BrightScript language syntax | Tree-sitter behaviour |
 | 2 | Official behaviour | Reproducible results from an official Roku device/compiler | Resolving ambiguity or gaps in Level 1 | Anything it was not observed to show |
 | 3 | Toolchain | Official Tree-sitter repositories, documentation and grammars | Grammar DSL, generator, ABI, runtime, test and query semantics | BrightScript syntax |
-| 4 | Comparative | BrighterScript and other community BrightScript tools (e.g. `brs`, `brs-engine`) | Discovering edge cases; differential testing; the basis for a `tolerated` status | Validity or invalidity of standard BrightScript |
+| 4 | Comparative | BrighterScript and other community BrightScript tools (e.g. `brs`, `brs-engine`) | Discovering edge cases; differential testing; the basis for a `tolerated` status when the tool accepts the variant as plain BrightScript (never a BrighterScript-only extension) | Validity or invalidity of standard BrightScript |
 | 5 | Historical | Legacy Tree-sitter BrightScript grammars | Defect discovery; regression candidates | Any requirement |
 | — | Downstream | `go-treesitter` and other consumers | Nothing about syntax | Syntax, grammar design |
 
@@ -24,9 +24,8 @@ Rules:
   `docs/specs/language-conformance.md`); it is not settled by majority vote
   among community parsers.
 - Absence of a construct from Level 1 is not evidence that it is invalid.
-- Level 2 evidence is recorded only when it was actually produced. No Level 2
-  evidence exists yet; the collection policy is in
-  `docs/validation/validation.md`.
+- Level 2 evidence is recorded only when it was actually produced; the
+  collection policy is in `docs/validation/validation.md`.
 - Secondary retellings (search summaries, blog posts, AI summaries) are not
   evidence. When one conflicts with a Level 1 snapshot, the snapshot wins and
   the retelling is discarded.
@@ -38,9 +37,10 @@ edge cases, suspected omissions, known defects and differential-test inputs.
 
 Nothing may be copied from them into this repository: no grammar rules,
 generated parser code, queries, corpus tests, bindings, documentation wording
-or parse-tree design. Every grammar rule and fixture is re-derived from Level 1
-(or Level 2) evidence, and node names and structure are chosen under
-`docs/specs/tree-schema.md`.
+or parse-tree design. Every grammar rule and fixture is written independently
+from its requirement; Level 4 evidence may justify accepting a variant
+(`tolerated`) but never supplies the implementation. Node names and structure
+are chosen under `docs/specs/tree-schema.md`.
 
 ## Citation
 
@@ -54,8 +54,10 @@ or parse-tree design. Every grammar rule and fixture is re-derived from Level 1
 
 ## Promotion of research into requirements
 
-1. A research observation (for example a `_ref` note) identifies a testable
-   syntax statement and its Level 1 source.
+1. A research observation (for example a note under
+   `_ref/normative/roku-docs/notes/`) identifies a testable syntax statement
+   and its Level 1 source, or, for an undocumented variant, the Level 4 or
+   Level 2 evidence that supports tolerating it.
 2. The statement becomes a requirement record with a stable `BS-*` ID in
    `docs/specs/language-conformance.md`, carrying its evidence pointer,
    `since` version and status.

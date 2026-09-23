@@ -40,7 +40,6 @@ Known limitations of this snapshot:
   rely on undamaged examples and cross-page evidence where prose is damaged.
 - Official code blocks mix source with program output, console transcripts and
   a few typos; they are not automatically valid fixtures.
-- No Level 2 (device/compiler) evidence exists.
 
 ## Level 3 — Tree-sitter
 
@@ -57,6 +56,26 @@ Known limitations of this snapshot:
 Structural references (conventions only, nothing copied):
 `tree-sitter/tree-sitter-json` @ `254c42a6476413b776221e03982ac8ae159eeb72`,
 `tree-sitter/tree-sitter-python` @ `26855eabccb19c6abf499fbc5b8dc7cc9ab8bc64`.
+
+### Precedents and references cited by decisions
+
+Observed 2026-09-23. Commits are the repository `HEAD` resolved that day with
+`git ls-remote`; the observations were read from the default branch the same
+day.
+
+| Reference | Identity | Cited for |
+|---|---|---|
+| `https://github.com/tree-sitter/tree-sitter-c` | `b780e47fc780ddc8da13afa35a3f4ed5c157823d` | All preprocessor branches parsed as code, no scanner (ADR-0004) |
+| `https://github.com/tree-sitter/tree-sitter-c-sharp` | `9150f7d56bb47f1a809fa23623f1ba1413e93fa9` | One grammar for C# 1–14 (ADR-0003); `#if` branches parsed as code, scanner not involved (ADR-0004) |
+| `https://github.com/tree-sitter/tree-sitter-haskell` | `0975ef72fc3c47b530309ca93937d7d143523628` | Inactive CPP branches consumed as opaque text by an external scanner (ADR-0004) |
+| `https://github.com/alex-pinkus/tree-sitter-swift` | `00bbb0a2550f8bc0023a2a4992922d51ae045626` | `#if` branches parsed as code; directive tokens external (ADR-0004) |
+| `https://github.com/Isopod/tree-sitter-pascal` | `042119eca2e18a60e56317fb06ee3ba5c32cb447` | `{$IFDEF}` branches parsed as code (ADR-0004) |
+| `tree-sitter/tree-sitter-python` (above) | `26855eab…` | Python 2 and 3 statements in one grammar (ADR-0003) |
+| `https://github.com/tree-sitter/parser-test-action` | tag `v3` → `05f6ce7c7e54603c45cd87ed926725dc870bcc63` | Regeneration drift check compares `parser.c` only (ADR-0002) |
+| `https://tree-sitter.github.io/tree-sitter/creating-parsers/6-publishing.html` | page as read 2026-09-23 | Semantic-versioning guidance for node types (`docs/specs/tree-schema.md`) |
+| `https://github.com/tree-sitter/tree-sitter/issues/5910`, `/issues/5925` | open on 2026-09-23 | Pin-selection risks (ADR-0002) |
+| `crates/cli/npm/install.js` in `tree-sitter/tree-sitter` @ `v0.27.0` | tag `v0.27.0` | npm CLI downloads its binary without checksum verification (ADR-0002) |
+| `go-treesitter` `docs/design/decisions/ADR-0014-separate-gpl-grammar-distribution.md` | `0f3e720bf7ed2f776f8384f40d4b126f798c6cb4` | Grammar scanners carried as Go code downstream (ADR-0005) |
 
 ## Level 4 — Comparative
 

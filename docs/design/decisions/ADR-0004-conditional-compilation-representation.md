@@ -16,7 +16,8 @@ Precedent (observed 2026-09-23): tree-sitter-c, -cpp, -c-sharp, a Pascal
 grammar and a Swift grammar parse every branch as ordinary code, mostly
 without an external scanner. tree-sitter-haskell consumes inactive branches
 as opaque text using an external scanner. No scanner-free grammar was found
-that treats `#if false` / `#if 0` bodies as opaque.
+that treats `#if false` / `#if 0` bodies as opaque. Identities:
+[upstream-sources.md](../../provenance/upstream-sources.md#precedents-and-references-cited-by-decisions).
 
 ## Decision
 

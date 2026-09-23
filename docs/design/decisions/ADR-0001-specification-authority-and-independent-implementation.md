@@ -30,8 +30,10 @@ licensing, and could not show why any rule exists.
    for edge cases, defects and differential tests, but no grammar rules,
    generated code, queries, tests, bindings, documentation wording or
    parse-tree design are copied from them.
-4. Every grammar rule and fixture traces to a requirement ID whose evidence is
-   Level 1 or Level 2.
+4. Every grammar rule and fixture traces to a requirement ID. What the grammar
+   must accept or reject rests on Level 1 or Level 2 evidence; Level 4 evidence
+   can only justify accepting an undocumented variant as `tolerated`
+   (`docs/specs/grammar-contract.md` §3), never supply implementation text.
 
 ## Alternatives considered
 
@@ -54,7 +56,9 @@ licensing, and could not show why any rule exists.
 
 - Requirement records cite evidence (`docs/specs/language-conformance.md`).
 - Review rejects grammar rules or fixtures without a requirement ID.
-- `_ref/` is Git-ignored; commits are checked for staged `_ref/` content.
+- `_ref/` is Git-ignored, and the V0 checklist
+  (`docs/validation/validation.md`) confirms before each commit that no
+  `_ref/` content is staged.
 
 ## Revisit conditions
 

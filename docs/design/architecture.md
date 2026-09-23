@@ -54,7 +54,9 @@ docs/validation/   validation
 
 Added when grammar implementation begins: `grammar.js`, `tree-sitter.json`
 (all language bindings disabled), a private `package.json` and lockfile that
-pin the generator, `src/**`, `test/corpus/`, `queries/highlights.scm`, CI.
+pin the generator, `src/**`, `test/corpus/`, CI.
+
+Added before the first release: `queries/highlights.scm`.
 
 Added only when justified: language bindings or WASM artifacts (per consumer
 demand), `queries/tags.scm` (before 1.0) and other queries, fuzzing tools,

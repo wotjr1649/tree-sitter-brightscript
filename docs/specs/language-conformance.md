@@ -3,14 +3,17 @@
 The single place where BrightScript language requirements are defined and
 traced. Grammar rules, fixtures and release claims refer to the IDs below.
 
-Status: **no requirements promoted yet.** Promotion from the local research
-inventory starts in Session 02. This document fixes the format so that
-promotion does not re-decide it.
+Status: **no requirements promoted yet.** Promotion starts in Session 02 from
+the local research inventory in `_ref/normative/roku-docs/notes/`
+(`syntax-inventory.md`, `ambiguities.md`, `versioned-language-changes.md`),
+following [source-policy.md](../provenance/source-policy.md). This document
+fixes the format so that promotion does not re-decide it.
 
 ## Traceability chain
 
-Level 1/2 evidence → requirement (`BS-*`) → grammar rule → positive fixture →
-negative or recovery fixture (where the acceptance policy allows one) → status.
+Evidence (Level 1/2; Level 4 only for `tolerated`) → requirement (`BS-*`) →
+grammar rule → positive fixture → negative or recovery fixture (where the
+acceptance policy allows one) → status.
 
 ## Requirement IDs
 
@@ -47,6 +50,7 @@ from `_ref` (`LEX-01`, `AMB-20`, …) are never used as IDs.
 | Positive fixtures | corpus test names |
 | Negative / recovery fixtures | corpus test names, or `n/a` with reason |
 | Coverage | `none`, `partial`, `covered` |
+| Known limitations | `KL-NNN` IDs from [validation.md](../validation/validation.md), if any |
 | Notes | ambiguities, disagreements between sources, known incompatibilities |
 
 ## Status vocabulary

@@ -61,7 +61,7 @@ Do not copy Roku documentation wholesale into the repository. Record URLs, retri
 
 ## Local reference repositories
 
-`D:\AIDEV\tree-sitter-brightscript\_ref` contains local research material and is not product source.
+`_ref/` at the repository root contains local research material and is not product source.
 
 Treat `_ref/` as read-only evidence during ordinary implementation work.
 
@@ -74,7 +74,7 @@ Expected reference categories may include:
 
 Do not commit `_ref/`.
 
-`D:\AIDEV\go-treesitter` is a separate downstream repository. Treat it as read-only unless the current task explicitly authorizes integration changes there.
+`go-treesitter` is a separate downstream repository (locally a sibling checkout, `../go-treesitter`). Treat it as read-only unless the current task explicitly authorizes integration changes there.
 
 ## Canonical sources and generated files
 
@@ -110,7 +110,8 @@ Session execution material is local and ignored by Git:
 - `docs/prompts/`;
 - `docs/plans/`;
 - `artifacts/`;
-- `_ref/`.
+- `_ref/`;
+- `.work/`.
 
 A session result that changes the durable product contract must be promoted into the appropriate canonical document before the work unit is considered complete.
 
@@ -126,7 +127,7 @@ Fresh-parse equality is not native Tree-sitter oracle equality.
 
 Native Tree-sitter equality is not proof that the grammar matches Roku's language specification.
 
-Every claim must identify the evidence level that supports it (`docs/validation/validation.md`).
+Every claim must identify the validation level (V0–V10) and source level (L1–L5) that support it (`docs/validation/validation.md`, `docs/provenance/source-policy.md`).
 
 Preserve failures and regressions. Do not delete, weaken, skip, or reclassify a failing test merely to obtain a green result.
 
@@ -169,7 +170,7 @@ Use one verified work unit per commit. Do not mix unrelated grammar, documentati
 
 Record the validation that was run, and what was not run, in the commit body.
 
-Merge a session branch into `main` locally with `--no-ff` only after its session gate passes and only when the session's task authorizes the merge; otherwise stop at the branch and hand off.
+Merge a session branch into `main` locally with `--no-ff` only after its session gate (defined in `docs/validation/validation.md`) is met and only when the session's task authorizes the merge; otherwise stop at the branch and hand off.
 
 Do not rewrite unrelated history or discard user work.
 

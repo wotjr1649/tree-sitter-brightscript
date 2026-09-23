@@ -39,18 +39,19 @@ The grammar version in `tree-sitter.json` is embedded in generated
 |---|---|---|
 | Public node type or field removed or renamed; public structure changed incompatibly | MINOR bump, recorded | MAJOR |
 | Public node type or field added | MINOR | MINOR |
-| Internal change only | PATCH or MINOR | MINOR |
+| Internal change only | PATCH if `node-types.json` is unchanged, otherwise MINOR | MINOR |
 | Fix with no node-type or structure change | PATCH | PATCH |
 
-From 1.0 this matches Tree-sitter's publishing guidance (incompatible node-type
-or structure changes are major; new node types are minor).
+From 1.0 this matches Tree-sitter's
+[publishing guidance](https://tree-sitter.github.io/tree-sitter/creating-parsers/6-publishing.html)
+(incompatible node-type or structure changes are major; new node types are
+minor).
 
 Any change to the public tier updates the catalogue in the same commit, and
 the `src/node-types.json` diff is reviewed. Queries that reference changed
 nodes are updated in the same commit.
 
-1.0 requires: every Level 1 requirement `covered`, or disclosed as
-`provisional`/`unresolved`; a frozen public tier; and the 1.0 gates in
+1.0 freezes the public tier; the other 1.0 conditions are the v1.0 gates in
 [validation.md](../validation/validation.md).
 
 ## Catalogue

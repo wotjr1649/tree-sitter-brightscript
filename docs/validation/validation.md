@@ -1,10 +1,11 @@
 # Validation contract
 
-Defines evidence levels, the claims each level supports, release gates, and
-how failures are handled. Validation tooling is built with the grammar; none
-exists yet.
+Defines validation levels (V0–V10; distinct from the source levels L1–L5 in
+`docs/provenance/source-policy.md`), the claims each supports, gates, and how
+failures are handled. Automated tooling is built with the grammar; until then
+V0 is the manual checklist below.
 
-## Evidence levels
+## Validation levels
 
 | Level | Check | Supports the claim | Does not support |
 |---|---|---|---|
@@ -32,10 +33,10 @@ does not prove either tree is right.
 | V0 | required | required | required |
 | V1 | on grammar change | required | required |
 | V2 | on grammar change | required | required |
-| V3 | requirements touched | all implemented requirements | every Level 1 requirement `covered` or disclosed `provisional`/`unresolved` |
+| V3 | requirements touched | all implemented requirements | every requirement with Level 1 evidence is `covered`, disclosed `provisional`, or a disclosed `KL-NNN`; `unresolved` variants are listed in the release summary |
 | V4 | on node-shape change | `highlights.scm` | `highlights.scm`, `tags.scm` |
 | V5 | on boundary or ambiguity changes | representative edit set | extended edit set |
-| V6 | — | required | required |
+| V6 | when the change's blast radius requires | required | required |
 | V7 | optional | optional | recommended |
 | V8 | — | per Level 2 policy | per Level 2 policy |
 | V9 | — | only for integration claims | only for integration claims |
@@ -43,6 +44,27 @@ does not prove either tree is right.
 
 V9 evidence is produced in `go-treesitter`, not here
 ([ADR-0006](../design/decisions/ADR-0006-downstream-integration-boundary.md)).
+
+The v1.0 column is the single definition of 1.0 readiness; other documents
+link here.
+
+A **session gate** is met when V0 and every check the Gates table requires for
+the session's changes are `PASS`, or `NOT_RUN`/`BLOCKED` with a recorded
+reason; any `FAIL` means the gate is not met.
+
+## V0 checklist (manual until automated)
+
+1. No `_ref/`, `docs/prompts/`, `docs/plans/`, `artifacts/` or `.work/` content
+   is staged or tracked.
+2. `git check-ignore` confirms local-only paths are ignored and generated
+   sources (`src/parser.c`, `src/grammar.json`, `src/node-types.json`,
+   `src/tree_sitter/*`) and `package-lock.json` are not.
+3. Relative Markdown links in tracked documents resolve.
+4. License metadata is MIT everywhere it appears.
+5. Tracked text files contain no CR bytes and end with a newline.
+6. Once a grammar exists: regeneration with the pinned generator reproduces
+   every generated file byte for byte, and no `src/scanner.c` exists without
+   an accepted ADR.
 
 ## Result vocabulary
 
@@ -92,5 +114,4 @@ ID (V3), and date. A result for one identity is never reused for another.
 - A device campaign starts only after the owner has reviewed the Roku
   developer license terms and explicitly authorized it. Level 2 checks are
   not rerun in CI.
-- Current state (2026-09-23): no device is available and none is planned, so
-  Level 2-dependent requirements remain `provisional` or `unresolved`.
+- Whether a campaign is planned is tracked in `docs/roadmap.md`.

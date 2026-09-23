@@ -15,8 +15,8 @@ Date: 2026-09-23
 - With ABI 15, `parser.c` embeds the grammar version from `tree-sitter.json`,
   so a version bump changes generated output.
 - Official grammars declare the CLI with caret ranges and their CI installs the
-  latest CLI; the common test action checks regeneration drift for
-  `parser.c` only.
+  latest CLI; the common test action (`tree-sitter/parser-test-action` v3)
+  checks regeneration drift for `parser.c` only.
 - The npm `tree-sitter-cli` package downloads its binary at install time
   without checksum verification.
 - At 2026-09-23 the latest stable release is 0.27.0, with open issues #5910

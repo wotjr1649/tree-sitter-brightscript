@@ -10,13 +10,15 @@ bit shifts (6.1), doubled-quote escapes (6.2), string keys in associative-array
 literals and `&` LongInteger (7.0), `++`/`--` and compound assignment (7.1),
 `TRY`/`CATCH`/`THROW` (9.4), optional chaining `?.` `?@` `?[` `?(` (11.0) and
 `CONTINUE FOR`/`CONTINUE WHILE` (11.5). Some changes altered the meaning of
-existing text: pre-9.4 code could use `try`/`catch` as names, and `IF x?("…")`
-no longer prints.
+existing text: the documentation asks that older code using `try`/`catch` as
+names be rewritten (whether such code still compiles is unresolved), and
+`IF x?("…")` no longer prints.
 
 A Tree-sitter language has no runtime parameter for dialects. Mainstream
 grammars (for example tree-sitter-c-sharp for C# 1–14 and tree-sitter-python
 with both Python 2 and 3 statements) use one superset grammar; no
-version-variant grammar was found.
+version-variant grammar was found. Identities:
+[upstream-sources.md](../../provenance/upstream-sources.md#precedents-and-references-cited-by-decisions).
 
 ## Decision
 
