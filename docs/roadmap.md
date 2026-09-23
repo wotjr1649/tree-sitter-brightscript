@@ -2,8 +2,9 @@
 
 ## Current maturity
 
-Grammar version 0.1.0, release candidate (Session 03). Phases 1–5 have
-their exit evidence in
+Grammar version 0.1.0, release candidate (Session 03), independently
+audited in Session 04 ([reports/0.1.0-release-audit.md](reports/0.1.0-release-audit.md)).
+Phases 1–5 have their exit evidence in
 [reports/0.1.0-release-candidate.md](reports/0.1.0-release-candidate.md);
 Phase 6 was carried out on a local `go-treesitter` branch that is neither
 merged nor pushed; it did not pass V9 (recovery-tree differences in the Go

@@ -11,7 +11,7 @@ This project aims to provide a current, well-tested BrightScript syntax grammar 
 
 ## Status
 
-Grammar version 0.1.0 is implemented (Session 03): `grammar.js`, the generated parser in `src/`, the conformance corpus, `queries/highlights.scm` and the check scripts. Every `documented`, `provisional`, `tolerated` and `invalid` requirement in the [registry](docs/specs/language-conformance.md) has passing fixtures; `unresolved` and `out-of-scope` requirements are not claimed. The release-candidate evidence and verdict are in [docs/reports/0.1.0-release-candidate.md](docs/reports/0.1.0-release-candidate.md). Nothing has been tagged or published. See [docs/roadmap.md](docs/roadmap.md).
+Grammar version 0.1.0 is implemented (Session 03): `grammar.js`, the generated parser in `src/`, the conformance corpus, `queries/highlights.scm` and the check scripts. Every `documented`, `provisional`, `tolerated` and `invalid` requirement in the [registry](docs/specs/language-conformance.md) has passing fixtures; `unresolved` and `out-of-scope` requirements are not claimed. The release-candidate evidence and verdict are in [docs/reports/0.1.0-release-candidate.md](docs/reports/0.1.0-release-candidate.md); the independent release audit and promotion verdict are in [docs/reports/0.1.0-release-audit.md](docs/reports/0.1.0-release-audit.md). Nothing has been tagged or published. See [docs/roadmap.md](docs/roadmap.md).
 
 No compatibility or completeness claim should be inferred until the corresponding release gate in [docs/validation/validation.md](docs/validation/validation.md) is met.
 
