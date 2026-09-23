@@ -161,6 +161,8 @@ def check(name, data, want_clean, want_error, tmp, fail):
         problems.append(f"{secs:.1f} s")
     if peak > MEMORY_LIMIT:
         problems.append(f"{peak / 2**20:.0f} MiB")
+    elif code is not None and peak < 0:
+        problems.append("peak memory not measured")
     if (want_clean or want_error) and code in (0, 1):
         has_error = cst(path, timeout=TIME_LIMIT * 3)[0]
         if want_clean and has_error:

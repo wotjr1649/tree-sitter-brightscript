@@ -5,7 +5,8 @@ Usage: python scripts/check_generated.py [--no-regenerate]
 1. The generator is pinned exactly (package.json, lockfile, installed CLI version).
 2. The installed CLI binary's SHA-256 equals the decompressed release asset
    recorded for this platform in docs/provenance/upstream-sources.md.
-3. No external scanner exists (ADR-0005).
+3. No external scanner exists (ADR-0005), and src/ holds only the files the
+   generator writes.
 4. Unless --no-regenerate: `tree-sitter generate --abi 15` run twice reproduces
    every file under src/ byte for byte (drift and determinism).
 Stdlib only; exits non-zero on any failure.
@@ -53,6 +54,10 @@ elif recorded[asset] != digest:
 
 if (SRC / "scanner.c").exists():
     fail.append("src/scanner.c exists without an accepted scanner ADR (ADR-0005)")
+GENERATED = {"parser.c", "grammar.json", "node-types.json", "tree_sitter/alloc.h", "tree_sitter/array.h",
+             "tree_sitter/parser.h"}
+if stray := sorted({p.relative_to(SRC).as_posix() for p in SRC.rglob("*") if p.is_file()} - GENERATED):
+    fail.append(f"src/ holds files the generator does not write: {stray}")
 if re.search(r"^\s*externals\s*:", (ROOT / "grammar.js").read_text(encoding="utf-8"), re.M):
     fail.append("grammar.js declares externals (ADR-0005)")
 
