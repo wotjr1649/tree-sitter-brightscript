@@ -10,6 +10,11 @@
 /// <reference types="tree-sitter-cli/dsl" />
 // @ts-check
 
+// grammar-design §5 (internal mapping of the official precedence table).
+const PREC = {
+  POSTFIX: 10,
+};
+
 /** Regex source matching `word` in any letter case. */
 function ci(word) {
   return word.replace(/[a-z]/gi, c => `[${c.toLowerCase()}${c.toUpperCase()}]`);
@@ -20,6 +25,14 @@ function kw(word) {
   return alias(new RegExp(ci(word)), word);
 }
 
+function commaSep1(rule) {
+  return seq(rule, repeat(seq(',', rule)));
+}
+
+function commaSep(rule) {
+  return optional(commaSep1(rule));
+}
+
 module.exports = grammar({
   name: 'brightscript',
 
@@ -28,6 +41,10 @@ module.exports = grammar({
 
   // BS-LEX-026: keyword boundaries (grammar-design §3, §4).
   word: $ => $.identifier,
+
+  supertypes: $ => [$.expression],
+
+  inline: $ => [$._postfix_operand],
 
   rules: {
     // BS-LEX-008 (grammar-design §2).
@@ -43,6 +60,62 @@ module.exports = grammar({
     comment: _ => token(choice(
       /'[^\r\n]*/,
       /[rR][eE][mM]([ \t][^\r\n]*)?/,
+    )),
+
+    // ---------------------------------------------------- expressions (§5)
+    expression: $ => choice(
+      $.identifier,
+      $.number,
+      $.string,
+      $.true,
+      $.false,
+      $.invalid,
+      $.source_literal,
+      $.parenthesized_expression,
+      $.call_expression,
+      $.member_expression,
+      $.index_expression,
+      $.attribute_expression,
+    ),
+
+    _postfix_operand: $ => choice(
+      $.identifier,
+      $.parenthesized_expression,
+      $.call_expression,
+      $.member_expression,
+      $.index_expression,
+      $.attribute_expression,
+    ),
+
+    // BS-EXP-002.
+    parenthesized_expression: $ => seq('(', $.expression, ')'),
+
+    // BS-EXP-003-007, 021: one postfix level applied left to right; the
+    // optional forms share the node types (BS-LEX-029).
+    call_expression: $ => prec(PREC.POSTFIX, seq(
+      field('function', $._postfix_operand),
+      field('arguments', $.argument_list),
+    )),
+
+    argument_list: $ => seq(choice('(', '?('), commaSep($.expression), ')'),
+
+    member_expression: $ => prec(PREC.POSTFIX, seq(
+      field('object', choice($._postfix_operand, $.number, $.string)),
+      choice('.', '?.'),
+      field('property', $.identifier),
+    )),
+
+    index_expression: $ => prec(PREC.POSTFIX, seq(
+      field('object', $._postfix_operand),
+      choice('[', '?['),
+      commaSep1(field('index', $.expression)),
+      ']',
+    )),
+
+    attribute_expression: $ => prec(PREC.POSTFIX, seq(
+      field('object', $._postfix_operand),
+      choice('@', '?@'),
+      field('attribute', $.identifier),
     )),
 
     // BS-TYPE-001: one rule for parameter and return types.
