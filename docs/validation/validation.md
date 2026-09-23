@@ -165,6 +165,18 @@ compared).
 | ID | State | Requirement | Behaviour | Demonstrating fixture |
 |---|---|---|---|---|
 | KL-001 | retired (unused): the ADR-0004 spike passed with design V1 on 2026-09-23 | BS-COND-007 | A literal-`false` conditional branch whose text is not BrightScript (the documented block-comment idiom) produces `ERROR` nodes | `BS-COND-007: block comment with prose` and the spike fixtures S3, S5–S8, S10–S12, asserted with `:error` |
+| KL-002 | active; accepted for 0.1.0 by the owner on 2026-09-24 | none is violated (robustness only); the construct involved is the prefix `+`/`-` of BS-EXP-012 and BS-EXP-027 | Error recovery time grows with the square of the number of consecutive malformed prefix-operator pairs inside one unclosed expression: `+` or `-` followed by a token that cannot start an operand (`*`, `/`, `,`, `)`, `<`, …), repeated, as in `x = ` + `+*`×k. Tree-sitter runtimes 0.25.1, 0.26.13 and 0.27.0 behave alike, and generators 0.26.13 and 0.27.0 emit identical files, so neither the pin nor a runtime choice removes it. Valid input, scattered errors and one malformed statement per line stay linear. Measurements, cause and mitigation: [0.1.0-performance.md](../reports/0.1.0-performance.md#known-limitation-kl-002) | W13 seed `KL-002 B-01 witness k=1000` and the KL-002 scaling guard (`scripts/check_robustness.py`) |
+
+KL-002 and the V10 bound. W06's per-input bound (10 s, 1 GiB) still applies to
+every W06 input and W13 seed, the KL-002 witness included. A KL-002-family
+input large enough to exceed it (about 7 KB through the pinned CLI) is a
+`FAIL` of that bound, not a pass: it is accepted for 0.1.0 as KL-002, it is not
+a W06 input, and V10 supports no time claim for it beyond the recorded
+measurements. The KL-002 guard, run with W13 locally and in hosted CI, parses
+the witness at k = 250 and k = 1,000 and fails if the local exponent of the
+parse times exceeds 2.5 (worse than the disclosed quadratic) or the larger
+parse exceeds 10 s. A fix is recorded by re-measuring, retiring KL-002 and
+turning the guard into a scaling regression test.
 
 ## Fixture rules
 

@@ -14,13 +14,20 @@ Usage: python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N] 
   N iterations (default 1000) of up to 10 edits and seed N (default 1,
   TREE_SITTER_SEED) reports no failure. The fuzzer signals failures only in
   its output, so its output is scanned.
+- KL-002 guard (validation.md): the B-01 witness `x = ` + `+*`×k is parsed at
+  two sizes; the local exponent of the CLI parse times (minimum of three
+  `--time` runs each) must not exceed 2.5 and the larger parse must finish
+  within 10 s. The disclosed behaviour is quadratic; the exponent is printed
+  so that a fix, or a worse regression, is visible.
 Crash = a timeout, an exit status other than 0 or 1, or status 1 without the
 CLI's parse-error summary line (status 1 also reports failures to run). Error
 state is the root line of `--cst` output, read by scripts/tscli.py `has_error`
 without the rest (S04-H5); the timed run uses `--quiet`.
 Stdlib only.
 """
+import math
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -31,6 +38,13 @@ from corpus import read_corpus
 from tscli import cli, cst, has_error, popen
 TIME_LIMIT = 10.0
 MEMORY_LIMIT = 1 << 30
+KL002_SIZES = (250, 1000)
+KL002_MAX_EXPONENT = 2.5
+
+
+def kl002_witness(k):
+    """B-01: a prefix `+` followed by `*`, repeated k times inside one unclosed expression."""
+    return b"x = " + b"+*" * k + b"\n"
 
 
 def w06():
@@ -101,7 +115,42 @@ def w07_w13_seeds():
         ("W13 10000 colons", b":" * 10000),
         ("W13 #if without #end if", b"#if false\nprose\n#if A\n"),
         ("W13 directive-like region lines at line end", b"#if false\n#elsei\n#endi\n#if-then-else notes\n#else:\nx = 1\n#end if\ny = 2\n"),
+        ("KL-002 B-01 witness k=1000", kl002_witness(1000)),
     ]
+
+
+def parse_ms(path):
+    """CLI parse time of one file in ms (`--time`), excluding process start and grammar loading."""
+    code, out, err = cli("parse", "--quiet", "--time", path, timeout=TIME_LIMIT * 3)
+    m = re.search(r"\tParse:\s*([0-9.]+) ms", out)
+    if code not in (0, 1) or not m:
+        raise RuntimeError(f"parse --time {path} printed no time (exit {code}): {err.strip()[-300:]}")
+    return float(m.group(1))
+
+
+def kl002_verdict(small_bytes, small_ms, large_bytes, large_ms):
+    """(local exponent, problems) of the KL-002 guard."""
+    exponent = math.log(large_ms / max(small_ms, 0.001)) / math.log(large_bytes / small_bytes)
+    problems = []
+    if exponent > KL002_MAX_EXPONENT:
+        problems.append(f"exponent {exponent:.2f} > {KL002_MAX_EXPONENT} (worse than the disclosed quadratic)")
+    if large_ms > TIME_LIMIT * 1000:
+        problems.append(f"{large_ms / 1000:.1f} s > {TIME_LIMIT:.0f} s")
+    return exponent, problems
+
+
+def kl002_guard(tmp, fail):
+    times = []
+    for k in KL002_SIZES:
+        path = tmp / f"kl002-{k}.brs"
+        path.write_bytes(kl002_witness(k))
+        times.append((path.stat().st_size, min(parse_ms(path) for _ in range(3))))
+    (sb, sm), (lb, lm) = times
+    exponent, problems = kl002_verdict(sb, sm, lb, lm)
+    note = " (below 1.5: KL-002 may no longer hold; re-measure and update it)" if exponent < 1.5 else ""
+    print(f"  k={KL002_SIZES[0]}: {sb:,} bytes, {sm:.1f} ms; k={KL002_SIZES[1]}: {lb:,} bytes, {lm:.1f} ms; "
+          f"exponent {exponent:.2f}{note}{' FAIL ' + ', '.join(problems) if problems else ''}")
+    fail += [f"KL-002 guard: {p}" for p in problems]
 
 
 def run(path):
@@ -194,6 +243,8 @@ def main():
         for name, t in corpus.items():
             if ":error" in t["attrs"]:
                 check(name, t["input"], False, True, tmp, fail)
+        print("KL-002 scaling guard (B-01 witness, minimum of 3 CLI parse times)")
+        kl002_guard(tmp, fail)
     if "--skip-fuzz" not in sys.argv:
         iterations = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--fuzz-iterations=")), "1000")
         seed = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--fuzz-seed=")), "1")
