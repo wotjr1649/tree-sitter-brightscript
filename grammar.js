@@ -103,6 +103,8 @@ module.exports = grammar({
       $.end_statement,
       $.stop_statement,
       $.library_statement,
+      $.throw_statement,
+      $.try_statement,
       $.function_declaration,
     ),
 
@@ -200,6 +202,7 @@ module.exports = grammar({
       $.stop_statement,
       $.goto_statement,
       $.end_statement,
+      $.throw_statement,
       $.dim_statement,
       alias($._single_line_if, $.if_statement),
     ),
@@ -389,6 +392,25 @@ module.exports = grammar({
       ':',
       field('value', $.expression),
     ),
+
+    // ------------------------------------------------- error handling (§10)
+    // BS-ERR-001-005: CATCH is required and takes one identifier.
+    try_statement: $ => seq(
+      kw('try'),
+      field('body', alias($._try_body, $.block)),
+      field('handler', $.catch_clause),
+      choice(endKw('try'), kw('endtry')),
+    ),
+
+    // A separate line rule keeps `catch` a keyword only directly in a TRY
+    // body (grammar-design §4).
+    _try_body: $ => seq($._terminator, repeat($._try_line)),
+
+    _try_line: $ => choice(seq($.statement, $._terminator), $._terminator),
+
+    catch_clause: $ => seq(kw('catch'), field('variable', $.identifier), field('body', $.block)),
+
+    throw_statement: $ => seq(kw('throw'), field('value', $.expression)),
 
     // ----------------------------------------------------- functions (§8)
     // BS-FUNC-001-003, 005, 006: FUNCTION and SUB share the node; each closes

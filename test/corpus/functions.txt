@@ -262,6 +262,42 @@ q = {
               value: (number))))))))
 
 ================================================================================
+BS-FUNC-010: one-line function bodies
+================================================================================
+FUNCTION explode() : THROW "Kaboom!" : END FUNCTION
+FUNCTION x(_) : RETURN TRUE : END FUNCTION
+obj = { Get : function() : return m.Value : end function }
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (throw_statement
+        value: (string))))
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter
+        name: (identifier)))
+    body: (block
+      (return_statement
+        value: (true))))
+  (assignment_statement
+    left: (identifier)
+    right: (associative_array_literal
+      (associative_array_entry
+        key: (identifier)
+        value: (anonymous_function
+          parameters: (parameter_list)
+          body: (block
+            (return_statement
+              value: (member_expression
+                object: (identifier)
+                property: (identifier)))))))))
+
+================================================================================
 BS-FUNC-011: anonymous sub
 ================================================================================
 cb = sub (x)

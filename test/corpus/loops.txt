@@ -201,6 +201,41 @@ end	for
         consequence: (block)))))
 
 ================================================================================
+BS-STMT-035: one-line loop and TRY bodies with colons
+================================================================================
+for i = 1 to 3 : print i : end for
+while x : x = x - 1 : end while
+try : f() : catch e : print e : end try
+--------------------------------------------------------------------------------
+
+(source_file
+  (for_statement
+    counter: (identifier)
+    start: (number)
+    end: (number)
+    body: (block
+      (print_statement
+        (identifier))))
+  (while_statement
+    condition: (identifier)
+    body: (block
+      (assignment_statement
+        left: (identifier)
+        right: (binary_expression
+          left: (identifier)
+          right: (number)))))
+  (try_statement
+    body: (block
+      (call_expression
+        function: (identifier)
+        arguments: (argument_list)))
+    handler: (catch_clause
+      variable: (identifier)
+      body: (block
+        (print_statement
+          (identifier))))))
+
+================================================================================
 BS-STMT-036: nested blocks close with their own terminators
 ================================================================================
 for i = 1 to 2

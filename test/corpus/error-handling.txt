@@ -1,0 +1,228 @@
+================================================================================
+BS-ERR-001: TRY with CATCH
+================================================================================
+try
+  print 1/0
+catch e
+  print "Division failed: ", e
+end try
+--------------------------------------------------------------------------------
+
+(source_file
+  (try_statement
+    body: (block
+      (print_statement
+        (binary_expression
+          left: (number)
+          right: (number))))
+    handler: (catch_clause
+      variable: (identifier)
+      body: (block
+        (print_statement
+          (string)
+          (identifier))))))
+
+================================================================================
+BS-ERR-001: empty TRY and CATCH bodies with ENDTRY
+================================================================================
+try
+catch e
+endtry
+--------------------------------------------------------------------------------
+
+(source_file
+  (try_statement
+    body: (block)
+    handler: (catch_clause
+      variable: (identifier)
+      body: (block))))
+
+================================================================================
+BS-ERR-002: nested TRY in TRY and CATCH bodies
+================================================================================
+try
+  try
+    x = 1
+  catch e
+  end try
+catch e
+  try
+    print e.message
+  catch e2
+  end try
+end try
+--------------------------------------------------------------------------------
+
+(source_file
+  (try_statement
+    body: (block
+      (try_statement
+        body: (block
+          (assignment_statement
+            left: (identifier)
+            right: (number)))
+        handler: (catch_clause
+          variable: (identifier)
+          body: (block))))
+    handler: (catch_clause
+      variable: (identifier)
+      body: (block
+        (try_statement
+          body: (block
+            (print_statement
+              (member_expression
+                object: (identifier)
+                property: (identifier))))
+          handler: (catch_clause
+            variable: (identifier)
+            body: (block)))))))
+
+================================================================================
+BS-ERR-003: CATCH without a variable
+:error
+================================================================================
+try
+catch
+end try
+--------------------------------------------------------------------------------
+
+================================================================================
+BS-ERR-003: CATCH with an index
+:error
+================================================================================
+try
+catch someArray[23]
+end try
+--------------------------------------------------------------------------------
+
+================================================================================
+BS-ERR-003: CATCH with a member
+:error
+================================================================================
+try
+catch bill.ted
+end try
+--------------------------------------------------------------------------------
+
+================================================================================
+BS-ERR-003: CATCH with a literal
+:error
+================================================================================
+try
+catch 22
+end try
+--------------------------------------------------------------------------------
+
+================================================================================
+BS-ERR-003: CATCH with an expression
+:error
+================================================================================
+try
+catch a+wave
+end try
+--------------------------------------------------------------------------------
+
+================================================================================
+BS-ERR-004: THROW forms
+================================================================================
+throw "Cannot calculate."
+THROW {number: ERR_DIV_ZERO, message: "Division by zero"}
+throw e
+--------------------------------------------------------------------------------
+
+(source_file
+  (throw_statement
+    value: (string))
+  (throw_statement
+    value: (associative_array_literal
+      (associative_array_entry
+        key: (identifier)
+        value: (identifier))
+      (associative_array_entry
+        key: (identifier)
+        value: (string))))
+  (throw_statement
+    value: (identifier)))
+
+================================================================================
+BS-ERR-005: try and catch as identifiers
+================================================================================
+x = try + catch
+catch = 1
+sub f()
+  catch = 2
+  x = 0
+  catch = 3
+  if x then
+    catch = 4
+  end if
+end sub
+try
+  if y then
+    catch = 5
+  end if
+catch e
+end try
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (identifier)
+      right: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number))
+      (assignment_statement
+        left: (identifier)
+        right: (number))
+      (assignment_statement
+        left: (identifier)
+        right: (number))
+      (if_statement
+        condition: (identifier)
+        consequence: (block
+          (assignment_statement
+            left: (identifier)
+            right: (number))))))
+  (try_statement
+    body: (block
+      (if_statement
+        condition: (identifier)
+        consequence: (block
+          (assignment_statement
+            left: (identifier)
+            right: (number)))))
+    handler: (catch_clause
+      variable: (identifier)
+      body: (block))))
+
+================================================================================
+BS-ERR-007: label inside a TRY body is not rejected
+================================================================================
+try
+here:
+  x = 1
+catch e
+end try
+--------------------------------------------------------------------------------
+
+(source_file
+  (try_statement
+    body: (block
+      (label_statement
+        name: (identifier))
+      (assignment_statement
+        left: (identifier)
+        right: (number)))
+    handler: (catch_clause
+      variable: (identifier)
+      body: (block))))

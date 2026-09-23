@@ -142,6 +142,14 @@
         "named": true
       },
       {
+        "type": "throw_statement",
+        "named": true
+      },
+      {
+        "type": "try_statement",
+        "named": true
+      },
+      {
         "type": "update_statement",
         "named": true
       },
@@ -535,6 +543,32 @@
           },
           {
             "type": "parenthesized_expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "catch_clause",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "variable": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
             "named": true
           }
         ]
@@ -1069,6 +1103,48 @@
     "fields": {}
   },
   {
+    "type": "throw_statement",
+    "named": true,
+    "fields": {
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "try_statement",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "handler": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "catch_clause",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "type",
     "named": true,
     "fields": {}
@@ -1332,6 +1408,10 @@
     "named": false
   },
   {
+    "type": "catch",
+    "named": false
+  },
+  {
     "type": "comment",
     "named": true,
     "extra": true
@@ -1385,6 +1465,10 @@
     "named": false
   },
   {
+    "type": "end try",
+    "named": false
+  },
+  {
     "type": "end while",
     "named": false
   },
@@ -1398,6 +1482,10 @@
   },
   {
     "type": "endsub",
+    "named": false
+  },
+  {
+    "type": "endtry",
     "named": false
   },
   {
@@ -1517,12 +1605,20 @@
     "named": false
   },
   {
+    "type": "throw",
+    "named": false
+  },
+  {
     "type": "to",
     "named": false
   },
   {
     "type": "true",
     "named": true
+  },
+  {
+    "type": "try",
+    "named": false
   },
   {
     "type": "void",

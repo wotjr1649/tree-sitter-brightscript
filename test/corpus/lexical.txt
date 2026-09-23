@@ -407,6 +407,48 @@ a = 1 : a$ = "s" : a% = 2 : a! = 1.5 : a# = 2.5
     right: (number)))
 
 ================================================================================
+BS-LEX-017: designators on parameters and loop and catch variables
+================================================================================
+sub f(a$, n%)
+  for i% = 1 to n%
+  end for
+  for each s$ in list
+  end for
+  try
+    x = 1
+  catch e$
+  end try
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter
+        name: (identifier))
+      (parameter
+        name: (identifier)))
+    body: (block
+      (for_statement
+        counter: (identifier)
+        start: (number)
+        end: (identifier)
+        body: (block))
+      (for_each_statement
+        item: (identifier)
+        collection: (identifier)
+        body: (block))
+      (try_statement
+        body: (block
+          (assignment_statement
+            left: (identifier)
+            right: (number)))
+        handler: (catch_clause
+          variable: (identifier)
+          body: (block))))))
+
+================================================================================
 BS-LEX-018: LongInteger designator on a variable
 ================================================================================
 id& = 9876543210&
