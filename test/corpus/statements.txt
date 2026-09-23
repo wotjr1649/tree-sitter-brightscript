@@ -140,6 +140,27 @@ m.top.observeField("x", "onX")
       (string))))
 
 ================================================================================
+BS-STMT-023: RETURN with and without a value
+================================================================================
+function f()
+  if x then return
+  return 1
+end function
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (if_statement
+        condition: (identifier)
+        consequence: (block
+          (return_statement)))
+      (return_statement
+        value: (number)))))
+
+================================================================================
 BS-STMT-024: PRINT separators and trailing semicolon
 ================================================================================
 print 25; " is equal to"; x^2
@@ -306,6 +327,65 @@ stop
   (stop_statement))
 
 ================================================================================
+BS-STMT-031: LIBRARY at the top of a file
+================================================================================
+Library "v30/bslCore.brs"
+sub main()
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (library_statement
+    path: (string))
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block)))
+
+================================================================================
+BS-STMT-032: LIBRARY after a function declaration
+================================================================================
+sub a()
+end sub
+LIBRARY "v30/bslCore.brs"
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block))
+  (library_statement
+    path: (string)))
+
+================================================================================
+BS-STMT-033: statements at file level
+================================================================================
+x = 1
+print x
+sub main()
+end sub
+if x then y = 2
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (print_statement
+    (identifier))
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))))
+
+================================================================================
 BS-STMT-037: EXIT FOR outside a loop is not rejected
 ================================================================================
 exit for
@@ -313,6 +393,28 @@ exit for
 
 (source_file
   (exit_statement))
+
+================================================================================
+BS-LEX-027: label line
+================================================================================
+sub main()
+mylabel:
+  print "here"
+  goto mylabel
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (label_statement
+        name: (identifier))
+      (print_statement
+        (string))
+      (goto_statement
+        label: (identifier)))))
 
 ================================================================================
 BS-LEX-028: label followed by a comment

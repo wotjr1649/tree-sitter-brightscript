@@ -43,6 +43,43 @@ myvar = 3
     right: (number)))
 
 ================================================================================
+BS-LEX-002: indentation and repeated spaces
+================================================================================
+sub main()
+    x   =   1
+        print    x
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number))
+      (print_statement
+        (identifier)))))
+
+================================================================================
+BS-LEX-003: tab indentation and tabs between tokens
+================================================================================
+sub main()
+	x	=	1
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))))
+
+================================================================================
 BS-LEX-004: keyword directly followed by a string
 ================================================================================
 if c <> k then print"error" : stop
@@ -57,6 +94,27 @@ if c <> k then print"error" : stop
       (print_statement
         (string))
       (stop_statement))))
+
+================================================================================
+BS-LEX-004: compact one-line anonymous function
+================================================================================
+photo.GetTitle=function():return m.xml@title:end function
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (member_expression
+      object: (identifier)
+      property: (identifier))
+    right: (anonymous_function
+      parameters: (parameter_list)
+      body: (block
+        (return_statement
+          value: (attribute_expression
+            object: (member_expression
+              object: (identifier)
+              property: (identifier))
+            attribute: (identifier)))))))
 
 ================================================================================
 BS-LEX-005: one statement per line
@@ -122,6 +180,29 @@ REM b
   (comment))
 
 ================================================================================
+BS-LEX-009: blank lines around and inside blocks
+================================================================================
+
+
+sub main()
+
+  x = 1
+
+end sub
+
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))))
+
+================================================================================
 BS-LEX-010: colon-separated statements
 ================================================================================
 x=5:print 25; " is"; x^2
@@ -137,6 +218,28 @@ x=5:print 25; " is"; x^2
     (binary_expression
       left: (identifier)
       right: (number))))
+
+================================================================================
+BS-LEX-010: colon-separated statements in a block body
+================================================================================
+sub main()
+  a = 1 : b = 2 : print a
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number))
+      (assignment_statement
+        left: (identifier)
+        right: (number))
+      (print_statement
+        (identifier)))))
 
 ================================================================================
 BS-LEX-011: repeated, leading and trailing colons
@@ -313,6 +416,55 @@ id& = 9876543210&
   (assignment_statement
     left: (identifier)
     right: (number)))
+
+================================================================================
+BS-LEX-021: reserved keywords in statement positions
+================================================================================
+Function f() As Integer
+  Dim a[2]
+  For i = 1 To 2 Step 1
+    If a[i] = Invalid Then Exit For
+  Next
+  While True : Exit While : End While
+  Goto done
+done:
+  Return 1
+End Function
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    return_type: (type)
+    body: (block
+      (dim_statement
+        name: (identifier)
+        dimension: (number))
+      (for_statement
+        counter: (identifier)
+        start: (number)
+        end: (number)
+        step: (number)
+        body: (block
+          (if_statement
+            condition: (binary_expression
+              left: (index_expression
+                object: (identifier)
+                index: (identifier))
+              right: (invalid))
+            consequence: (block
+              (exit_statement)))))
+      (while_statement
+        condition: (true)
+        body: (block
+          (exit_statement)))
+      (goto_statement
+        label: (identifier))
+      (label_statement
+        name: (identifier))
+      (return_statement
+        value: (number)))))
 
 ================================================================================
 BS-LEX-022: reserved built-in function calls

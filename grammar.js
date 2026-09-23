@@ -103,6 +103,7 @@ module.exports = grammar({
       $.end_statement,
       $.stop_statement,
       $.library_statement,
+      $.function_declaration,
     ),
 
     // Statement-level chains (grammar-design §6): an identifier head, then
@@ -284,6 +285,7 @@ module.exports = grammar({
       $.array_literal,
       $.associative_array_literal,
       $.parenthesized_expression,
+      $.anonymous_function,
       $.unary_expression,
       $.binary_expression,
       $.call_expression,
@@ -386,6 +388,57 @@ module.exports = grammar({
       field('key', choice($.identifier, $.string)),
       ':',
       field('value', $.expression),
+    ),
+
+    // ----------------------------------------------------- functions (§8)
+    // BS-FUNC-001-003, 005, 006: FUNCTION and SUB share the node; each closes
+    // only with its own terminator (BS-STMT-036).
+    function_declaration: $ => choice(
+      seq(
+        kw('function'),
+        field('name', $.identifier),
+        field('parameters', $.parameter_list),
+        optional(seq(kw('as'), field('return_type', $.type))),
+        field('body', $.block),
+        choice(endKw('function'), kw('endfunction')),
+      ),
+      seq(
+        kw('sub'),
+        field('name', $.identifier),
+        field('parameters', $.parameter_list),
+        field('body', $.block),
+        choice(endKw('sub'), kw('endsub')),
+      ),
+    ),
+
+    // BS-FUNC-009-011.
+    anonymous_function: $ => choice(
+      seq(
+        kw('function'),
+        field('parameters', $.parameter_list),
+        optional(seq(kw('as'), field('return_type', $.type))),
+        field('body', $.block),
+        choice(endKw('function'), kw('endfunction')),
+      ),
+      seq(
+        kw('sub'),
+        field('parameters', $.parameter_list),
+        field('body', $.block),
+        choice(endKw('sub'), kw('endsub')),
+      ),
+    ),
+
+    // A line break is allowed after a comma only (BS-FUNC-006).
+    parameter_list: $ => seq(
+      '(',
+      optional(seq($.parameter, repeat(seq(',', repeat($._newline), $.parameter)))),
+      ')',
+    ),
+
+    parameter: $ => seq(
+      field('name', $.identifier),
+      optional(seq('=', field('default', $.expression))),
+      optional(seq(kw('as'), field('type', $.type))),
     ),
 
     // BS-TYPE-001: one rule for parameter and return types.

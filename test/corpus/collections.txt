@@ -175,6 +175,35 @@ aa = { key1: "value", key2: 55, key3: 5+3 }
           right: (number))))))
 
 ================================================================================
+BS-AA-001: anonymous functions as values
+================================================================================
+obj = {
+  Set : function(x) : m.Value = x : end function
+  Value : 0
+}
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (associative_array_literal
+      (associative_array_entry
+        key: (identifier)
+        value: (anonymous_function
+          parameters: (parameter_list
+            (parameter
+              name: (identifier)))
+          body: (block
+            (assignment_statement
+              left: (member_expression
+                object: (identifier)
+                property: (identifier))
+              right: (identifier)))))
+      (associative_array_entry
+        key: (identifier)
+        value: (number)))))
+
+================================================================================
 BS-AA-002: string keys
 ================================================================================
 aa = { "Jane Doe": 1001, "John Doe": 1002 }

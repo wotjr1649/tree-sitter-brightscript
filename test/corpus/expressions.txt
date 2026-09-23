@@ -1,4 +1,32 @@
 ================================================================================
+BS-EXP-001: primary expressions
+================================================================================
+x = [a, 1, "s", true, invalid, LINE_NUM, (b), {k: 1}, function() : return 1 : end function]
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (array_literal
+      (identifier)
+      (number)
+      (string)
+      (true)
+      (invalid)
+      (source_literal)
+      (parenthesized_expression
+        (identifier))
+      (associative_array_literal
+        (associative_array_entry
+          key: (identifier)
+          value: (number)))
+      (anonymous_function
+        parameters: (parameter_list)
+        body: (block
+          (return_statement
+            value: (number)))))))
+
+================================================================================
 BS-EXP-003: call forms
 ================================================================================
 print five()

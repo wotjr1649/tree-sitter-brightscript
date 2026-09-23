@@ -1,0 +1,307 @@
+================================================================================
+BS-TYPE-001: parameter and return type names
+================================================================================
+function f(a as integer, b as Float, c as DOUBLE, d as boolean, e as string, f as object, g as dynamic, h as function) as void
+end function
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter
+        name: (identifier)
+        type: (type))
+      (parameter
+        name: (identifier)
+        type: (type))
+      (parameter
+        name: (identifier)
+        type: (type))
+      (parameter
+        name: (identifier)
+        type: (type))
+      (parameter
+        name: (identifier)
+        type: (type))
+      (parameter
+        name: (identifier)
+        type: (type))
+      (parameter
+        name: (identifier)
+        type: (type))
+      (parameter
+        name: (identifier)
+        type: (type)))
+    return_type: (type)
+    body: (block)))
+
+================================================================================
+BS-FUNC-001: function with typed parameters and return type
+================================================================================
+function add(a as Integer, b as Integer) as Integer
+  return a+b
+end function
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter
+        name: (identifier)
+        type: (type))
+      (parameter
+        name: (identifier)
+        type: (type)))
+    return_type: (type)
+    body: (block
+      (return_statement
+        value: (binary_expression
+          left: (identifier)
+          right: (identifier))))))
+
+================================================================================
+BS-FUNC-001: function without parameters
+================================================================================
+function five() as Integer
+  return 5
+end function
+function Main()
+end function
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    return_type: (type)
+    body: (block
+      (return_statement
+        value: (number))))
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block)))
+
+================================================================================
+BS-FUNC-002: sub declaration
+================================================================================
+sub main()
+  print "x"
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (print_statement
+        (string)))))
+
+================================================================================
+BS-FUNC-003: ENDFUNCTION and ENDSUB
+================================================================================
+function f()
+endfunction
+sub g()
+endsub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block))
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block)))
+
+================================================================================
+BS-FUNC-005: parameters with defaults and types
+================================================================================
+function add3(a as Integer, b=a+5 as Integer) as Integer
+  return a+b
+end function
+sub s(x = 1, y = "a")
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter
+        name: (identifier)
+        type: (type))
+      (parameter
+        name: (identifier)
+        default: (binary_expression
+          left: (identifier)
+          right: (number))
+        type: (type)))
+    return_type: (type)
+    body: (block
+      (return_statement
+        value: (binary_expression
+          left: (identifier)
+          right: (identifier)))))
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter
+        name: (identifier)
+        default: (number))
+      (parameter
+        name: (identifier)
+        default: (string)))
+    body: (block)))
+
+================================================================================
+BS-FUNC-006: parameter list continued after a comma
+================================================================================
+function helper(http as Object, xmllist as Object,
+    owner=invalid as dynamic) as Object
+  return invalid
+end function
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter
+        name: (identifier)
+        type: (type))
+      (parameter
+        name: (identifier)
+        type: (type))
+      (parameter
+        name: (identifier)
+        default: (invalid)
+        type: (type)))
+    return_type: (type)
+    body: (block
+      (return_statement
+        value: (invalid)))))
+
+================================================================================
+BS-FUNC-008: default-parameter order is not enforced
+================================================================================
+function f(a = 1, b)
+end function
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter
+        name: (identifier)
+        default: (number))
+      (parameter
+        name: (identifier)))
+    body: (block)))
+
+================================================================================
+BS-FUNC-009: anonymous function assigned to a variable
+================================================================================
+myfunc = function (a, b)
+  return a+b
+end function
+print myfunc(1,2)
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (anonymous_function
+      parameters: (parameter_list
+        (parameter
+          name: (identifier))
+        (parameter
+          name: (identifier)))
+      body: (block
+        (return_statement
+          value: (binary_expression
+            left: (identifier)
+            right: (identifier))))))
+  (print_statement
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number)
+        (number)))))
+
+================================================================================
+BS-FUNC-009: anonymous function as an associative-array value
+================================================================================
+q = {
+  starring : function(o, e)
+    return 0
+  end function
+}
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (associative_array_literal
+      (associative_array_entry
+        key: (identifier)
+        value: (anonymous_function
+          parameters: (parameter_list
+            (parameter
+              name: (identifier))
+            (parameter
+              name: (identifier)))
+          body: (block
+            (return_statement
+              value: (number))))))))
+
+================================================================================
+BS-FUNC-011: anonymous sub
+================================================================================
+cb = sub (x)
+  print x
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (anonymous_function
+      parameters: (parameter_list
+        (parameter
+          name: (identifier)))
+      body: (block
+        (print_statement
+          (identifier))))))
+
+================================================================================
+BS-FUNC-013: m used as an identifier
+================================================================================
+function add() as void
+  m.result = m.a + m.b
+end function
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    return_type: (type)
+    body: (block
+      (assignment_statement
+        left: (member_expression
+          object: (identifier)
+          property: (identifier))
+        right: (binary_expression
+          left: (member_expression
+            object: (identifier)
+            property: (identifier))
+          right: (member_expression
+            object: (identifier)
+            property: (identifier)))))))
