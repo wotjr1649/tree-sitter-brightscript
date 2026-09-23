@@ -319,6 +319,7 @@ The last input line, just before the divider, ends with LF alone
 | `BS-STMT-025: TAB and POS items` | `print tab(5)"tabbed 5";tab(25)"tabbed 25"↵print tab(40) pos(0)↵print "these" tab(pos(0)+5)"words"` | items alternate `call_expression` and `string` as written |
 | `BS-STMT-026: ambiguous adjacent PRINT items` | `print a -1↵print a (1)` | `(print_statement (binary_expression …))`; `(print_statement (call_expression …))` |
 | `BS-STMT-039: PRINT with no items` | `print↵?` | `(source_file (print_statement) (print_statement))` |
+| `BS-STMT-040: leading and repeated PRINT separators` | `print , a↵? ;a↵print a,,b↵print a;;b↵print ;` | `(source_file (print_statement (identifier)) (print_statement (identifier)) (print_statement (identifier) (identifier)) (print_statement (identifier) (identifier)) (print_statement))` |
 | `BS-STMT-027: GOTO a label` | `start:↵goto start` | `(source_file (label_statement name: (identifier)) (goto_statement label: (identifier)))` |
 | `BS-STMT-029: END statement` | `if done then end↵end` | `(if_statement condition: (identifier) consequence: (block (end_statement)))`; `(end_statement)` |
 | `BS-STMT-030: STOP statement` | `if x then stop↵stop` | `(if_statement condition: (identifier) consequence: (block (stop_statement)))`; `(stop_statement)` |
@@ -422,6 +423,7 @@ The last input line, just before the divider, ends with LF alone
 | `BS-ERR-003: CATCH with an expression` | `try↵catch a+wave↵end try` | `:error` |
 | `BS-ERR-004: THROW forms` | `throw "Cannot calculate."↵THROW {number: ERR_DIV_ZERO, message: "Division by zero"}↵throw e` | `throw_statement value:` `string`, `associative_array_literal`, `identifier` |
 | `BS-ERR-005: try and catch as identifiers` | `x = try + catch↵catch = 1↵sub f()↵  catch = 2↵  x = 0↵  catch = 3↵  if x then↵    catch = 4↵  end if↵end sub↵try↵  if y then↵    catch = 5↵  end if↵catch e↵end try` | every `catch = …` is `(assignment_statement left: (identifier) right: (number))`; the last lines form one `try_statement` whose `handler` has `variable: (identifier)` |
+| `BS-ERR-005: try as an identifier in a single-line branch` | `if a then try = 1↵if b then x = 1 else try = 2` | `(source_file (if_statement condition: (identifier) consequence: (block (assignment_statement left: (identifier) right: (number)))) (if_statement condition: (identifier) consequence: (block (assignment_statement left: (identifier) right: (number))) alternative: (else_clause body: (block (assignment_statement left: (identifier) right: (number))))))` |
 | `BS-ERR-007: label inside a TRY body is not rejected` | `try↵here:↵  x = 1↵catch e↵end try` | `try_statement` whose `body` holds a `label_statement`; no `ERROR` (guard) |
 
 ### `test/corpus/conditional-compilation.txt`
@@ -441,6 +443,7 @@ The last input line, just before the divider, ends with LF alone
 | `BS-COND-012: nested #if blocks` | `#if A↵  #if B↵    x = 1↵  #end if↵#end if` | `(if_directive condition: (identifier) consequence: (block (if_directive condition: (identifier) consequence: (block (assignment_statement …)))))` |
 | `BS-COND-013: #const with a non-boolean value` | `#const x = 5` | `:error` |
 | `BS-COND-013: #const with a string value` | `#const s = "a"` | `:error` |
+| `BS-COND-015: #error without a message` | `#error↵#if DEBUG↵  #error⇥↵#end if` | `(source_file (error_directive) (if_directive condition: (identifier) consequence: (block (error_directive))))` |
 
 ADR-0004 literal-false fixtures (grammar-design §11). The PASS column applies
 to design V1; under V2 every `(comment)` inside `inactive_text` is absent. On

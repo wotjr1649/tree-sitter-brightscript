@@ -86,6 +86,8 @@ def w07_w13_seeds():
         ("BS-FUNC-007 breaks after ( in parameters", b"function f(\na,\nb\n)\nend function\n"),
         ("BS-FUNC-012 nested declarations", b"sub outer()\nsub inner()\nend sub\nend sub\n"),
         ("BS-ARRAY-006 several DIM declarators", b"dim a[1], b[2]\n"),
+        ("BS-ARRAY-009 comma-first array", b"a = [\n1\n, 2\n]\n"),
+        ("BS-AA-006 comma-first and a break after a colon", b"a = {\nx: 1\n, y: 2\n}\nb = {\nx:\n1\n}\n"),
         ("BS-ERR-006 TRY without CATCH", b"try\nx = 1\nend try\n"),
         ("BS-COND-009 compact and spaced directives", b"#if DEBUG\n#elseif X\n#endif\n# if A\n# end if\n#if not DEBUG\n#end if\n#const x = a and b\n"),
         ("BS-COND-010 directives in expressions", b"x = 1 +\n#if A\n2\n#else\n3\n#end if\nif a then\n#if B\nend if\n#end if\n"),

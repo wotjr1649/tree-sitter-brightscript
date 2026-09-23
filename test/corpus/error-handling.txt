@@ -206,6 +206,32 @@ end try
       body: (block))))
 
 ================================================================================
+BS-ERR-005: try as an identifier in a single-line branch
+================================================================================
+if a then try = 1
+if b then x = 1 else try = 2
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))
+    alternative: (else_clause
+      body: (block
+        (assignment_statement
+          left: (identifier)
+          right: (number))))))
+
+================================================================================
 BS-ERR-007: label inside a TRY body is not rejected
 ================================================================================
 try

@@ -198,7 +198,7 @@ or more. Unnamed children are named nodes without a field.
 | `exit_statement` | — | — | BS-STMT-018, 020 | highlight |
 | `continue_statement` | — | — | BS-STMT-019 | highlight |
 | `return_statement` | `value: expression`? | — | BS-STMT-023 | — |
-| `print_statement` | — | `expression`* | BS-STMT-024–026, 039, BS-LEX-031, 035 | — |
+| `print_statement` | — | `expression`* | BS-STMT-024–026, 039, 040, BS-LEX-031, 035 | — |
 | `dim_statement` | `name: identifier`, `dimension: expression`+ | — | BS-ARRAY-004, 005 | — |
 | `goto_statement` | `label: identifier` | — | BS-STMT-027 | tags (label reference) |
 | `label_statement` | `name: identifier` | — | BS-LEX-027, 028 | highlight, tags |
@@ -216,7 +216,7 @@ or more. Unnamed children are named nodes without a field.
 | `if_directive` | `condition: identifier, true or false`, `consequence: block or inactive_text`, `alternative: else_if_directive* else_directive?` | — | BS-COND-002, 006, 007, 012 | highlight |
 | `else_if_directive` | `condition: identifier, true or false`, `consequence: block or inactive_text` | — | BS-COND-003, 007 | highlight |
 | `else_directive` | `body: block` | — | BS-COND-003 | highlight |
-| `error_directive` | `message: error_message`? | — | BS-COND-004 | highlight |
+| `error_directive` | `message: error_message`? | — | BS-COND-004, 015 | highlight |
 | `error_message` | — | — | BS-COND-004 | highlight |
 | `inactive_text` | — | `comment`* (other text is hidden) | BS-COND-007 | highlight |
 
@@ -436,6 +436,7 @@ hidden rules or anonymous children).
 | BS-STMT-035 | S | `block` |
 | BS-STMT-036 | S | block-structured statement nodes |
 | BS-STMT-039 | N | `print_statement` |
+| BS-STMT-040 | N | `print_statement` |
 | BS-FUNC-001 | S | `function_declaration`, `parameter_list` |
 | BS-FUNC-002 | N | `function_declaration` |
 | BS-FUNC-003 | N | `function_declaration` |
@@ -468,9 +469,10 @@ hidden rules or anonymous children).
 | BS-COND-007 | S | `if_directive` with `inactive_text` |
 | BS-COND-008 | L | directive tokens and line terminators |
 | BS-COND-012 | S | `if_directive` inside `block` |
+| BS-COND-015 | S | `error_directive` without `message` |
 
 `invalid`, `unresolved` and `out-of-scope` rows need no shape; `tolerated` rows are listed because they are implemented. Requirements
 without a planned shape: 0 (counts in the next line are checked
 mechanically).
 
-Mapped: 130 (S 79, N 26, L 25).
+Mapped: 132 (S 80, N 27, L 25).

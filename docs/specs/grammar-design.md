@@ -53,7 +53,7 @@ explicit class `[ \t]`.
 | Comment termination | `comment` stops before `\r` or `\n`; the newline is a separate `_newline` | BS-LEX-012 | `BS-LEX-012: comment after code on the same line` |
 | REM termination | same as `'` | BS-LEX-013, 014 | `BS-LEX-014: bare REM line` |
 | Label and colon | `label_statement` = identifier `:`; the next token must be a terminator | BS-LEX-027, 028 | `BS-LEX-027: label line` |
-| Directive lines | a directive is a statement; `#error` text runs to the line end; code after `:` on a directive line is not contractual | BS-COND-008 | `BS-COND-008: indented directives with comments` |
+| Directive lines | a directive is a statement; `#error` text runs to the line end; a directive sharing its line with a statement (before or after `:`) is not contractual | BS-COND-008 | `BS-COND-008: indented directives with comments` |
 
 Statement lists:
 
@@ -193,6 +193,14 @@ every keyword is contextual.
 | D. Syntax words not on the list | As Catch Continue EndTry In Library Mod Throw Try; type names Integer Float Double Boolean String Object Dynamic Void | `kw()` tokens, contextual | BS-LEX-025, BS-ERR-005, BS-TYPE-001 |
 
 Categories A–C cover all 44 official reserved words.
+
+Where only a name is valid (the CATCH variable, a `#const` name, a FOR
+counter, a parameter), the literal words `true`, `false`, `invalid` and
+`LINE_NUM` are not valid tokens, so context-aware lexing yields an
+`identifier` (`catch true`); where a name or a boolean is valid (a `#const`
+value, a directive condition), `invalid` and `LINE_NUM` do (`#const x =
+invalid`, `#if invalid`). Using a reserved word as a name is a compile-time
+rule (BS-LEX-023), not grammar.
 
 Where a keyword and an identifier are both valid, the keyword wins. The
 positions that matter are statement starts (`if for while try throw return
@@ -355,7 +363,7 @@ Boundary rules:
 | Block IF clauses | `ELSE IF`/`ELSEIF` + condition + optional THEN + `block`; `ELSE` + `block` | BS-STMT-010, 011 |
 | Labels | `label_statement` only in `source_file`/`block` lists, never in single-line branches | BS-LEX-027, 028 |
 | Comments | extras; they never end a statement, the following `_newline` does; placement in the tree follows the tree-schema comment rule | BS-LEX-012 |
-| PRINT items | `print_statement` = (`print` or `?`) then any sequence of `expression`, `,`, `;`; the list has `LIST` precedence so every operator or postfix continuation extends the current item | BS-STMT-024–026 |
+| PRINT items | `print_statement` = (`print` or `?`) then any sequence of `expression`, `,`, `;`; the list has `LIST` precedence so every operator or postfix continuation extends the current item | BS-STMT-024–026, 040 |
 | Directive lines | directives are statements, placed wherever statements are; their bodies are `block`s | BS-COND-002–008, 012 |
 | END vs END X | the two-word terminators are single tokens (§3); `end` alone is `end_statement` | BS-STMT-029, 036 |
 | NEXT | a terminator only of the innermost open FOR/FOR EACH; inside a WHILE body it closes nothing, so the WHILE is an error whether `next` lexes there as a keyword or an identifier | BS-STMT-013, 017 |
@@ -409,7 +417,9 @@ index_expression          := object ('[' | '?[') index:expression (',' index:exp
 
 - `_sep` covers comma-separated, newline-separated and mixed forms; a trailing
   `_sep` gives the tolerated trailing comma (BS-ARRAY-003, BS-AA-004); two
-  commas in a row have no rule.
+  commas in a row have no rule, and neither have a comma that starts a line
+  (comma-first) or a line break between an entry's `:` and its value
+  (BS-ARRAY-009, BS-AA-006, unresolved).
 - `a[1,2,3]` is one `index_expression` with three `index` fields; `a[1][2][3]`
   is three nested ones (BS-ARRAY-007). No normalisation.
 - AA keys that are keyword words are identifiers by contextual lexing
@@ -446,7 +456,7 @@ if_directive      := '#if' condition:_cc_condition consequence:block
                      alternative:else_if_directive* alternative:else_directive? '#end' kw(if)
 else_if_directive := '#else' kw(if) condition:_cc_condition consequence:block
 else_directive    := '#else' body:block
-error_directive   := '#error' message:error_message?
+error_directive   := '#error' message:error_message?      (no message: BS-COND-015)
 _cc_condition     := identifier | true | false
 ```
 

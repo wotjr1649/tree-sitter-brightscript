@@ -297,6 +297,29 @@ print
   (print_statement))
 
 ================================================================================
+BS-STMT-040: leading and repeated PRINT separators
+================================================================================
+print , a
+? ;a
+print a,,b
+print a;;b
+print ;
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (identifier))
+  (print_statement
+    (identifier))
+  (print_statement
+    (identifier)
+    (identifier))
+  (print_statement
+    (identifier)
+    (identifier))
+  (print_statement))
+
+================================================================================
 BS-STMT-027: GOTO a label
 ================================================================================
 start:
