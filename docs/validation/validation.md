@@ -2,8 +2,8 @@
 
 Defines validation levels (V0–V10; distinct from the source levels L1–L5 in
 `docs/provenance/source-policy.md`), the claims each supports, gates, and how
-failures are handled. Automated tooling is built with the grammar; until then
-V0 is the manual checklist below.
+failures are handled. The V0 checklist below is automated by
+`scripts/check_v0.py` (items 1–5) and `scripts/check_generated.py` (item 6).
 
 ## Validation levels
 
@@ -42,6 +42,10 @@ does not prove either tree is right.
 | V9 | — | only for integration claims | only for integration claims |
 | V10 | — | pathological inputs and a bounded fuzz run (workload W13) | fuzzing |
 
+Hosted CI (`.github/workflows/ci.yml`, Windows and Ubuntu) runs V0, generation
+drift (V1), the registry and corpus checks (V2, V3) and, once queries exist,
+V4 on every push; it never fetches Roku documentation.
+
 V9 evidence is produced in `go-treesitter`, not here
 ([ADR-0006](../design/decisions/ADR-0006-downstream-integration-boundary.md)).
 
@@ -72,6 +76,7 @@ every row below is `PASS`. Workload sets are defined in
 | Robustness | W06, W07 and W13 show no crash, hang or runaway memory. |
 | Level 1 refresh | A new dated snapshot of the ten Level 1 pages is taken before the candidate and stored beside `roku-docs-2026-09-23` (source-policy refresh rules); for every page whose content-region SHA-256 changed, each citing requirement is reviewed and the outcome recorded in `upstream-sources.md`. |
 | Provenance | Generator identity, Level 1 snapshot identity and SHA-256 of every generated file are recorded. |
+| Hosted CI | The workflow `.github/workflows/ci.yml` passes on Windows and Ubuntu for the candidate commit, pushed to the session branch; a local run does not substitute. |
 | Downstream | V9 is not required; it is run only when the work in `go-treesitter` is authorized, and then must pass before a pin change is proposed there. |
 | Review | An independent adversarial review is complete; every material finding is fixed or disclosed as a `KL-NNN` or `provisional` row, and the affected gates were rerun. |
 
@@ -82,7 +87,7 @@ reconciliation (planned vs `node-types.json`); results of W01–W13 with the
 commands used; known limitations; `provisional` and `tolerated` requirements;
 downstream results if run; review findings and their disposition; the verdict.
 
-## V0 checklist (manual until automated)
+## V0 checklist
 
 1. No `_ref/`, `docs/prompts/`, `docs/plans/`, `artifacts/` or `.work/` content
    is staged or tracked.

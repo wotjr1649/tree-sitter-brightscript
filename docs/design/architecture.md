@@ -45,6 +45,13 @@ Present now:
 
 ```text
 LICENSE  README.md  AGENTS.md  .gitignore  .gitattributes
+package.json  package-lock.json   private; exact tree-sitter-cli pin
+tree-sitter.json                  grammar metadata; all bindings disabled
+grammar.js                        canonical grammar source
+src/                              generated parser artifacts (never hand-edited)
+test/corpus/                      requirement fixtures (bytes/ is byte-exact)
+scripts/                          V0, drift and registry checks
+.github/workflows/ci.yml          hosted CI (Windows, Ubuntu)
 docs/README.md  docs/roadmap.md
 docs/specs/        grammar-contract, language-conformance, grammar-design, tree-schema
 docs/design/       architecture, decisions/ (ADRs)
@@ -52,11 +59,8 @@ docs/provenance/   source-policy, upstream-sources
 docs/validation/   validation, workload-matrix, known-regressions
 ```
 
-Added when grammar implementation begins: `grammar.js`, `tree-sitter.json`
-(all language bindings disabled), a private `package.json` and lockfile that
-pin the generator, `src/**`, `test/corpus/`, `test/samples/`, `scripts/`
-(V0 drift and registry checks, workload generator). CI is added once the
-repository has a remote.
+Added with the remaining grammar work: `test/samples/` and the workload
+scripts (generator, incremental, oracle, fuzz).
 
 Added before the first release: `queries/highlights.scm`, `test/highlight/`.
 

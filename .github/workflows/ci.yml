@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+      - name: Install the pinned generator
+        run: npm ci
+      - name: V0 static checks
+        run: python scripts/check_v0.py
+      - name: Generator identity, regeneration drift and determinism
+        run: python scripts/check_generated.py
+      - name: Registry, catalogue and corpus consistency
+        run: python scripts/check_registry.py
+      - name: Corpus
+        run: npx tree-sitter test
+      - name: No tracked changes
+        shell: bash
+        run: |
+          git status --porcelain
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
