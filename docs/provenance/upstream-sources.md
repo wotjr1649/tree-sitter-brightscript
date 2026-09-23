@@ -151,9 +151,11 @@ resolved to the same commit (the commits the Session 03 runs downloaded).
 | `actions/setup-node` | `v7.0.0` | `820762786026740c76f36085b0efc47a31fe5020` |
 | `actions/setup-python` | `v7.0.0` | `5fda3b95a4ea91299a34e894583c3862153e4b97` |
 
-The runner images (`ubuntu-latest`, `windows-latest`), Node 24.x and Python 3.x
-are not pinned; the generator binary is compared with the table above before it
-runs (`scripts/check_generated.py`).
+The runner images (`ubuntu-latest`, `windows-latest`), Node 24.x (24.20.0 in
+the Session 04 runs) and Python 3.x are not pinned, and the npm version CI uses
+is not logged, so whether it enforces `allowScripts` is not known; either way
+the generator binary is compared with the table above before it runs
+(`scripts/check_generated.py`).
 
 ## Level 4 — Comparative
 
