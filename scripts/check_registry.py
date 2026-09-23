@@ -20,6 +20,8 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from corpus import CORPUS, read_corpus
+
 ROOT = Path(__file__).resolve().parents[1]
 REG = ROOT / "docs/specs/language-conformance.md"
 VAL = ROOT / "docs/validation/validation.md"
@@ -27,7 +29,6 @@ WM = ROOT / "docs/validation/workload-matrix.md"
 TS = ROOT / "docs/specs/tree-schema.md"
 AMB = ROOT / "_ref/normative/roku-docs/notes/ambiguities.md"
 INV = ROOT / "_ref/normative/roku-docs/notes/syntax-inventory.md"
-CORPUS = ROOT / "test/corpus"
 
 AREAS = ["LEX", "LIT", "TYPE", "EXP", "STMT", "FUNC", "ARRAY", "AA", "ERR", "COND"]
 STATUSES = ["documented", "provisional", "tolerated", "unresolved", "invalid", "out-of-scope", "retired"]
@@ -228,40 +229,14 @@ if set(catalogue) != set(fixtures):
                 f"extra {sorted(set(catalogue) - set(fixtures))}")
 
 # ----------------------------------------------------------------- corpus
-DELIM = re.compile(rb"^(=|-){3,}\r?$")
-corpus = {}
-for path in sorted(CORPUS.rglob("*.txt")) if CORPUS.exists() else []:
-    lines = path.read_bytes().split(b"\n")
-    heads = []
-    i = 0
-    while i < len(lines):
-        if re.fullmatch(rb"={3,}\r?", lines[i]):
-            j = i + 1
-            while j < len(lines) and not re.fullmatch(rb"={3,}\r?", lines[j]):
-                j += 1
-            if j < len(lines) and j > i + 1 and lines[i + 1].strip():
-                heads.append((i, j))
-                i = j + 1
-                continue
-        i += 1
-    for k, (i, j) in enumerate(heads):
-        header = [l.decode("utf-8").strip() for l in lines[i + 1:j]]
-        name = header[0]
-        attrs = {a for a in header[1:] if a.startswith(":")}
-        body = lines[j + 1:(heads[k + 1][0] if k + 1 < len(heads) else len(lines))]
-        dividers = [n for n, l in enumerate(body) if re.fullmatch(rb"-{3,}\r?", l)]
-        if not dividers:
-            fail.append(f"{path.name}: {name}: no divider")
-            continue
-        best = max(dividers, key=lambda n: (len(body[n].rstrip(b"\r")), n))
-        data = b"\n".join(body[:best])
-        if data.endswith(b"\r"):
-            data = data[:-1]
-        out = sexp(b"\n".join(body[best + 1:]).decode("utf-8"))
-        rel = path.relative_to(CORPUS).as_posix()
-        if name in corpus:
-            fail.append(f"corpus test appears twice: {name}")
-        corpus[name] = dict(file=rel, input=data, attrs=attrs, tree=out)
+corpus, duplicates = read_corpus(CORPUS) if CORPUS.exists() else ({}, [])
+for name in duplicates:
+    fail.append(f"corpus test appears twice: {name}")
+for name, t in corpus.items():
+    if t["input"] is None:
+        fail.append(f"{t['file']}: {name}: no divider")
+        t["input"], t["expected"] = b"", ""
+    t["tree"] = sexp(t["expected"])
 
 for name, t in corpus.items():
     if name not in fixtures:
