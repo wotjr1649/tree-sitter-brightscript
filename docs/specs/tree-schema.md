@@ -230,10 +230,12 @@ so all 54 node types are in the catalogue.
 Rules applied: every node cites at least one requirement; `block`,
 `argument_list` and `parameter_list` are public because fields point to them
 and queries match them, not for parser convenience; hidden helpers
-(`_terminator`, `_newline`, `_inline_block`, `_inline_statement`,
-`_try_body`, `_try_line`, `_postfix_operand`, `_assignment_target`, the statement-level
-chains, the optional-chaining variants, `_sep`, `_cc_condition`,
-`_inactive_line`, `_inactive_if`) stay internal; punctuation, keywords and the
+(`_line`, `_terminator`, `_newline`, `_block_if`, `_single_line_if`,
+`_inline_else`, `_inline_block`, `_inline_statement`, `_print_item`,
+`_try_body`, `_try_line`, `_postfix_operand`, `_assignment_target`, the
+statement-level chain `_stmt_chain` with `_stmt_member`, `_stmt_index`,
+`_stmt_call` and `_stmt_arguments`, `_sep`, `_cc_condition`,
+`_inactive_item`, `_inactive_line`, `_inactive_if`) stay internal; punctuation, keywords and the
 single-token block terminators stay anonymous. `exit_statement` and
 `continue_statement` have no field for the loop kind: it is the anonymous
 keyword token (`for`, `while` or `exitwhile`), and a field would point at
@@ -258,8 +260,11 @@ a parser:
   body → a child of that `block`; `x = 1 ' c` at file level → a child of
   `source_file` after the `assignment_statement`.
 - Hidden rules contribute their children to the enclosing node; aliased hidden
-  rules (`_inline_block`, `_try_body` → `block`; statement chains → their
-  expression nodes) appear under the alias name with the planned fields.
+  rules appear under the alias name with the planned fields: `_inline_block`
+  and `_try_body` → `block`, `_single_line_if` → `if_statement`,
+  `_inline_else` → `else_clause`, `_stmt_member` → `member_expression`,
+  `_stmt_index` → `index_expression`, `_stmt_call` → `call_expression`,
+  `_stmt_arguments` → `argument_list`.
 
 ### Fields
 

@@ -62,9 +62,6 @@ docs/provenance/   source-policy, upstream-sources
 docs/validation/   validation, workload-matrix, known-regressions
 ```
 
-Added with the remaining release work: the workload scripts for generated
-inputs, the native oracle and fuzzing.
-
 Added only when justified: language bindings or WASM artifacts (per consumer
 demand), `queries/tags.scm` (before 1.0) and other queries, fuzzing tools,
 further validation and report documents.

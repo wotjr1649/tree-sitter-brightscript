@@ -93,7 +93,7 @@ with LF alone.
 | keywords | `kw(w)`: a character-class regex matching `w` in any letter case (`/[eE][nN][dD]/`), aliased to the lower-case anonymous name `w` | anonymous | per rule | BS-LEX-001, 021, 025 |
 | `number` | decimal: (`\d+(\.\d+)?` or `\.\d+`), optional exponent `[eEdD][+-]?\d+`, optional suffix `[%!#&]`; hex: `&[hH][0-9A-Fa-f]+` with optional `&` | public | `expression` | BS-LIT-003–014 |
 | `string` | `"` then any run of (`[^"\r\n]` or `""`) then `"` | public | `expression`, AA keys, `library_statement` | BS-LIT-015–018 |
-| `source_literal` | `kw('line_num')` aliased | public | `expression` | BS-LIT-019 |
+| `source_literal` | a pattern matching `line_num` in any letter case | public | `expression` | BS-LIT-019 |
 | punctuation | `( ) [ ] { } , ; : . @ ? =` | anonymous | per rule | — |
 | optional chaining | `?.` `?@` `?[` `?(` as single tokens | anonymous | postfix rules | BS-LEX-029, 030 |
 | operators | `^ * / \ + - <> < > <= >= << >>`; words `kw('mod') kw('and') kw('or') kw('not')` | anonymous | `binary_expression`, `unary_expression` | BS-EXP-011–019 |
@@ -101,7 +101,7 @@ with LF alone.
 | update operators | `++ --` | anonymous | `update_statement` | BS-STMT-003, 004 |
 | block terminators | `end`, a run of `[ \t]`, then `if`, `for`, `while`, `sub`, `function` or `try`, in any case, each **one token**, aliased to the anonymous names `end if`, `end for`, `end while`, `end sub`, `end function`, `end try` | anonymous | block rules | BS-STMT-010, 012, 015, 016, 022, 036, BS-FUNC-001, 002, BS-ERR-001 |
 | directive words | `#` immediately followed by `const`, `if`, `else`, `end` or `error` in any case, one token each, aliased to `#const`, `#if`, `#else`, `#end`, `#error`; no word boundary (§11) | anonymous | directive rules | BS-COND-001–005, 008 |
-| `error_message` | `[^\r\n]+` with lexical precedence 1 (wins over `comment` for the same text); valid only after `#error` | public | `error_directive` | BS-COND-004 |
+| `error_message` | `[^ \t\r\n][^\r\n]*` with lexical precedence 1 (wins over `comment` for the same text); valid only after `#error` | public | `error_directive` | BS-COND-004 |
 
 Details:
 
@@ -118,13 +118,17 @@ Details:
   keyword's conflicts with other tokens (`identify_keywords` in
   `crates/generate/src/build_tables.rs` @ `v0.27.0`). `comment` overlaps
   `identifier` on `rem`, so keywords that are valid in a state where
-  `identifier` is not (for example `then`, `to`, `in`, `as`, `mod`, `and`,
-  `or`, `catch` and the type names) are not extracted and are recognised by
-  context-aware lexing in the main lexer. Valid input gets the same tree either
-  way. Invalid input can differ: where such a keyword is valid and `identifier`
-  is not, a word that merely begins with it is split (`x = a modx` lexes as
-  `a mod x`, without `ERROR`). No requirement depends on that input
-  (grammar-contract non-goals: not every invalid program is rejected).
+  `identifier` is not (for example `then`, `else`, `to`, `in`, `as`, `mod`,
+  `and`, `or`, `catch` and the type names) are not extracted and are
+  recognised by context-aware lexing in the main lexer. Valid input gets the
+  same tree either way. Invalid input can differ: where such a keyword is valid
+  and `identifier` is not, a word that merely begins with it is split, without
+  `ERROR` (`x = a modx` lexes as `a mod x`, `x = a android` as `a and roid`,
+  `for i = 1 tox` as `to x`, `if a then b() elsex = 1` as `else x = 1`, and in
+  a block IF `else iffy = 1` as `else if fy = 1`). By the same rule a
+  single-line `elseif` lexes as `else` `if`, giving the tree of `else if`
+  (single-line ELSE IF has no requirement row). No requirement depends on such
+  input (grammar-contract non-goals: not every invalid program is rejected).
 - The two-word block terminators are single tokens. After a line terminator
   inside a block, both an END statement (`end`) and the block's own terminator
   are valid; with `end` and `if` as two tokens one token of lookahead could not
@@ -183,7 +187,7 @@ every keyword is contextual.
 
 | Category | Words | Treatment | Requirements |
 |---|---|---|---|
-| A. Reserved grammar keywords | And Dim Each Else ElseIf End EndFunction EndIf EndSub EndWhile Exit ExitWhile False For Function Goto If Invalid LINE_NUM Next Not Or Print Return Step Stop Sub Then To True While (31) + Rem | `kw()` tokens; `Rem` is recognised by the `comment` token | BS-LEX-021, 013 |
+| A. Reserved grammar keywords | And Dim Each Else ElseIf End EndFunction EndIf EndSub EndWhile Exit ExitWhile False For Function Goto If Invalid LINE_NUM Next Not Or Print Return Step Stop Sub Then To True While (31) + Rem | `kw()` tokens, except the literals `True`, `False`, `Invalid` and `LINE_NUM`, which are named nodes matched by case-insensitive patterns (§3); `Rem` is recognised by the `comment` token | BS-LEX-021, 013 |
 | B. Reserved callable names | Box CreateObject Eval GetGlobalAA GetLastRunCompileError GetLastRunRunTimeError ObjFun Pos Run Tab Type (11) | ordinary `identifier`; calls are `call_expression` | BS-LEX-022, 023 |
 | C. Reserved, no documented form | Let (1) | ordinary `identifier`; no LET rule | BS-STMT-034 |
 | D. Syntax words not on the list | As Catch Continue EndTry In Library Mod Throw Try; type names Integer Float Double Boolean String Object Dynamic Void | `kw()` tokens, contextual | BS-LEX-025, BS-ERR-005, BS-TYPE-001 |
@@ -488,10 +492,6 @@ hidden text. A lower precedence for `_inactive_line` is not used: the lexer
 would stop at a completed higher-precedence `comment` (`prefer_transition`)
 and split `Remember` after `Rem`.
 
-Design V2, tried only if V1 fails a criterion: as V1, but `_inactive_line` has
-lexical precedence 1 and `#if`, `#else`, `#end` precedence 2, so every region
-line, including `'` and REM lines, is hidden text and `inactive_text` has no
-`comment` children.
 Directive-like lines (adopted after the Session 03 review, which found that
 `#ifdef FOO` inside a region lexed as `#if` and opened a nested block, so the
 region swallowed the rest of the file). The `#` alternative of
@@ -517,6 +517,10 @@ line end, so a line consisting of exactly `#endi` or `#elsei` still lexes as
 the directive word and yields a local `ERROR`. Fixture:
 `BS-COND-007: directive-like words inside a false region`.
 
+Design V2, tried only if V1 fails a criterion: as V1, but `_inactive_line` has
+lexical precedence 1 and `#if`, `#else`, `#end` precedence 2, so every region
+line, including `'` and REM lines, is hidden text and `inactive_text` has no
+`comment` children.
 
 No other design is tried. A design is adopted when it meets C1–C5 and the
 PASS expectation, for that design, of all fifteen fixtures in the

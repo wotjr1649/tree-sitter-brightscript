@@ -122,8 +122,8 @@ otherwise. Page keys (routes under `https://developer.roku.com/dev/docs/`):
 | CA | Component architecture | `component-architecture` |
 | RF | Runtime functions | `runtime-functions` |
 
-Coverage: a `covered` row meets the definition above at the Session 03 release
-candidate (every listed fixture present and passing in workload W01);
+Coverage: a `covered` row meets the definition above for grammar version
+0.1.0 (Session 03): every listed fixture is present and passes in workload W01;
 `unresolved` and `out-of-scope` rows keep `none`. `—` means no known
 limitation.
 
@@ -335,7 +335,7 @@ limitation.
 | ID | Requirement | Evidence | Since | Status | Grammar | Positive fixtures | Negative / recovery fixtures | Coverage | KL | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|
 | BS-COND-001 | `#const name = value` where value is `true`, `false` or a constant name. | CC (introduction) | unknown | documented | `const_directive` | `BS-COND-001: #const forms` | n/a | covered | — | CC-01, CC-04, VER-27 |
-| BS-COND-002 | `#if condition` … `#end if`, the condition a constant name, `true` or `false`. Conditions are never evaluated; every branch is parsed as BrightScript (baseline, ADR-0004). | CC §Uses, §Undefined constants | unknown | documented | `if_directive` | `BS-COND-002: #if around statements`<br>`BS-COND-002: #if true and #if name bodies are code` | `BS-COND-002: #if missing #end if` (recovery) | covered | — | CC-02, VER-27 |
+| BS-COND-002 | `#if condition` … `#end if`, the condition a constant name, `true` or `false`. Conditions are never evaluated; every branch is parsed as BrightScript (baseline, ADR-0004), except a literal-`false` branch, which is `inactive_text` (BS-COND-007). | CC §Uses, §Undefined constants | unknown | documented | `if_directive` | `BS-COND-002: #if around statements`<br>`BS-COND-002: #if true and #if name bodies are code` | `BS-COND-002: #if missing #end if` (recovery) | covered | — | CC-02, VER-27 |
 | BS-COND-003 | `#else if condition` and `#else` branches. | CC §Uses | unknown | documented | `else_if_directive`, `else_directive` | `BS-COND-003: #else if and #else branches` | n/a | covered | — | CC-02 |
 | BS-COND-004 | `#error message`; the message is free text to the end of the line. | CC §Uses | unknown | documented | `error_directive`, `error_message` | `BS-COND-004: #error with free text` | n/a | covered | — | CC-03 |
 | BS-COND-005 | Directive words and constant names in any letter case. | CC §Criteria; SS | unknown | documented | directive tokens | `BS-COND-005: directives in mixed case` | n/a | covered | — | CC-04, LEX-01 |
@@ -399,8 +399,13 @@ Official code that is not valid source as printed and is never used as a
 fixture: PS §WHILE `print "loop once".` (trailing period); RF §Run
 `BreakIfRunError(LINE_NUM)     stop` (two statements without a separator); CA
 §Attribute operator adjacent operands (BS-EXP-022); EVT §Identifiers bare
-identifier list (`a`, `boy5`, `super_man$`); program output and console
-transcripts in PS §PRINT item list, CA and EH.
+identifier list (`a`, `boy5`, `super_man$`); elisions and placeholders (PS
+§CONTINUE `...`, the PS block-IF outline's `statements`, EVT §Logical
+`then ...` and `IF aa?.foo THEN ...`, CA §Scope `.....`); fragments (EH §The
+backtrace from `CATCH e`, which parses inside a TRY, and RF
+`&hFC==ERR_NORMAL_END`); the SS list of statement types; program output and
+console transcripts in PS §PRINT item list, CA, EH, RF (`20`) and RN 7.1
+(`a from ' {...}`).
 
 ### Research inventory → requirements
 
