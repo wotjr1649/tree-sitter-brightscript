@@ -40,7 +40,7 @@ does not prove either tree is right.
 | V7 | optional | optional | recommended |
 | V8 | — | per Level 2 policy | per Level 2 policy |
 | V9 | — | only for integration claims | only for integration claims |
-| V10 | — | pathological inputs | fuzzing |
+| V10 | — | pathological inputs and a bounded fuzz run (workload W13) | fuzzing |
 
 V9 evidence is produced in `go-treesitter`, not here
 ([ADR-0006](../design/decisions/ADR-0006-downstream-integration-boundary.md)).
@@ -52,6 +52,36 @@ A **session gate** is met when V0 and every check the Gates table requires for
 the session's changes are `PASS`, or `NOT_RUN`/`BLOCKED` with a recorded
 reason; any `FAIL` means the gate is not met.
 
+## Release candidate (0.x)
+
+A 0.x release candidate is declared only when the v0.x column above holds and
+every row below is `PASS`. Workload sets are defined in
+[workload-matrix.md](workload-matrix.md).
+
+| Area | Condition |
+|---|---|
+| Requirements | Every `documented`, `provisional` and `tolerated` requirement has its rule and all of its listed fixtures pass (Coverage `covered`); every `invalid` requirement's negative fixtures pass; a `documented` requirement that is not covered is a disclosed `KL-NNN`; `unresolved` and `out-of-scope` rows are reported as they stand; no coverage claim exceeds the registry. |
+| Generation | The generator is pinned by the ADR-0002 adoption procedure; generated files are committed; regeneration reproduces every generated file byte for byte. |
+| Corpus | W01 and W02 pass. |
+| Valid conformance | No positive fixture and no W03 sample contains `ERROR` or `MISSING`, except a fixture that cites its `KL-NNN`. |
+| Negative and recovery | W08 passes. |
+| Schema | The planned public schema is reconciled with `src/node-types.json`, the catalogue is filled, and every public node and field is reviewed; no unintended public node remains. |
+| Queries | `queries/highlights.scm` compiles and W11 passes. |
+| Incremental | W10 passes (and the spike's E1–E6 when it passed). |
+| Native oracle | W12 is recorded for the candidate identity. |
+| Robustness | W06, W07 and W13 show no crash, hang or runaway memory. |
+| Level 1 refresh | A new dated snapshot of the ten Level 1 pages is taken before the candidate and stored beside `roku-docs-2026-09-23` (source-policy refresh rules); for every page whose content-region SHA-256 changed, each citing requirement is reviewed and the outcome recorded in `upstream-sources.md`. |
+| Provenance | Generator identity, Level 1 snapshot identity and SHA-256 of every generated file are recorded. |
+| Downstream | V9 is not required; it is run only when the work in `go-treesitter` is authorized, and then must pass before a pin change is proposed there. |
+| Review | An independent adversarial review is complete; every material finding is fixed or disclosed as a `KL-NNN` or `provisional` row, and the affected gates were rerun. |
+
+Evidence package, written to `docs/reports/<version>-release-candidate.md` and
+reproducible from the committed identity: requirement coverage summary and
+status counts; generated-file identity; generator identity; schema
+reconciliation (planned vs `node-types.json`); results of W01–W13 with the
+commands used; known limitations; `provisional` and `tolerated` requirements;
+downstream results if run; review findings and their disposition; the verdict.
+
 ## V0 checklist (manual until automated)
 
 1. No `_ref/`, `docs/prompts/`, `docs/plans/`, `artifacts/` or `.work/` content
@@ -61,7 +91,8 @@ reason; any `FAIL` means the gate is not met.
    `src/tree_sitter/*`) and `package-lock.json` are not.
 3. Relative Markdown links in tracked documents resolve.
 4. License metadata is MIT everywhere it appears.
-5. Tracked text files contain no CR bytes and end with a newline.
+5. Tracked text files contain no CR bytes and end with a newline, except
+   files under paths marked `-text` in `.gitattributes` (byte fixtures).
 6. Once a grammar exists: regeneration with the pinned generator reproduces
    every generated file byte for byte, and no `src/scanner.c` exists without
    an accepted ADR.
@@ -91,16 +122,31 @@ ID (V3), and date. A result for one identity is never reused for another.
   affected `BS-*` requirement, the observed behaviour and the fixture that
   demonstrates it. Tree-sitter's `:skip` attribute is allowed only on a fixture
   that cites its `KL-NNN`.
-- No known limitations are recorded yet.
+
+| ID | State | Requirement | Behaviour | Demonstrating fixture |
+|---|---|---|---|---|
+| KL-001 | contingent: active only if the ADR-0004 literal-`false` spike fails; otherwise retired unused | BS-COND-007 | A literal-`false` conditional branch whose text is not BrightScript (the documented block-comment idiom) produces `ERROR` nodes | `BS-COND-007: block comment with prose` and the spike fixtures S3, S5–S8, S10–S12, asserted with `:error` |
 
 ## Fixture rules
 
 - Recovery and negative fixtures assert that an error occurs (`:error`) unless
   a requirement specifies the recovery shape, because recovery trees differ
   between runtimes.
-- Corpus files are LF text. Fixtures whose bytes matter (CRLF, CR, BOM,
-  missing final newline) live under a dedicated path that `.gitattributes`
-  marks `-text` when the first one is added.
+- Positive expectations are written from the specification, never generated
+  with `tree-sitter test --update`; a mismatch is investigated against the
+  specification before either side changes.
+- Corpus files are LF text. Fixtures whose bytes matter (CR bytes, byte-order
+  mark) live under `test/corpus/bytes/`; the commit that adds the first of
+  them adds `test/corpus/bytes/** -text` to `.gitattributes` (likewise for
+  `test/samples/program-crlf.brs`).
+- Every registry fixture exists exactly once in the corpus; inputs and
+  expectations are catalogued in [workload-matrix.md](workload-matrix.md),
+  together with the validation sets W01–W14.
+- `unresolved` forms have no corpus fixture; they appear only as V10 seeds.
+  Out-of-scope "guard" fixtures assert that semantically invalid but
+  well-formed code parses without `ERROR`.
+- Defects of earlier grammars that must not recur are listed in
+  [known-regressions.md](known-regressions.md) with their guarding checks.
 - Generated-artifact drift checks cover every generated file, not only
   `src/parser.c`.
 

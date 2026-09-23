@@ -46,17 +46,19 @@ Present now:
 ```text
 LICENSE  README.md  AGENTS.md  .gitignore  .gitattributes
 docs/README.md  docs/roadmap.md
-docs/specs/        grammar-contract, language-conformance, tree-schema
+docs/specs/        grammar-contract, language-conformance, grammar-design, tree-schema
 docs/design/       architecture, decisions/ (ADRs)
 docs/provenance/   source-policy, upstream-sources
-docs/validation/   validation
+docs/validation/   validation, workload-matrix, known-regressions
 ```
 
 Added when grammar implementation begins: `grammar.js`, `tree-sitter.json`
 (all language bindings disabled), a private `package.json` and lockfile that
-pin the generator, `src/**`, `test/corpus/`, CI.
+pin the generator, `src/**`, `test/corpus/`, `test/samples/`, `scripts/`
+(V0 drift and registry checks, workload generator). CI is added once the
+repository has a remote.
 
-Added before the first release: `queries/highlights.scm`.
+Added before the first release: `queries/highlights.scm`, `test/highlight/`.
 
 Added only when justified: language bindings or WASM artifacts (per consumer
 demand), `queries/tags.scm` (before 1.0) and other queries, fuzzing tools,
@@ -118,6 +120,8 @@ README holding every contract.
 | External scanner | [ADR-0005](decisions/ADR-0005-external-scanner-policy.md) |
 | Downstream boundary | [ADR-0006](decisions/ADR-0006-downstream-integration-boundary.md) |
 | Acceptance policy | [grammar-contract.md](../specs/grammar-contract.md) |
+| Line model, tokens, reserved words, precedence, statement boundaries, implementation order | [grammar-design.md](../specs/grammar-design.md) |
 | Tree stability, versioning | [tree-schema.md](../specs/tree-schema.md) |
 | Validation gates, Level 2 policy | [validation.md](../validation/validation.md) |
+| Validation workloads, fixture catalogue, known regressions | [workload-matrix.md](../validation/workload-matrix.md), [known-regressions.md](../validation/known-regressions.md) |
 | Git workflow | `AGENTS.md` |
