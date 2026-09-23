@@ -32,6 +32,8 @@ jobs:
         run: python scripts/check_generated.py
       - name: Registry, catalogue and corpus consistency
         run: python scripts/check_registry.py --complete
+      - name: Schema reconciliation and catalogue
+        run: python scripts/check_schema.py
       - name: Corpus
         run: npx tree-sitter test
       - name: Composite samples (W03)

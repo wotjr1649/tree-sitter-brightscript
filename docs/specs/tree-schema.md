@@ -57,9 +57,80 @@ nodes are updated in the same commit.
 
 ## Catalogue
 
-Empty. It is filled when the implementation reconciles the planned public
-schema below with the generated `src/node-types.json`; only then do the nodes
-become public in the sense of the tiers above.
+Reconciled in Session 03 (WP17) with `src/node-types.json` of grammar
+version 0.1.0: every planned node, supertype, field (name, types, optional
+and repeated) and unnamed-children entry of the planned schema below equals
+the generated schema, and no unplanned public node exists; the planned schema
+needed no change (`scripts/check_schema.py`). One representational
+difference is not a schema difference: `node-types.json` never lists extras
+as children, so the `comment` children of `inactive_text` (and comments
+elsewhere) do not appear in it. The nodes below are the public tier. The
+table is generated from `node-types.json` and checked by the same script;
+`(extra)` marks a node that may appear anywhere; `?` optional, `*` repeated,
+`+` one or more.
+
+| Node | Fields | Children |
+|---|---|---|
+| `anonymous_function` | `body: block`, `parameters: parameter_list`, `return_type?: type` | — |
+| `argument_list` | — | `expression`* |
+| `array_literal` | — | `expression`* |
+| `assignment_statement` | `left: identifier \| index_expression \| member_expression`, `operator: "*=" \| "+=" \| "-=" \| "/=" \| "<<=" \| "=" \| ">>=" \| "\="`, `right: expression` | — |
+| `associative_array_entry` | `key: identifier \| string`, `value: expression` | — |
+| `associative_array_literal` | — | `associative_array_entry`* |
+| `attribute_expression` | `attribute: identifier`, `object: attribute_expression \| call_expression \| identifier \| index_expression \| member_expression \| parenthesized_expression` | — |
+| `binary_expression` | `left: expression`, `operator: "*" \| "+" \| "-" \| "/" \| "<" \| "<<" \| "<=" \| "<>" \| "=" \| ">" \| ">=" \| ">>" \| "\" \| "^" \| "and" \| "mod" \| "or"`, `right: expression` | — |
+| `block` | — | `statement`* |
+| `call_expression` | `arguments: argument_list`, `function: attribute_expression \| call_expression \| identifier \| index_expression \| member_expression \| parenthesized_expression` | — |
+| `catch_clause` | `body: block`, `variable: identifier` | — |
+| `comment` (extra) | — | — |
+| `const_directive` | `name: identifier`, `value: false \| identifier \| true` | — |
+| `continue_statement` | — | — |
+| `dim_statement` | `dimension+: expression`, `name: identifier` | — |
+| `else_clause` | `body: block` | — |
+| `else_directive` | `body: block` | — |
+| `else_if_clause` | `condition: expression`, `consequence: block` | — |
+| `else_if_directive` | `condition: false \| identifier \| true`, `consequence: block \| inactive_text` | — |
+| `end_statement` | — | — |
+| `error_directive` | `message?: error_message` | — |
+| `error_message` | — | — |
+| `exit_statement` | — | — |
+| `false` | — | — |
+| `for_each_statement` | `body: block`, `collection: expression`, `item: identifier` | — |
+| `for_statement` | `body: block`, `counter: identifier`, `end: expression`, `start: expression`, `step?: expression` | — |
+| `function_declaration` | `body: block`, `name: identifier`, `parameters: parameter_list`, `return_type?: type` | — |
+| `goto_statement` | `label: identifier` | — |
+| `identifier` | — | — |
+| `if_directive` | `alternative*: else_directive \| else_if_directive`, `condition: false \| identifier \| true`, `consequence: block \| inactive_text` | — |
+| `if_statement` | `alternative*: else_clause \| else_if_clause`, `condition: expression`, `consequence: block` | — |
+| `inactive_text` | — | — |
+| `index_expression` | `index+: expression`, `object: attribute_expression \| call_expression \| identifier \| index_expression \| member_expression \| parenthesized_expression` | — |
+| `invalid` | — | — |
+| `label_statement` | `name: identifier` | — |
+| `library_statement` | `path: string` | — |
+| `member_expression` | `object: attribute_expression \| call_expression \| identifier \| index_expression \| member_expression \| number \| parenthesized_expression \| string`, `property: identifier` | — |
+| `number` | — | — |
+| `parameter` | `default?: expression`, `name: identifier`, `type?: type` | — |
+| `parameter_list` | — | `parameter`* |
+| `parenthesized_expression` | — | `expression` |
+| `print_statement` | — | `expression`* |
+| `return_statement` | `value?: expression` | — |
+| `source_file` | — | `statement`* |
+| `source_literal` | — | — |
+| `stop_statement` | — | — |
+| `string` | — | — |
+| `throw_statement` | `value: expression` | — |
+| `true` | — | — |
+| `try_statement` | `body: block`, `handler: catch_clause` | — |
+| `type` | — | — |
+| `unary_expression` | `operand: expression`, `operator: "+" \| "-" \| "not"` | — |
+| `update_statement` | `operand: identifier \| index_expression \| member_expression`, `operator: "++" \| "--"` | — |
+| `while_statement` | `body: block`, `condition: expression` | — |
+
+Supertype `expression`: `anonymous_function`, `array_literal`, `associative_array_literal`, `attribute_expression`, `binary_expression`, `call_expression`, `false`, `identifier`, `index_expression`, `invalid`, `member_expression`, `number`, `parenthesized_expression`, `source_literal`, `string`, `true`, `unary_expression`.
+
+Supertype `statement`: `assignment_statement`, `call_expression`, `const_directive`, `continue_statement`, `dim_statement`, `end_statement`, `error_directive`, `exit_statement`, `for_each_statement`, `for_statement`, `function_declaration`, `goto_statement`, `if_directive`, `if_statement`, `label_statement`, `library_statement`, `print_statement`, `return_statement`, `stop_statement`, `throw_statement`, `try_statement`, `update_statement`, `while_statement`.
+
+Counts: 54 named node types, 2 supertypes, 33 field names.
 
 ## Planned public schema
 
@@ -152,8 +223,9 @@ or more. Unnamed children are named nodes without a field.
 `inactive_text` depended on the ADR-0004 spike
 ([grammar-design.md §11](grammar-design.md#11-conditional-compilation)); the
 spike passed with design V1, so it is part of the schema. Counts:
-53 unconditional node types (`true` and `false` counted separately), 1
-conditional, 2 supertypes, 33 field names.
+53 unconditional node types (`true` and `false` counted separately) and the
+conditional `inactive_text`, 2 supertypes, 33 field names; the spike passed,
+so all 54 node types are in the catalogue.
 
 Rules applied: every node cites at least one requirement; `block`,
 `argument_list` and `parameter_list` are public because fields point to them
