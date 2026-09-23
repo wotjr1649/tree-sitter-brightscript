@@ -5,7 +5,8 @@ Usage: python scripts/check_generated.py [--no-regenerate]
 1. The generator is pinned exactly (package.json, lockfile, installed CLI version).
 2. The installed CLI binary's SHA-256 equals the decompressed release asset
    recorded for this platform in docs/provenance/upstream-sources.md; the
-   binary is not run before this holds.
+   binary is not run before this holds (scripts/tscli.py `verify`, the check
+   every script's CLI run passes through).
 3. No external scanner exists (ADR-0005), and src/ holds only the files the
    generator writes.
 4. Unless --no-regenerate: `tree-sitter generate --abi 15` run twice reproduces
@@ -14,13 +15,11 @@ Stdlib only; exits non-zero on any failure.
 """
 import hashlib
 import json
-import platform
 import re
-import subprocess
 import sys
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+from tscli import ROOT, cli, verify
+
 SRC = ROOT / "src"
 fail = []
 
@@ -33,30 +32,13 @@ locked = lock["packages"].get("node_modules/tree-sitter-cli", {}).get("version")
 if locked != pinned:
     fail.append(f"lockfile tree-sitter-cli {locked} != package.json {pinned}")
 
-exe = ROOT / "node_modules/tree-sitter-cli" / ("tree-sitter.exe" if sys.platform == "win32" else "tree-sitter")
-if not exe.is_file():
-    print(f"FAIL\n  - generator binary missing: {exe} (run npm ci)")
-    sys.exit(1)
-
-os_name = {"win32": "windows", "linux": "linux", "darwin": "macos"}.get(sys.platform, sys.platform)
-arch = {"amd64": "x64", "x86_64": "x64", "arm64": "arm64", "aarch64": "arm64"}.get(platform.machine().lower(), platform.machine().lower())
-asset = f"tree-sitter-{os_name}-{arch}"
-sources = (ROOT / "docs/provenance/upstream-sources.md").read_text(encoding="utf-8")
-recorded = {m.group(1): m.group(3) for m in re.finditer(
-    r"\| `(tree-sitter-[a-z0-9]+-[a-z0-9]+)\.gz` \| `([0-9a-f]{64})` \| `([0-9a-f]{64})` \|", sources)}
-digest = hashlib.sha256(exe.read_bytes()).hexdigest()
-if asset not in recorded:
-    fail.append(f"no recorded binary identity for {asset} in upstream-sources.md (installed SHA-256 {digest})")
-elif recorded[asset] != digest:
-    fail.append(f"{asset}: installed binary SHA-256 {digest} != recorded {recorded[asset]}")
-if recorded.get(asset) != digest:
-    print("FAIL (the binary was not run)")
-    for x in fail:
+try:
+    asset, digest, version = verify()
+except RuntimeError as e:
+    print("FAIL")
+    for x in [*fail, str(e)]:
         print("  -", x)
     sys.exit(1)
-version = subprocess.run([str(exe), "--version"], capture_output=True, text=True).stdout.strip()
-if version != f"tree-sitter {pinned}":
-    fail.append(f"installed CLI reports {version!r}, pinned {pinned}")
 
 if (SRC / "scanner.c").exists():
     fail.append("src/scanner.c exists without an accepted scanner ADR (ADR-0005)")
@@ -80,9 +62,9 @@ if "--no-regenerate" not in sys.argv and not fail:
     before = snapshot()
     runs = []
     for _ in range(2):
-        r = subprocess.run([str(exe), "generate", "--abi", "15"], cwd=ROOT, capture_output=True, text=True)
-        if r.returncode:
-            fail.append(f"generate failed: {r.stderr.strip()}")
+        code, _, err = cli("generate", "--abi", "15", timeout=600)
+        if code:
+            fail.append(f"generate failed: {err.strip()}")
             break
         runs.append(snapshot())
     if len(runs) == 2:

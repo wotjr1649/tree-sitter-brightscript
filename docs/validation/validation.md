@@ -43,7 +43,8 @@ does not prove either tree is right.
 | V10 | — | pathological inputs and a bounded fuzz run (workload W13) | fuzzing |
 
 Hosted CI (`.github/workflows/ci.yml`, Windows and Ubuntu) runs on every push
-V0, generation drift (V1), the registry, schema and corpus checks (V2, V3), V4,
+V0, generation drift (V1), the self-test of the verified CLI path
+(`scripts/test_tscli.py`), the registry, schema and corpus checks (V2, V3), V4,
 the W03 and W05 checks, V5 (W10) and V10 (W06–W08, W13 with fuzzing); the
 commands are in [workload-matrix.md](workload-matrix.md) "Automation". It never
 fetches Roku documentation, so the registry's research-inventory and ambiguity
@@ -127,13 +128,21 @@ Every recorded result names: grammar commit, generator version, ABI,
 SHA-256 of the generated files, runtime version (V5, V6, V9), Level 1 snapshot
 ID (V3), and date. A result for one identity is never reused for another.
 
+Every check script runs the CLI only through `scripts/tscli.py`, which first
+compares the binary's SHA-256 with its record in
+[upstream-sources.md](../provenance/upstream-sources.md) and never runs a
+binary that differs (so the check does not depend on the order of CI steps);
+`python scripts/tscli.py test` is the verified form of `tree-sitter test`. The
+`generate` and `test` scripts in `package.json` call the npm-installed binary
+directly and are conveniences, not evidence.
+
 The Tree-sitter CLI caches a compiled parser by grammar name alone, so a
 parser compiled from another checkout can be loaded silently. Every check
 script therefore runs the CLI with a private parser-library directory
 (`TREE_SITTER_LIBDIR`, `scripts/tscli.py`) and an empty private configuration
 directory (`TREE_SITTER_DIR`), so that a user's `parser-directories` cannot
-select another grammar for `.brs` files; a manual `tree-sitter test` used as
-evidence is run the same way. "No error" means
+select another grammar for `.brs` files; `python scripts/tscli.py` does the
+same for a manual run used as evidence. "No error" means
 the root has-error state is unset, read from `--cst` output: the CLI's exit
 status and default output omit hidden `MISSING` nodes, and exit status 1 also
 reports failures to run, so a check accepts a run only if a tree was printed.

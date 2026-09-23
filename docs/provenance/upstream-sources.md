@@ -110,8 +110,10 @@ commit `6070dbfefd326bd735e5683eb128cc1b57dad0c0`; release published
 npm 12 blocks dependency install scripts unless `package.json` `allowScripts`
 lists them. The entry `tree-sitter-cli@0.27.0` (pinned to the reviewed version)
 lets the package's `install.js` run; it downloads the release asset below and
-decompresses it, nothing else. `scripts/check_generated.py` compares the
-installed binary with this table on every platform that runs it.
+decompresses it, nothing else. `scripts/tscli.py`, the only path through
+which the check scripts run the CLI, compares the installed binary with this
+table before running it, on every platform (`scripts/check_generated.py`
+reports the result).
 
 | Release asset | Asset SHA-256 (equals the release `digest`) | Decompressed binary SHA-256 |
 |---|---|---|
@@ -155,7 +157,7 @@ The runner images (`ubuntu-latest`, `windows-latest`), Node 24.x (24.20.0 or
 24.21.0 in the Session 04 runs) and Python 3.x are not pinned, and the npm
 version CI uses is not logged, so whether it enforces `allowScripts` is not
 known; either way the generator binary is compared with the table above
-before it runs (`scripts/check_generated.py`).
+before it runs (`scripts/tscli.py`).
 
 ## Level 4 — Comparative
 

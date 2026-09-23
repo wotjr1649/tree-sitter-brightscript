@@ -26,8 +26,8 @@ import tempfile
 import time
 from pathlib import Path
 
-from corpus import ROOT, read_corpus
-from tscli import ENV, EXE, cli, cst
+from corpus import read_corpus
+from tscli import cli, cst, popen
 TIME_LIMIT = 10.0
 MEMORY_LIMIT = 1 << 30
 
@@ -105,8 +105,7 @@ def w07_w13_seeds():
 def run(path):
     """Parse one file; return (exit code, seconds, peak bytes, output)."""
     start = time.monotonic()
-    proc = subprocess.Popen([str(EXE), "parse", "--quiet", str(path)], cwd=ROOT, env=ENV,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = popen("parse", "--quiet", path, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         out, _ = proc.communicate(timeout=TIME_LIMIT * 3)
     except subprocess.TimeoutExpired:
@@ -136,8 +135,7 @@ def peak_memory(proc):
 
 def run_posix(path):
     start = time.monotonic()
-    proc = subprocess.Popen([str(EXE), "parse", "--quiet", str(path)], cwd=ROOT, env=ENV,
-                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    proc = popen("parse", "--quiet", path, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     deadline = start + TIME_LIMIT * 3
     while True:
         pid, status, usage = os.wait4(proc.pid, os.WNOHANG)

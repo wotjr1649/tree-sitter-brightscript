@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 
 from corpus import ROOT, read_corpus
-from tscli import EXE, LIBDIR, cst, parse
+from tscli import LIBDIR, cst, parse, verify
 
 sha = lambda b: hashlib.sha256(b).hexdigest()  # noqa: E731
 # The summary line the CLI prints for a tree with an error (crates/cli/src/parse.rs @ v0.27.0):
@@ -72,13 +72,14 @@ def main():
                             has_error=has_error, expected_error=expect_error))
     library, = [p for p in Path(LIBDIR).iterdir() if p.suffix in (".dll", ".so", ".dylib")]
     parser_c = (ROOT / "src/parser.c").read_text(encoding="utf-8")
+    _, binary_sha256, version = verify()
     identity = dict(
         grammar_commit=commit,
-        generator=subprocess.run([str(EXE), "--version"], capture_output=True, text=True).stdout.strip(),
+        generator=version,
         abi=int(re.search(r"#define LANGUAGE_VERSION (\d+)", parser_c).group(1)),
         generated_files={p.relative_to(ROOT).as_posix(): sha(p.read_bytes())
                          for p in sorted((ROOT / "src").rglob("*")) if p.is_file()},
-        cli_binary_sha256=sha(EXE.read_bytes()),
+        cli_binary_sha256=binary_sha256,
         runtime="tree-sitter CLI runtime (same release as the generator)",
         platform=sys.platform,
         workload=dict(cases=len(records), sha256=sha("".join(r["input_sha256"] for r in records).encode())),

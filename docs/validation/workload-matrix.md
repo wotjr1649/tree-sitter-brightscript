@@ -156,7 +156,7 @@ runs all of them except W12 and W14 on Windows and Ubuntu.
 
 | Set | Command |
 |---|---|
-| W01, W02, W04, W07 (valid), W09 (fixtures), W11 | `npx tree-sitter test` (with a private `TREE_SITTER_LIBDIR` or `--rebuild`, validation.md "Identity binding") and `python scripts/check_registry.py --complete` |
+| W01, W02, W04, W07 (valid), W09 (fixtures), W11 | `python scripts/tscli.py test` (verified binary, private parser library, validation.md "Identity binding") and `python scripts/check_registry.py --complete` |
 | W03 | `python scripts/check_samples.py` |
 | W05 | `python scripts/check_spellings.py` |
 | W06, W07 (invalid bytes), W08, W13 | `python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N]` |
