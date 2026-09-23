@@ -36,8 +36,10 @@ jobs:
         run: python scripts/check_schema.py
       - name: Corpus
         run: npx tree-sitter test
-      - name: Composite samples (W03)
-        run: python scripts/check_samples.py
+      - name: Composite samples (W03) and equivalent spellings (W05)
+        run: |
+          python scripts/check_samples.py
+          python scripts/check_spellings.py
       - name: Incremental edits (W10) and literal-false spike criteria C4, C5
         run: |
           python scripts/check_incremental.py
