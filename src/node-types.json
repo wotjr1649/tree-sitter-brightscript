@@ -86,6 +86,10 @@
         "named": true
       },
       {
+        "type": "const_directive",
+        "named": true
+      },
+      {
         "type": "continue_statement",
         "named": true
       },
@@ -95,6 +99,10 @@
       },
       {
         "type": "end_statement",
+        "named": true
+      },
+      {
+        "type": "error_directive",
         "named": true
       },
       {
@@ -115,6 +123,10 @@
       },
       {
         "type": "goto_statement",
+        "named": true
+      },
+      {
+        "type": "if_directive",
         "named": true
       },
       {
@@ -576,6 +588,40 @@
     }
   },
   {
+    "type": "const_directive",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "false",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "true",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "continue_statement",
     "named": true,
     "fields": {}
@@ -623,6 +669,22 @@
     }
   },
   {
+    "type": "else_directive",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "else_if_clause",
     "named": true,
     "fields": {
@@ -649,9 +711,59 @@
     }
   },
   {
+    "type": "else_if_directive",
+    "named": true,
+    "fields": {
+      "condition": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "false",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "true",
+            "named": true
+          }
+        ]
+      },
+      "consequence": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "end_statement",
     "named": true,
     "fields": {}
+  },
+  {
+    "type": "error_directive",
+    "named": true,
+    "fields": {
+      "message": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "error_message",
+            "named": true
+          }
+        ]
+      }
+    }
   },
   {
     "type": "exit_statement",
@@ -806,6 +918,54 @@
         "types": [
           {
             "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "if_directive",
+    "named": true,
+    "fields": {
+      "alternative": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "else_directive",
+            "named": true
+          },
+          {
+            "type": "else_if_directive",
+            "named": true
+          }
+        ]
+      },
+      "condition": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "false",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "true",
+            "named": true
+          }
+        ]
+      },
+      "consequence": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
             "named": true
           }
         ]
@@ -1248,6 +1408,26 @@
     }
   },
   {
+    "type": "#const",
+    "named": false
+  },
+  {
+    "type": "#else",
+    "named": false
+  },
+  {
+    "type": "#end",
+    "named": false
+  },
+  {
+    "type": "#error",
+    "named": false
+  },
+  {
+    "type": "#if",
+    "named": false
+  },
+  {
     "type": "(",
     "named": false
   },
@@ -1491,6 +1671,10 @@
   {
     "type": "endwhile",
     "named": false
+  },
+  {
+    "type": "error_message",
+    "named": true
   },
   {
     "type": "exit",

@@ -40,6 +40,11 @@ function endKw(word) {
   return alias(token(new RegExp(`${ci('end')}[ \\t]+${ci(word)}`)), `end ${word}`);
 }
 
+/** Directive word: `#` immediately followed by the word (BS-COND-005, 008). */
+function directive(word) {
+  return alias(token(new RegExp(`#${ci(word)}`)), `#${word}`);
+}
+
 function commaSep1(rule) {
   return seq(rule, repeat(seq(',', rule)));
 }
@@ -59,7 +64,7 @@ module.exports = grammar({
 
   supertypes: $ => [$.statement, $.expression],
 
-  inline: $ => [$._postfix_operand, $._assignment_target, $._stmt_chain],
+  inline: $ => [$._postfix_operand, $._assignment_target, $._stmt_chain, $._cc_condition],
 
   rules: {
     // ---------------------------------------------------------------- lines
@@ -106,6 +111,9 @@ module.exports = grammar({
       $.throw_statement,
       $.try_statement,
       $.function_declaration,
+      $.const_directive,
+      $.if_directive,
+      $.error_directive,
     ),
 
     // Statement-level chains (grammar-design §6): an identifier head, then
@@ -485,6 +493,42 @@ module.exports = grammar({
     false: _ => new RegExp(ci('false')),
     invalid: _ => new RegExp(ci('invalid')),
     source_literal: _ => new RegExp(ci('line_num')),
+
+    // ------------------------------------- conditional compilation (§11)
+    // BS-COND-001-006, 008, 012, 013: directives are statements; conditions
+    // are never evaluated and every branch body is an ordinary block.
+    const_directive: $ => seq(
+      directive('const'),
+      field('name', $.identifier),
+      '=',
+      field('value', choice($.identifier, $.true, $.false)),
+    ),
+
+    if_directive: $ => seq(
+      directive('if'),
+      field('condition', $._cc_condition),
+      field('consequence', $.block),
+      repeat(field('alternative', $.else_if_directive)),
+      optional(field('alternative', $.else_directive)),
+      directive('end'),
+      kw('if'),
+    ),
+
+    else_if_directive: $ => seq(
+      directive('else'),
+      kw('if'),
+      field('condition', $._cc_condition),
+      field('consequence', $.block),
+    ),
+
+    else_directive: $ => seq(directive('else'), field('body', $.block)),
+
+    error_directive: $ => seq(directive('error'), optional(field('message', $.error_message))),
+
+    // BS-COND-004: free text to the end of the line, apostrophes included.
+    error_message: _ => token(prec(1, /[^ \t\r\n][^\r\n]*/)),
+
+    _cc_condition: $ => choice($.identifier, $.true, $.false),
 
     // BS-LEX-015, 017, 018: the designator is part of the identifier. Defined
     // last: an equal-length match goes to the earlier token, so every keyword

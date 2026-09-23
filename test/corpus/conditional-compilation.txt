@@ -1,0 +1,232 @@
+================================================================================
+BS-COND-001: #const forms
+================================================================================
+#const someFlag = true
+#const anotherFlag = false
+#const someOtherFlag = someFlag
+--------------------------------------------------------------------------------
+
+(source_file
+  (const_directive
+    name: (identifier)
+    value: (true))
+  (const_directive
+    name: (identifier)
+    value: (false))
+  (const_directive
+    name: (identifier)
+    value: (identifier)))
+
+================================================================================
+BS-COND-002: #if around statements
+================================================================================
+#if mylibrary_enable_detailed_logging
+    ? "hello world"
+#end if
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_directive
+    condition: (identifier)
+    consequence: (block
+      (print_statement
+        (string)))))
+
+================================================================================
+BS-COND-002: #if true and #if name bodies are code
+================================================================================
+#if true
+  x = 1
+#end if
+#if DEBUG
+  y = 2
+#end if
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_directive
+    condition: (true)
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number))))
+  (if_directive
+    condition: (identifier)
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))))
+
+================================================================================
+BS-COND-003: #else if and #else branches
+================================================================================
+#const FeatureA = true
+#if FeatureA
+  'code for Feature A
+#else if FeatureB
+  x = 1
+#else
+  y = 2
+#end if
+--------------------------------------------------------------------------------
+
+(source_file
+  (const_directive
+    name: (identifier)
+    value: (true))
+  (if_directive
+    condition: (identifier)
+    consequence: (block
+      (comment))
+    alternative: (else_if_directive
+      condition: (identifier)
+      consequence: (block
+        (assignment_statement
+          left: (identifier)
+          right: (number))))
+    alternative: (else_directive
+      body: (block
+        (assignment_statement
+          left: (identifier)
+          right: (number))))))
+
+================================================================================
+BS-COND-004: #error with free text
+================================================================================
+#if FeatureAImplemented
+  ' code
+#else
+  #error TO DO: implement feature A, don't forget
+#end if
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_directive
+    condition: (identifier)
+    consequence: (block
+      (comment))
+    alternative: (else_directive
+      body: (block
+        (error_directive
+          message: (error_message))))))
+
+================================================================================
+BS-COND-005: directives in mixed case
+================================================================================
+#CONST Flag = TRUE
+#If flag
+  x = 1
+#Else If other
+#ELSE
+#End If
+--------------------------------------------------------------------------------
+
+(source_file
+  (const_directive
+    name: (identifier)
+    value: (true))
+  (if_directive
+    condition: (identifier)
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))
+    alternative: (else_if_directive
+      condition: (identifier)
+      consequence: (block))
+    alternative: (else_directive
+      body: (block))))
+
+================================================================================
+BS-COND-006: #if around function declarations
+================================================================================
+#if DEBUG
+function debugOnly()
+end function
+#end if
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_directive
+    condition: (identifier)
+    consequence: (block
+      (function_declaration
+        name: (identifier)
+        parameters: (parameter_list)
+        body: (block)))))
+
+================================================================================
+BS-COND-008: indented directives with comments
+================================================================================
+sub main()
+    #if DEBUG ' debug only
+        print "d"
+    #else   if   OTHER
+    #end	if ' done
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (if_directive
+        condition: (identifier)
+        (comment)
+        consequence: (block
+          (print_statement
+            (string)))
+        alternative: (else_if_directive
+          condition: (identifier)
+          consequence: (block)))
+      (comment))))
+
+================================================================================
+BS-COND-012: #if inside a function body
+================================================================================
+sub main()
+#if DEBUG
+  print "d"
+#end if
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (if_directive
+        condition: (identifier)
+        consequence: (block
+          (print_statement
+            (string)))))))
+
+================================================================================
+BS-COND-012: nested #if blocks
+================================================================================
+#if A
+  #if B
+    x = 1
+  #end if
+#end if
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_directive
+    condition: (identifier)
+    consequence: (block
+      (if_directive
+        condition: (identifier)
+        consequence: (block
+          (assignment_statement
+            left: (identifier)
+            right: (number)))))))
+
+================================================================================
+BS-COND-013: #const with a non-boolean value
+:error
+================================================================================
+#const x = 5
+--------------------------------------------------------------------------------
