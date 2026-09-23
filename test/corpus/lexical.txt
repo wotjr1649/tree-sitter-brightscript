@@ -509,6 +509,62 @@ End Function
         value: (number)))))
 
 ================================================================================
+BS-LEX-021: reserved keywords in mixed case
+================================================================================
+Sub Main()
+  For Each v In list
+    If v = False And Not x Or y Then
+      Print LINE_NUM
+    ElseIf v Then
+      Stop
+    Else
+      While z
+        ExitWhile
+      EndWhile
+    EndIf
+  Next
+EndSub
+Function F()
+EndFunction
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (for_each_statement
+        item: (identifier)
+        collection: (identifier)
+        body: (block
+          (if_statement
+            condition: (binary_expression
+              left: (binary_expression
+                left: (binary_expression
+                  left: (identifier)
+                  right: (false))
+                right: (unary_expression
+                  operand: (identifier)))
+              right: (identifier))
+            consequence: (block
+              (print_statement
+                (source_literal)))
+            alternative: (else_if_clause
+              condition: (identifier)
+              consequence: (block
+                (stop_statement)))
+            alternative: (else_clause
+              body: (block
+                (while_statement
+                  condition: (identifier)
+                  body: (block
+                    (exit_statement))))))))))
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block)))
+
+================================================================================
 BS-LEX-022: reserved built-in function calls
 ================================================================================
 o = CreateObject("roList")
@@ -557,6 +613,31 @@ print tab(5) pos(0)
       function: (identifier)
       arguments: (argument_list
         (number)))))
+
+================================================================================
+BS-LEX-022: Eval, Run and GetLastRunRunTimeError calls
+================================================================================
+r = Eval("x = 1")
+Run("pkg:/source/other.brs")
+e = GetLastRunRunTimeError()
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (string))))
+  (call_expression
+    function: (identifier)
+    arguments: (argument_list
+      (string)))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list))))
 
 ================================================================================
 BS-LEX-024: keywords as member names
@@ -615,6 +696,23 @@ aa = { function: "main()", end: 1, if: 2, next: 3 }
         value: (number)))))
 
 ================================================================================
+BS-LEX-024: function as a member name after an index
+================================================================================
+name = e.backtrace[i].function
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (member_expression
+      object: (index_expression
+        object: (member_expression
+          object: (identifier)
+          property: (identifier))
+        index: (identifier))
+      property: (identifier))))
+
+================================================================================
 BS-LEX-025: non-reserved keyword words as identifiers
 ================================================================================
 mod = 3
@@ -641,6 +739,41 @@ y = a mod b
     left: (identifier)
     right: (binary_expression
       left: (identifier)
+      right: (identifier))))
+
+================================================================================
+BS-LEX-025: more non-reserved words as identifiers
+================================================================================
+x = continue + library + throw + try + catch + endtry
+y = float + double + boolean + object + dynamic + void
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (binary_expression
+          left: (binary_expression
+            left: (binary_expression
+              left: (identifier)
+              right: (identifier))
+            right: (identifier))
+          right: (identifier))
+        right: (identifier))
+      right: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (binary_expression
+          left: (binary_expression
+            left: (binary_expression
+              left: (identifier)
+              right: (identifier))
+            right: (identifier))
+          right: (identifier))
+        right: (identifier))
       right: (identifier))))
 
 ================================================================================

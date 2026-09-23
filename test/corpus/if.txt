@@ -309,6 +309,38 @@ end if
         value: (number)))))
 
 ================================================================================
+BS-STMT-010: ELSE IF and ELSEIF without THEN
+================================================================================
+if a
+  x = 1
+else if b
+  x = 2
+elseif c
+  x = 3
+end if
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))
+    alternative: (else_if_clause
+      condition: (identifier)
+      consequence: (block
+        (assignment_statement
+          left: (identifier)
+          right: (number))))
+    alternative: (else_if_clause
+      condition: (identifier)
+      consequence: (block
+        (assignment_statement
+          left: (identifier)
+          right: (number))))))
+
+================================================================================
 BS-STMT-011: ELSE and ELSE IF headers followed by comments and colons
 ================================================================================
 if a then

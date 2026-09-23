@@ -201,6 +201,60 @@ end	for
         consequence: (block)))))
 
 ================================================================================
+BS-STMT-022: more multi-word keywords with extra spacing
+================================================================================
+function f()
+  for i = 1 to 2
+    if a then
+      exit  for
+    else  if b then
+      continue	for
+    end if
+  end  for
+  while x
+    exit	while
+  end  while
+  try
+  catch e
+  end  try
+end  function
+sub s()
+end	sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (for_statement
+        counter: (identifier)
+        start: (number)
+        end: (number)
+        body: (block
+          (if_statement
+            condition: (identifier)
+            consequence: (block
+              (exit_statement))
+            alternative: (else_if_clause
+              condition: (identifier)
+              consequence: (block
+                (continue_statement))))))
+      (while_statement
+        condition: (identifier)
+        body: (block
+          (exit_statement)))
+      (try_statement
+        body: (block)
+        handler: (catch_clause
+          variable: (identifier)
+          body: (block)))))
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block)))
+
+================================================================================
 BS-STMT-035: one-line loop and TRY bodies with colons
 ================================================================================
 for i = 1 to 3 : print i : end for
@@ -236,6 +290,20 @@ try : f() : catch e : print e : end try
           (identifier))))))
 
 ================================================================================
+BS-STMT-035: FOR EACH header ending with a colon
+================================================================================
+for each v in list : print v : end for
+--------------------------------------------------------------------------------
+
+(source_file
+  (for_each_statement
+    item: (identifier)
+    collection: (identifier)
+    body: (block
+      (print_statement
+        (identifier)))))
+
+================================================================================
 BS-STMT-036: nested blocks close with their own terminators
 ================================================================================
 for i = 1 to 2
@@ -262,3 +330,44 @@ end for
               (assignment_statement
                 left: (identifier)
                 right: (false)))))))))
+
+================================================================================
+BS-STMT-036: compact terminators close their own constructs
+================================================================================
+function f()
+  try
+    while x
+      if y then
+        x = false
+      endif
+    endwhile
+  catch e
+  endtry
+endfunction
+sub s()
+endsub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (try_statement
+        body: (block
+          (while_statement
+            condition: (identifier)
+            body: (block
+              (if_statement
+                condition: (identifier)
+                consequence: (block
+                  (assignment_statement
+                    left: (identifier)
+                    right: (false)))))))
+        handler: (catch_clause
+          variable: (identifier)
+          body: (block)))))
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block)))

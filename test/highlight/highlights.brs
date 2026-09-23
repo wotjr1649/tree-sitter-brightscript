@@ -131,7 +131,7 @@ again:
 end function
 ' <- keyword
 sub Tail() : end : endsub
-'                  ^ keyword
+'            ^ keyword
 '                  ^ keyword
 sub Register(handler as Function)
 '            ^ variable.parameter
