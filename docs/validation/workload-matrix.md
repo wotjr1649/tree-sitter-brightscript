@@ -198,6 +198,7 @@ token.
 | `BS-LEX-008: final line with a line terminator` | `x = 1↵` | same tree as the previous fixture |
 | `BS-LEX-008: empty file` | (empty) | `(source_file)` |
 | `BS-LEX-008: only comments and blank lines` | `' a↵↵REM b↵` | `(source_file (comment) (comment))` |
+| `BS-LEX-008: only indented blank lines` | `  ↵⇥↵  ` | `(source_file)` |
 | `BS-LEX-009: blank lines around and inside blocks` | `↵↵sub main()↵↵  x = 1↵↵end sub↵↵` | `(source_file (function_declaration name: (identifier) parameters: (parameter_list) body: (block (assignment_statement …))))` |
 | `BS-LEX-010: colon-separated statements` | `x=5:print 25; " is"; x^2` | `(assignment_statement …)`, `(print_statement (number) (string) (binary_expression …))` |
 | `BS-LEX-010: colon-separated statements in a block body` | `sub main()↵  a = 1 : b = 2 : print a↵end sub` | `block` holding two `assignment_statement`s and a `print_statement` |
@@ -489,8 +490,8 @@ terminator or delimiter its construct is documented to have.
 
 | Item | Count |
 |---|---|
-| registry fixtures catalogued | 223 |
-| positive (including 4 guards; on a spike FAIL, 10 literal-false fixtures take their `:error` form) | 194 |
+| registry fixtures catalogued | 224 |
+| positive (including 4 guards; on a spike FAIL, 10 literal-false fixtures take their `:error` form) | 195 |
 | negative (`invalid` evidence) | 13 |
 | recovery (including spike R1–R3) | 16 |
 | corpus files | 13 (`bytes/` counted once) |
