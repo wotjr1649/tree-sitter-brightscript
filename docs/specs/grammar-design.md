@@ -528,8 +528,10 @@ otherwise):
   needs its own `#end if`; without one the region runs to the end of the file.
 - `#else` in the same position (`#else:`, `#else what`, `#elsei`) closes the
   region and the following lines are parsed as code, with or without `ERROR`.
-- `#end` in the same position (`#end.`, `#end region`, `#endi`) yields a local
-  `ERROR`; the region continues.
+- `#end` in the same position (`#end.`, `#end region`, `#endi`) yields an
+  `ERROR` that can also cover a neighbouring region line (the next one, or the
+  region text before it when the next line is not code); the block still ends
+  at the next `#end if`, and nothing after it is affected.
 
 These inputs are W13 seeds (robustness only).
 

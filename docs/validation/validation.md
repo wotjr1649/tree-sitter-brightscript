@@ -42,9 +42,12 @@ does not prove either tree is right.
 | V9 | — | only for integration claims | only for integration claims |
 | V10 | — | pathological inputs and a bounded fuzz run (workload W13) | fuzzing |
 
-Hosted CI (`.github/workflows/ci.yml`, Windows and Ubuntu) runs V0, generation
-drift (V1), the registry and corpus checks (V2, V3) and, once queries exist,
-V4 on every push; it never fetches Roku documentation.
+Hosted CI (`.github/workflows/ci.yml`, Windows and Ubuntu) runs on every push
+V0, generation drift (V1), the registry, schema and corpus checks (V2, V3), V4,
+the W03 and W05 checks, V5 (W10) and V10 (W06–W08, W13 with fuzzing); the
+commands are in [workload-matrix.md](workload-matrix.md) "Automation". It never
+fetches Roku documentation, so the registry's research-inventory and ambiguity
+reconciliations, which read the local `_ref/`, run only locally.
 
 V9 evidence is produced in `go-treesitter`, not here
 ([ADR-0006](../design/decisions/ADR-0006-downstream-integration-boundary.md)).
@@ -54,7 +57,11 @@ link here.
 
 A **session gate** is met when V0 and every check the Gates table requires for
 the session's changes are `PASS`, or `NOT_RUN`/`BLOCKED` with a recorded
-reason; any `FAIL` means the gate is not met.
+reason; a `FAIL` of any of those checks means the gate is not met. A level the
+table does not require for the session's changes (for example V7, or V9
+without an integration claim) may still be run; its `FAIL` is recorded and
+disclosed, does not by itself fail the session gate, and supports no claim of
+that level.
 
 ## Release candidate (0.x)
 
