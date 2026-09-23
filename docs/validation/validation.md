@@ -91,7 +91,10 @@ ID (V3), and date. A result for one identity is never reused for another.
   affected `BS-*` requirement, the observed behaviour and the fixture that
   demonstrates it. Tree-sitter's `:skip` attribute is allowed only on a fixture
   that cites its `KL-NNN`.
-- No known limitations are recorded yet.
+
+| ID | State | Requirement | Behaviour | Demonstrating fixture |
+|---|---|---|---|---|
+| KL-001 | contingent: active only if the ADR-0004 literal-`false` spike fails; otherwise retired unused | BS-COND-007 | A literal-`false` conditional branch whose text is not BrightScript (the documented block-comment idiom) produces `ERROR` nodes | `BS-COND-007: block comment with prose`, asserted with `:error` |
 
 ## Fixture rules
 
