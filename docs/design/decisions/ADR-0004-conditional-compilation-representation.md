@@ -63,7 +63,7 @@ that treats `#if false` / `#if 0` bodies as opaque. Identities:
 
 Added 2026-09-23 (Session 02); it refines, and does not change, the decision.
 Inputs, expected trees, the planned scanner-free
-design, the attempt budget and both outcomes are fixed in
+designs to try (V1, then V2) and both outcomes are fixed in
 [grammar-design.md §11](../../specs/grammar-design.md#11-conditional-compilation).
 The optional extension to the `#else` branch of a literal `true` condition is
 not attempted. The spike result updates this ADR's status line; the failure

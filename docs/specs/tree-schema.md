@@ -345,7 +345,7 @@ hidden rules or anonymous children).
 | BS-STMT-018 | S | `exit_statement` |
 | BS-STMT-019 | S | `continue_statement` |
 | BS-STMT-020 | N | `while_statement`, `exit_statement` |
-| BS-STMT-022 | L | separate keyword tokens |
+| BS-STMT-022 | L | single-token terminators; separate tokens for other multi-word keywords |
 | BS-STMT-023 | S | `return_statement` |
 | BS-STMT-024 | S | `print_statement` |
 | BS-STMT-025 | S | `print_statement` |

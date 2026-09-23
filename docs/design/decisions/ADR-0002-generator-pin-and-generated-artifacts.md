@@ -64,7 +64,11 @@ fallback order; it does not change decisions 1–7. The session that first runs
    not checked further, so it is not eligible. Order: descending semantic
    version. The first is the candidate. If the release list cannot be read
    (no network), the procedure is `BLOCKED` and the user is told what is
-   missing; no version is guessed.
+   missing; no version is guessed. A candidate newer than `v0.27.0` is
+   eligible only after the Level 3 facts that grammar-design cites (§2 corpus
+   newline handling, §3 keyword extraction and token tie-breaking, §4 state
+   merging and keyword fallback, `parse --edits`) are re-read at its tag; a
+   fact that no longer holds fails the candidate, and the check is recorded.
 2. **Issue review.** For every issue listed in this ADR (#5910, #5925) and
    every open issue that names the candidate version in its title and is
    labelled as a bug, record number, state and whether it concerns the

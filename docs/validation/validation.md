@@ -70,6 +70,7 @@ every row below is `PASS`. Workload sets are defined in
 | Incremental | W10 passes (and the spike's E1–E6 when it passed). |
 | Native oracle | W12 is recorded for the candidate identity. |
 | Robustness | W06, W07 and W13 show no crash, hang or runaway memory. |
+| Level 1 refresh | A new dated snapshot of the ten Level 1 pages is taken before the candidate and stored beside `roku-docs-2026-09-23` (source-policy refresh rules); for every page whose content-region SHA-256 changed, each citing requirement is reviewed and the outcome recorded in `upstream-sources.md`. |
 | Provenance | Generator identity, Level 1 snapshot identity and SHA-256 of every generated file are recorded. |
 | Downstream | V9 is not required; it is run only when the work in `go-treesitter` is authorized, and then must pass before a pin change is proposed there. |
 | Review | An independent adversarial review is complete; every material finding is fixed or disclosed as a `KL-NNN` or `provisional` row, and the affected gates were rerun. |

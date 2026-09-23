@@ -410,6 +410,7 @@ The last input line, just before the divider, ends with LF alone
 | `BS-COND-008: indented directives with comments` | `sub main()↵    #if DEBUG ' debug only↵        print "d"↵    #else   if   OTHER↵    #end⇥if ' done↵end sub` | `(source_file (function_declaration name: (identifier) parameters: (parameter_list) body: (block (if_directive condition: (identifier) (comment) consequence: (block (print_statement (string))) alternative: (else_if_directive condition: (identifier) consequence: (block))) (comment))))` |
 | `BS-COND-012: #if inside a function body` | `sub main()↵#if DEBUG↵  print "d"↵#end if↵end sub` | `(function_declaration … body: (block (if_directive condition: (identifier) consequence: (block (print_statement (string))))))` |
 | `BS-COND-012: nested #if blocks` | `#if A↵  #if B↵    x = 1↵  #end if↵#end if` | `(if_directive condition: (identifier) consequence: (block (if_directive condition: (identifier) consequence: (block (assignment_statement …)))))` |
+| `BS-COND-013: #const with a non-boolean value` | `#const x = 5` | `:error` |
 
 ADR-0004 literal-false fixtures (grammar-design §11). The PASS column applies
 to design V1; under V2 every `(comment)` inside `inactive_text` is absent. On
@@ -420,7 +421,7 @@ FAIL, `:error` fixtures are listed as KL-001 demonstrating fixtures.
 | `BS-COND-007: block comment with prose` | `#if false↵    This is a function that does nothing.↵    It takes no parameters.↵#end if↵function foo() as void↵    'do nothing↵end function` | `(source_file (if_directive condition: (false) consequence: (inactive_text)) (function_declaration name: (identifier) parameters: (parameter_list) return_type: (type) body: (block (comment))))` | `:error` |
 | `BS-COND-007: commented-out function` | `#if false↵    function Order66() as void↵        'code for Order66↵    end function↵#end if` | `(source_file (if_directive condition: (false) consequence: (inactive_text (comment))))` | `(source_file (if_directive condition: (false) consequence: (block (function_declaration name: (identifier) parameters: (parameter_list) return_type: (type) body: (block (comment))))))` |
 | `BS-COND-007: spike S3 case variants of #if false` | `#IF FALSE↵    Some prose here.↵#END IF↵#If False↵    More prose.↵#End If` | `(source_file (if_directive condition: (false) consequence: (inactive_text)) (if_directive condition: (false) consequence: (inactive_text)))` | `:error` |
-| `BS-COND-007: spike S4 #if falsey is code` | `#if falsey↵    x = 1↵#end if` | `(source_file (if_directive condition: (identifier) consequence: (block (assignment_statement left: (identifier) right: (number)))))` | same as PASS |
+| `BS-COND-007: spike S4 #if falsey is code` | `#if falsey↵    x = 1↵#end if↵#if falsey ' note↵    y = 2↵#end if` | `(source_file (if_directive condition: (identifier) consequence: (block (assignment_statement left: (identifier) right: (number)))) (if_directive condition: (identifier) (comment) consequence: (block (assignment_statement left: (identifier) right: (number)))))` | same as PASS |
 | `BS-COND-007: spike S5 comment after #if false` | `#if false ' note↵    Prose with words.↵#end if` | `(source_file (if_directive condition: (false) (comment) consequence: (inactive_text)))` | `:error` |
 | `BS-COND-007: spike S6 #else after a false branch` | `#if false↵    Prose line.↵#else↵    x = 1↵#end if` | `(source_file (if_directive condition: (false) consequence: (inactive_text) alternative: (else_directive body: (block (assignment_statement left: (identifier) right: (number))))))` | `:error` |
 | `BS-COND-007: spike S7 #else if after a false branch` | `#if false↵    Prose line.↵#else if DEBUG↵    x = 1↵#end if` | `(source_file (if_directive condition: (false) consequence: (inactive_text) alternative: (else_if_directive condition: (identifier) consequence: (block (assignment_statement left: (identifier) right: (number))))))` | `:error` |
@@ -458,9 +459,9 @@ terminator or delimiter its construct is documented to have.
 
 | Item | Count |
 |---|---|
-| registry fixtures catalogued | 209 |
+| registry fixtures catalogued | 210 |
 | positive (including 4 guards; on a spike FAIL, 9 literal-false fixtures take their `:error` form) | 183 |
-| negative (`invalid` evidence) | 10 |
+| negative (`invalid` evidence) | 11 |
 | recovery (including spike R1–R3) | 16 |
 | corpus files | 13 (`bytes/` counted once) |
 | incremental scripts | 12 + E1–E6 |

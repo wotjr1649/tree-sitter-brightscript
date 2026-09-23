@@ -114,9 +114,11 @@ Details:
   longest match prefers `end if` over `end`. The token contains whitespace, so
   it is not a keyword-extraction candidate. The other multi-word keywords
   (`else if`, `for each`, `exit for`, `exit while`, `continue for`,
-  `continue while`, `#else if`, `#end if`) stay separate tokens: their first
-  word never competes with a statement start. In both cases any run of spaces
-  or tabs may separate the words and a newline may not (BS-STMT-022).
+  `continue while`, `#else if`, `#end if`) stay separate tokens: one token of
+  lookahead after their first word decides (`else`, `#else` and `#end` never
+  start a statement, and after `exit`, `for` or `continue` the next word
+  selects the form). In both cases any run of spaces or tabs may separate the
+  words and a newline may not (BS-STMT-022).
 - A digit run followed by `.` and a letter is `number` then `.`: the fraction
   requires a digit after the point, so `5.tostr()` is member access
   (BS-LIT-014), and `5.` is not a number (BS-LIT-013, unresolved).
@@ -200,7 +202,8 @@ Fallback, used only when one of those fixtures fails and its actual tree has
 a keyword token where the fixture expects an `identifier` (or the reverse),
 after confirming the fixture matches this document:
 
-- add `reserved: { global: [category A keyword tokens], property: [] }`;
+- add `reserved: { global: [...], property: [] }`, where `global` lists the 31
+  `kw()` tokens of category A (not `Rem`);
 - wrap the identifier in member-name and AA-key positions with
   `reserved('property', …)`;
 - keep category D contextual.
@@ -317,7 +320,7 @@ Boundary rules:
 | Newline- and colon-delimited statements | `source_file` and `block` lists (§2) | BS-LEX-005, 010, 011 |
 | Single-line vs block IF | after `IF condition [THEN]`: `_terminator` or comment → block form (the block begins with that terminator); a statement start → single-line form | BS-STMT-007, 008 |
 | Single-line branch extent | `_inline_block` = `_inline_statement ( ':'+ _inline_statement )*`, right-precedence so `:` and `ELSE` continue the innermost single-line IF; ends at the enclosing `_terminator` that is a newline, or at EOF; a trailing `:` has no rule | BS-STMT-007, 009 |
-| `_inline_statement` | assignment, call, PRINT, RETURN, EXIT, CONTINUE, STOP (documented); update, GOTO, END, THROW, DIM, single-line IF (provisional) | BS-STMT-007, 009 |
+| `_inline_statement` | assignment, call, PRINT, RETURN, EXIT, CONTINUE, STOP (documented); update, GOTO, END, THROW, DIM, and a nested single-line IF only — the single-line alternative as a hidden rule aliased to `if_statement` (provisional) | BS-STMT-007, 009 |
 | ELSE association | single-line: nearest unmatched single-line IF; block: `ELSE` after a block body belongs to the open block IF | BS-STMT-009, 010 |
 | Block IF clauses | `ELSE IF`/`ELSEIF` + condition + optional THEN + `block`; `ELSE` + `block` | BS-STMT-010, 011 |
 | Labels | `label_statement` only in `source_file`/`block` lists, never in single-line branches | BS-LEX-027, 028 |
@@ -459,9 +462,12 @@ lexical precedence 1 and `#if`, `#else`, `#end` precedence 2, so every region
 line, including `'` and REM lines, is hidden text and `inactive_text` has no
 `comment` children.
 
-No other design is tried. A design is adopted when it meets C1–C5 and every
-spike fixture's PASS expectation for that design; V1 is judged first, then V2;
-if neither qualifies, the result is FAIL. No question is asked. V1's tie
+No other design is tried. A design is adopted when it meets C1–C5 and the
+PASS expectation, for that design, of all fifteen fixtures in the
+literal-false table of the workload-matrix catalogue (the two registry
+fixtures and S3–S12, R1–R3). Each design first gets the §15 allowance of three
+attempts for implementation defects; V1 is judged first, then V2; if neither
+qualifies, the result is FAIL. No question is asked. V1's tie
 analysis above assumes `comment` is a single token (REM mechanism 1 or 3,
 §3); if mechanism 2 was adopted, V1 is still tried first and judged only by
 the criteria and expectations.
@@ -499,7 +505,7 @@ the spike; every baseline COND fixture still passes.
 
 ## 12. Rule families
 
-| Family | Purpose | Requirements | Public nodes (fields) | Conflicts / risks | Fixture files | Depends on |
+| Family | Purpose | Requirements | Public nodes (fields) | Conflicts / risks | Main fixture file (the catalogue decides per fixture) | Depends on |
 |---|---|---|---|---|---|---|
 | Line and file | statement lists, EOF, blank lines | BS-LEX-005–011, BS-STMT-033, 035 | `source_file`, `block` | block start terminator | `lexical.txt`, `bytes/*` | — |
 | Comments | `'` and REM | BS-LEX-012–014 | `comment` | REM tie (§3) | `lexical.txt` | line |
@@ -582,7 +588,7 @@ produce it, with the reason recorded in the same commit.
 
 | WP | Content | Requirements | Files | Focused tests | Exit criteria | Depends on | If the design assumption fails |
 |---|---|---|---|---|---|---|---|
-| 0 | Toolchain and bootstrap: adoption procedure, `package.json` (private, exact devDependency, scripts `generate` = `tree-sitter generate --abi 15`, `test` = `tree-sitter test`), lockfile, `tree-sitter.json` (name `brightscript`, scope `source.brs`, file type `brs`, version `0.1.0`, license MIT, all bindings disabled), minimal `grammar.js` (`source_file` of comments and terminators), V0 drift and registry checks as scripts | — | `package.json`, lockfile, `tree-sitter.json`, `grammar.js`, `src/*`, `scripts/*` | generate twice, drift 0 | pinned identity recorded | — | ADR-0002 fallback order |
+| 0 | Toolchain and bootstrap: adoption procedure, `package.json` (private, exact devDependency, scripts `generate` = `tree-sitter generate --abi 15`, `test` = `tree-sitter test`), lockfile, `tree-sitter.json` (name `brightscript`, scope `source.brs`, file type `brs`, version `0.1.0`, license MIT, all bindings disabled), minimal `grammar.js` (`source_file` of comments and terminators), V0 drift and registry checks as scripts, the ADR-0002 smoke fixtures | — | `package.json`, lockfile, `tree-sitter.json`, `grammar.js`, `src/*`, `scripts/*`, `test/corpus/lexical.txt` and `test/corpus/bytes/*` (smoke fixtures only), `.gitattributes` | generate twice, drift 0 | pinned identity recorded | — | ADR-0002 fallback order |
 | 1 | Line model, comments, bytes corpus | BS-LEX-002–014, 033 | + `test/corpus/lexical.txt`, `test/corpus/bytes/*`, `.gitattributes` | runnable lexical and bytes fixtures | REM mechanism chosen; runnable fixtures pass | 0 | §3 REM fallbacks 2, 3 |
 | 2 | Identifiers, `kw()`, word token | BS-LEX-001, 015–026 | `lexical.txt` | keyword-boundary fixtures | BS-LEX-024–026 pass | 1 | §4 fallback |
 | 3 | Literals | BS-LIT-* | `literals.txt` | literal fixtures | all LIT fixtures | 2 | adjust token regex only |
