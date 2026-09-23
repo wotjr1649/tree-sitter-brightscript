@@ -31,9 +31,11 @@ jobs:
       - name: Generator identity, regeneration drift and determinism
         run: python scripts/check_generated.py
       - name: Registry, catalogue and corpus consistency
-        run: python scripts/check_registry.py
+        run: python scripts/check_registry.py --complete
       - name: Corpus
         run: npx tree-sitter test
+      - name: Composite samples (W03)
+        run: python scripts/check_samples.py
       - name: Incremental edits (W10) and literal-false spike criteria C4, C5
         run: |
           python scripts/check_incremental.py

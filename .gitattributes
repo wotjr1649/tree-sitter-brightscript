@@ -14,3 +14,6 @@ package-lock.json linguist-generated
 
 # Byte-sensitive corpus fixtures (CR bytes, byte-order mark); see docs/validation/validation.md
 test/corpus/bytes/** -text whitespace=cr-at-eol
+
+# Byte-exact CRLF copy of test/samples/program.brs (workload W03)
+test/samples/program-crlf.brs -text whitespace=cr-at-eol
