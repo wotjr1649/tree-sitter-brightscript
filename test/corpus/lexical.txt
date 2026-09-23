@@ -270,6 +270,29 @@ x = obj.end + obj.if + obj.print
         property: (identifier)))))
 
 ================================================================================
+BS-LEX-024: keywords as associative-array keys
+================================================================================
+aa = { function: "main()", end: 1, if: 2, next: 3 }
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (associative_array_literal
+      (associative_array_entry
+        key: (identifier)
+        value: (string))
+      (associative_array_entry
+        key: (identifier)
+        value: (number))
+      (associative_array_entry
+        key: (identifier)
+        value: (number))
+      (associative_array_entry
+        key: (identifier)
+        value: (number)))))
+
+================================================================================
 BS-LEX-025: non-reserved keyword words as identifiers
 ================================================================================
 mod = 3

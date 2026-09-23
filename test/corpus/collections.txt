@@ -1,0 +1,276 @@
+================================================================================
+BS-ARRAY-001: empty, flat and nested array literals
+================================================================================
+myarray = []
+myarray = [ 1, 2, 3 ]
+myarray = [ x+5, true, 1<>2, ["a","b"] ]
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (array_literal))
+  (assignment_statement
+    left: (identifier)
+    right: (array_literal
+      (number)
+      (number)
+      (number)))
+  (assignment_statement
+    left: (identifier)
+    right: (array_literal
+      (binary_expression
+        left: (identifier)
+        right: (number))
+      (true)
+      (binary_expression
+        left: (number)
+        right: (number))
+      (array_literal
+        (string)
+        (string)))))
+
+================================================================================
+BS-ARRAY-002: multi-line array without commas
+================================================================================
+a = [
+  "able"
+  "baker"
+]
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (array_literal
+      (string)
+      (string))))
+
+================================================================================
+BS-ARRAY-002: multi-line array with commas
+================================================================================
+a = [
+  3.1415,
+  2.71828
+]
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (array_literal
+      (number)
+      (number))))
+
+================================================================================
+BS-ARRAY-003: trailing comma in array literals
+================================================================================
+a = [1, 2,]
+b = [
+  1,
+  2,
+]
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (array_literal
+      (number)
+      (number)))
+  (assignment_statement
+    left: (identifier)
+    right: (array_literal
+      (number)
+      (number))))
+
+================================================================================
+BS-ARRAY-004: DIM with one and several dimensions
+================================================================================
+Dim array[5]
+dim c[5, 4, 6]
+dim d[n + 1]
+--------------------------------------------------------------------------------
+
+(source_file
+  (dim_statement
+    name: (identifier)
+    dimension: (number))
+  (dim_statement
+    name: (identifier)
+    dimension: (number)
+    dimension: (number)
+    dimension: (number))
+  (dim_statement
+    name: (identifier)
+    dimension: (binary_expression
+      left: (identifier)
+      right: (number))))
+
+================================================================================
+BS-ARRAY-005: DIM with parentheses
+================================================================================
+dim a(5, 4)
+--------------------------------------------------------------------------------
+
+(source_file
+  (dim_statement
+    name: (identifier)
+    dimension: (number)
+    dimension: (number)))
+
+================================================================================
+BS-ARRAY-007: multiple indexes in one access
+================================================================================
+item = array[1,2,3]
+item = array[1][2][3]
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (index_expression
+      object: (identifier)
+      index: (number)
+      index: (number)
+      index: (number)))
+  (assignment_statement
+    left: (identifier)
+    right: (index_expression
+      object: (index_expression
+        object: (index_expression
+          object: (identifier)
+          index: (number))
+        index: (number))
+      index: (number))))
+
+================================================================================
+BS-AA-001: empty and one-line associative arrays
+================================================================================
+aa = { }
+aa = {}
+aa = { key1: "value", key2: 55, key3: 5+3 }
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (associative_array_literal))
+  (assignment_statement
+    left: (identifier)
+    right: (associative_array_literal))
+  (assignment_statement
+    left: (identifier)
+    right: (associative_array_literal
+      (associative_array_entry
+        key: (identifier)
+        value: (string))
+      (associative_array_entry
+        key: (identifier)
+        value: (number))
+      (associative_array_entry
+        key: (identifier)
+        value: (binary_expression
+          left: (number)
+          right: (number))))))
+
+================================================================================
+BS-AA-002: string keys
+================================================================================
+aa = { "Jane Doe": 1001, "John Doe": 1002 }
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (associative_array_literal
+      (associative_array_entry
+        key: (string)
+        value: (number))
+      (associative_array_entry
+        key: (string)
+        value: (number)))))
+
+================================================================================
+BS-AA-003: multi-line associative array without commas
+================================================================================
+aa = {
+  Myfunc1: aFunction
+  Myval1: "the value"
+}
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (associative_array_literal
+      (associative_array_entry
+        key: (identifier)
+        value: (identifier))
+      (associative_array_entry
+        key: (identifier)
+        value: (string)))))
+
+================================================================================
+BS-AA-003: multi-line associative array with commas
+================================================================================
+aa = {
+  alpha: 1,
+  zulu: 26
+}
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (associative_array_literal
+      (associative_array_entry
+        key: (identifier)
+        value: (number))
+      (associative_array_entry
+        key: (identifier)
+        value: (number)))))
+
+================================================================================
+BS-AA-004: trailing comma in associative arrays
+================================================================================
+aa = { a: 1, }
+bb = {
+  a: 1,
+  b: 2,
+}
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (associative_array_literal
+      (associative_array_entry
+        key: (identifier)
+        value: (number))))
+  (assignment_statement
+    left: (identifier)
+    right: (associative_array_literal
+      (associative_array_entry
+        key: (identifier)
+        value: (number))
+      (associative_array_entry
+        key: (identifier)
+        value: (number)))))
+
+================================================================================
+BS-AA-005: duplicate keys are not rejected
+================================================================================
+aa = { a: 1, a: 2 }
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (associative_array_literal
+      (associative_array_entry
+        key: (identifier)
+        value: (number))
+      (associative_array_entry
+        key: (identifier)
+        value: (number)))))

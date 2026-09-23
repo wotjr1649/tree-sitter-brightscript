@@ -4,6 +4,14 @@
     "named": true,
     "subtypes": [
       {
+        "type": "array_literal",
+        "named": true
+      },
+      {
+        "type": "associative_array_literal",
+        "named": true
+      },
+      {
         "type": "attribute_expression",
         "named": true
       },
@@ -74,6 +82,10 @@
         "named": true
       },
       {
+        "type": "dim_statement",
+        "named": true
+      },
+      {
         "type": "update_statement",
         "named": true
       }
@@ -81,6 +93,21 @@
   },
   {
     "type": "argument_list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "array_literal",
     "named": true,
     "fields": {},
     "children": {
@@ -164,6 +191,51 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "associative_array_entry",
+    "named": true,
+    "fields": {
+      "key": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "associative_array_literal",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "associative_array_entry",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -352,6 +424,32 @@
           },
           {
             "type": "parenthesized_expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "dim_statement",
+    "named": true,
+    "fields": {
+      "dimension": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
             "named": true
           }
         ]
@@ -711,6 +809,10 @@
     "extra": true
   },
   {
+    "type": "dim",
+    "named": false
+  },
+  {
     "type": "false",
     "named": true
   },
@@ -749,5 +851,13 @@
   {
     "type": "true",
     "named": true
+  },
+  {
+    "type": "{",
+    "named": false
+  },
+  {
+    "type": "}",
+    "named": false
   }
 ]

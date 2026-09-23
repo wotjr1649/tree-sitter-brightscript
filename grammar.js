@@ -80,6 +80,7 @@ module.exports = grammar({
       $.assignment_statement,
       $.update_statement,
       alias($._stmt_call, $.call_expression),
+      $.dim_statement,
     ),
 
     // Statement-level chains (grammar-design §6): an identifier head, then
@@ -125,6 +126,16 @@ module.exports = grammar({
       field('operator', choice('++', '--')),
     ),
 
+    // BS-ARRAY-004, 005: brackets or parentheses, one declarator.
+    dim_statement: $ => seq(
+      kw('dim'),
+      field('name', $.identifier),
+      choice(
+        seq('[', commaSep1(field('dimension', $.expression)), ']'),
+        seq('(', commaSep1(field('dimension', $.expression)), ')'),
+      ),
+    ),
+
     // ---------------------------------------------------- expressions (§5)
     expression: $ => choice(
       $.identifier,
@@ -134,6 +145,8 @@ module.exports = grammar({
       $.false,
       $.invalid,
       $.source_literal,
+      $.array_literal,
+      $.associative_array_literal,
       $.parenthesized_expression,
       $.unary_expression,
       $.binary_expression,
@@ -205,6 +218,38 @@ module.exports = grammar({
       ].map(([p, operator]) => prec.left(p, seq(
         field('left', $.expression), field('operator', operator), field('right', $.expression),
       ))),
+    ),
+
+    // ------------------------------------------------ collections (§9)
+    // BS-ARRAY-001-003: line breaks after `[`, between elements (with or
+    // without commas) and before `]`; a trailing separator is tolerated.
+    array_literal: $ => seq(
+      '[',
+      repeat($._newline),
+      optional(seq($.expression, repeat(seq($._sep, $.expression)), optional($._sep))),
+      ']',
+    ),
+
+    // BS-AA-001-004: the same separator rules for entries.
+    associative_array_literal: $ => seq(
+      '{',
+      repeat($._newline),
+      optional(seq(
+        $.associative_array_entry,
+        repeat(seq($._sep, $.associative_array_entry)),
+        optional($._sep),
+      )),
+      '}',
+    ),
+
+    _sep: $ => choice(seq(',', repeat($._newline)), repeat1($._newline)),
+
+    // BS-AA-001, 002, BS-LEX-024: keyword words are identifier keys by
+    // context-aware lexing.
+    associative_array_entry: $ => seq(
+      field('key', choice($.identifier, $.string)),
+      ':',
+      field('value', $.expression),
     ),
 
     // BS-TYPE-001: one rule for parameter and return types.
