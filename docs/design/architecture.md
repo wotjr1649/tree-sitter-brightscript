@@ -50,7 +50,10 @@ tree-sitter.json                  grammar metadata; all bindings disabled
 grammar.js                        canonical grammar source
 src/                              generated parser artifacts (never hand-edited)
 test/corpus/                      requirement fixtures (bytes/ is byte-exact)
-scripts/                          V0, drift and registry checks
+test/samples/                     composite programs (workload W03)
+queries/highlights.scm            highlighting query (workload W11)
+test/highlight/                   highlight assertions
+scripts/                          V0, drift, registry, schema and workload checks
 .github/workflows/ci.yml          hosted CI (Windows, Ubuntu)
 docs/README.md  docs/roadmap.md
 docs/specs/        grammar-contract, language-conformance, grammar-design, tree-schema
@@ -59,10 +62,8 @@ docs/provenance/   source-policy, upstream-sources
 docs/validation/   validation, workload-matrix, known-regressions
 ```
 
-Added with the remaining grammar work: `test/samples/` and the workload
-scripts (generator, incremental, oracle, fuzz).
-
-Added before the first release: `queries/highlights.scm`, `test/highlight/`.
+Added with the remaining release work: the workload scripts for generated
+inputs, the native oracle and fuzzing.
 
 Added only when justified: language bindings or WASM artifacts (per consumer
 demand), `queries/tags.scm` (before 1.0) and other queries, fuzzing tools,
