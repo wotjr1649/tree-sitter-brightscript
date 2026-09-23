@@ -8,8 +8,10 @@ artifacts/oracle/<commit>/ (local, Git-ignored) by default:
   inputs/<n>.brs, trees/<n>.txt, cst/<n>.txt, manifest.json.
 The manifest binds the results to the identity (validation.md "Identity
 binding"): grammar commit, clean-tree state, generator version, ABI, SHA-256
-of every generated file and of the CLI binary, date, and a workload identity
-(SHA-256 over the ordered input hashes). Refuses to record for a dirty tree.
+of every generated file, of the CLI binary and of the parser library the CLI
+compiled from them in a private library directory, date, and a workload
+identity (SHA-256 over the ordered input hashes). `has_error` is the root
+has_error state (hidden MISSING included). Refuses to record for a dirty tree.
 Stdlib only.
 """
 import datetime
@@ -21,19 +23,13 @@ import sys
 from pathlib import Path
 
 from corpus import ROOT, read_corpus
+from tscli import EXE, LIBDIR, cst, parse
 
-EXE = ROOT / "node_modules/tree-sitter-cli" / ("tree-sitter.exe" if sys.platform == "win32" else "tree-sitter")
 sha = lambda b: hashlib.sha256(b).hexdigest()  # noqa: E731
 
 
 def git(*args):
     return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True).stdout.strip()
-
-
-def parse(path, *mode):
-    r = subprocess.run([str(EXE), "parse", *mode, str(path)], cwd=ROOT, capture_output=True, timeout=120)
-    text = r.stdout.decode("utf-8").replace("\r\n", "\n").replace(str(path), "INPUT")
-    return text.encode("utf-8"), r.returncode
 
 
 def main():
@@ -49,12 +45,14 @@ def main():
     for n, (name, data, expect_error) in enumerate(cases):
         path = out / "inputs" / f"{n:03d}.brs"
         path.write_bytes(data)
-        tree, code = parse(path)
-        cst, _ = parse(path, "--cst")
+        tree = parse(path).replace(str(path), "INPUT").encode("utf-8")
+        has_error, full = cst(path)
+        full = full.replace(str(path), "INPUT").encode("utf-8")
         (out / "trees" / f"{n:03d}.txt").write_bytes(tree)
-        (out / "cst" / f"{n:03d}.txt").write_bytes(cst)
-        records.append(dict(n=n, name=name, input_sha256=sha(data), tree_sha256=sha(tree), cst_sha256=sha(cst),
-                            has_error=code != 0, expected_error=expect_error))
+        (out / "cst" / f"{n:03d}.txt").write_bytes(full)
+        records.append(dict(n=n, name=name, input_sha256=sha(data), tree_sha256=sha(tree), cst_sha256=sha(full),
+                            has_error=has_error, expected_error=expect_error))
+    library, = [p for p in Path(LIBDIR).iterdir() if p.suffix in (".dll", ".so", ".dylib")]
     parser_c = (ROOT / "src/parser.c").read_text(encoding="utf-8")
     identity = dict(
         grammar_commit=commit,
@@ -63,6 +61,7 @@ def main():
         generated_files={p.relative_to(ROOT).as_posix(): sha(p.read_bytes())
                          for p in sorted((ROOT / "src").rglob("*")) if p.is_file()},
         cli_binary_sha256=sha(EXE.read_bytes()),
+        parser_library_sha256=sha(library.read_bytes()),
         runtime="tree-sitter CLI runtime (same release as the generator)",
         platform=sys.platform,
         date=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),

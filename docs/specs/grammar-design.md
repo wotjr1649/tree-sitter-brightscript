@@ -513,11 +513,14 @@ Acceptance criteria (ADR-0004 decision 3), all required:
 | C4 recovery does not swallow text outside the region | R1, R2 (R3: error present, no crash) |
 | C5 incremental equality inside, around and across the region | E1–E6 |
 
-C4 check: parse R1 and R2 with `tree-sitter parse` and parse their repaired
-versions (the malformed line replaced by `x = 1`). C4 holds when the only
-`ERROR` node lies within the malformed line and every node that starts after
-that line has the same type and the same start and end row and column in both
-parses. C5 check: for each script, the final tree of `tree-sitter parse
+C4 check (`scripts/check_spike.py`): parse R1 and R2 with `tree-sitter parse
+--cst` and parse their repaired versions (the malformed line replaced by
+`x = 1`). C4 holds when the repaired version has no error, every `ERROR` or
+`MISSING` node lies within the malformed line, and every node that ends before
+that line or starts after it has the same kind, start and end row and column,
+and has-error mark in both parses (so an error hidden elsewhere also fails).
+At the spike the check compared only the nodes after the line; the Session 03
+review widened it. C5 check: for each script, the final tree of `tree-sitter parse
 --edits` equals a fresh parse of the final text (same S-expression and
 ranges); every script ends on error-free text.
 

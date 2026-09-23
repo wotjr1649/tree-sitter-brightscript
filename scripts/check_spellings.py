@@ -1,19 +1,17 @@
 """W05 equivalent spellings (V3), docs/validation/workload-matrix.md.
 
 Usage: python scripts/check_spellings.py
-Every spelling of a pair (or group) parses without ERROR or MISSING, and the
-trees are identical after removing anonymous nodes and ranges
+Every spelling of a pair (or group) parses with no error (root has_error
+unset, hidden MISSING included), and the trees are identical after removing anonymous nodes and ranges
 (`tree-sitter parse --no-ranges`). The last pair compares the LF and CRLF
 composite samples. Stdlib only.
 """
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 from corpus import ROOT
-
-EXE = ROOT / "node_modules/tree-sitter-cli" / ("tree-sitter.exe" if sys.platform == "win32" else "tree-sitter")
+from tscli import cst, parse
 
 PAIRS = {
     "BS-LEX-001 keyword case": ["IF x THEN PRINT 1", "if x then print 1"],
@@ -34,9 +32,7 @@ FILES = {"BS-LEX-006 LF / CRLF": ["test/samples/program.brs", "test/samples/prog
 
 
 def tree(path):
-    r = subprocess.run([str(EXE), "parse", "--no-ranges", str(path)], cwd=ROOT, capture_output=True, timeout=60)
-    out = r.stdout.decode("utf-8").replace("\r\n", "\n")
-    return out, r.returncode == 0 and "ERROR" not in out and "MISSING" not in out
+    return parse(path, "--no-ranges"), not cst(path)[0]
 
 
 def main():

@@ -7,7 +7,8 @@ and gates are defined in [validation.md](validation.md); planned node names and
 placement rules in [tree-schema.md](../specs/tree-schema.md); rule design in
 [grammar-design.md](../specs/grammar-design.md).
 
-Nothing here has been run: there is no grammar yet.
+Every set is automated (see Automation below). Results belong to one grammar
+identity and are recorded in the release-candidate report, not here.
 
 ## Workload sets
 
@@ -15,17 +16,17 @@ Nothing here has been run: there is no grammar yet.
 |---|---|---|---|---|
 | W01 corpus | V2, V3 | every file under `test/corpus/` (catalogue below) | every fixture passes; each registry fixture exists exactly once; `:error` only on negative, recovery and KL-demonstrating fixtures; `:skip` only on a fixture listed under a `KL-NNN` | whole run ≤ 60 s |
 | W02 byte-sensitive | V2, V3 | `test/corpus/bytes/` (CR bytes, byte-order mark) | as W01; trees equal their LF or BOM-less counterparts | — |
-| W03 composite samples | V3, V6, V10 | `test/samples/*.brs`, independently written programs (below) | no `ERROR`/`MISSING`; recorded in V6 | ≤ 1 s each |
+| W03 composite samples | V3, V6, V10 | `test/samples/*.brs`, independently written programs (below) | no error (root has-error state, hidden `MISSING` included); exactly the catalogued files; `program-crlf.brs` is the CRLF byte copy of `program.brs`; recorded in V6 | ≤ 1 s each |
 | W04 precedence | V3 | fixtures of BS-EXP-002, 011–021, 027, covering every grouping case of grammar-design §5 | groupings exactly as listed | — |
 | W05 equivalent spellings | V3 | pairs below | the two trees are identical after removing anonymous nodes and byte ranges | — |
-| W06 nesting, length, repetition | V10 | generated inputs below | valid inputs: no `ERROR`; all inputs: no crash, no hang | per input ≤ 10 s, ≤ 1 GiB resident |
+| W06 nesting, length, repetition | V10 | generated inputs below | valid inputs: no error (root has-error state, hidden `MISSING` included); invalid inputs: an error; all inputs: no crash, no hang | per input ≤ 10 s, ≤ 1 GiB resident |
 | W07 UTF-8 | V3, V10 | BS-LEX-033 fixtures; samples with non-ASCII strings and comments; invalid UTF-8 and NUL bytes (robustness only) | valid: no `ERROR`; invalid bytes: no crash | — |
 | W08 recovery | V3, V10 | recovery and negative fixtures (catalogue) | `:error` holds; no crash; no hang | — |
 | W09 conditional compilation | V3, V5 | BS-COND fixtures including the spike fixtures; E1–E6 | baseline fixtures pass; spike decided PASS or FAIL by grammar-design §11 | — |
-| W10 incremental edits | V5 | edit scripts below | the final tree of `tree-sitter parse --edits` equals a fresh parse of the final text (same S-expression and ranges); every script ends on error-free text | — |
+| W10 incremental edits | V5 | edit scripts below | the final tree of `tree-sitter parse --edits` equals a fresh parse of the final text (default and `--cst` output); every script ends on text with no error (root has-error state) | — |
 | W11 highlights | V4 | `queries/highlights.scm`, `test/highlight/*.brs` | query compiles; every capture assertion passes | — |
 | W12 native oracle | V6 | all corpus inputs and `test/samples/*.brs` | output recorded per identity (validation.md identity binding) | — |
-| W13 fuzz and pathological | V10 | `tree-sitter fuzz` over the corpus; W06 inputs; seeds below | no crash, no hang, no runaway memory | fuzz: 1,000 iterations × 10 edits per fixture at release candidates |
+| W13 fuzz and pathological | V10 | `tree-sitter fuzz` over the corpus; W06 inputs; seeds below | no crash, no hang, no runaway memory | fuzz: 1,000 iterations × 10 edits per fixture at release candidates, with a recorded seed (default 1) |
 | W14 downstream parity | V9 (in `go-treesitter`) | W12 inputs and W10 edits for the same grammar identity | ordered trees equal the native V6 records; `CGO_ENABLED=0` build and tests pass | run only when that work is authorized |
 
 ### W03 composite samples
@@ -70,7 +71,7 @@ implementation; the files themselves are not committed.
 | postfix chain `a.b.c…` with calls and indexes | 2,000 links |
 | string literal | 1 MiB |
 | file of functions | 50,000 lines |
-| unterminated constructs (IF, FOR, AA, string, `#if`) at EOF | 1 each (robustness only) |
+| unterminated constructs (IF, FOR, AA, string, `#if`) at EOF | 1 each (an error expected) |
 
 ### W10 incremental edit scripts
 
@@ -146,6 +147,21 @@ bytes and invalid UTF-8 (BS-LEX-034); line breaks in argument lists, after
 BS-FUNC-007); lone `"`, `#`, `?`, `&h`; 10,000 `(`; 10,000 `:`; `#if` without
 `#end if`; every other unresolved form listed in the registry. Only the
 robustness criterion applies to them.
+
+## Automation
+
+Every command runs from the repository root; hosted CI (`.github/workflows/ci.yml`)
+runs all of them except W12 and W14 on Windows and Ubuntu.
+
+| Set | Command |
+|---|---|
+| W01, W02, W04, W07 (valid), W09 (fixtures), W11 | `npx tree-sitter test` (with a private `TREE_SITTER_LIBDIR` or `--rebuild`, validation.md "Identity binding") and `python scripts/check_registry.py --complete` |
+| W03 | `python scripts/check_samples.py` |
+| W05 | `python scripts/check_spellings.py` |
+| W06, W07 (invalid bytes), W08, W13 | `python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N]` |
+| W09 (C4), W10 (C5 included) | `python scripts/check_spike.py`, `python scripts/check_incremental.py` |
+| W12 | `python scripts/record_oracle.py` (clean tree; output under `artifacts/oracle/`) |
+| W14 | in `go-treesitter`, from the W12 inputs and W10 edits of the same identity |
 
 ## Corpus fixture catalogue
 

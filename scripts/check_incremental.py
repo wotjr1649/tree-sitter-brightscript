@@ -6,17 +6,19 @@ For each script, parse the base text with `tree-sitter parse --edits` (every edi
 is followed by an incremental reparse) and compare the final tree with a fresh
 parse of the final text: the default output (named nodes, fields, ranges) and
 the `--cst` output (every node) must be identical, and the final text must parse
-without ERROR or MISSING. Edits use the CLI form `row,column deleted inserted`
-on the current text; inserted text is passed literally (newline and CR bytes
-included). Bases I01-I12 are corpus fixture inputs; E1-E6 are the ADR-0004 spike
-scripts (grammar-design §11), run unless --no-spike. Stdlib only.
+with no error (root has_error unset, hidden MISSING included). Edits use the CLI
+form `row,column deleted inserted` on the current text; inserted text is passed
+literally (newline and CR bytes included). Bases I01-I12 are corpus fixture
+inputs; E1-E6 are the ADR-0004 spike scripts (grammar-design §11), run unless
+--no-spike. A script whose base fixture is absent, or an --only name that
+matches no script, fails. Stdlib only.
 """
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 from corpus import ROOT, read_corpus
+from tscli import cst, parse
 
 # The catalogue describes I01-I12 in words; these are the concrete edits.
 SCRIPTS = {
@@ -44,7 +46,6 @@ SPIKE = {
     "E5": ["1,4 5 true", "1,4 4 false"],
     "E6": ["3,0 0 #else\nx = 2\n"],
 }
-EXE = ROOT / "node_modules/tree-sitter-cli" / ("tree-sitter.exe" if sys.platform == "win32" else "tree-sitter")
 
 
 def apply(text, edit):
@@ -59,11 +60,6 @@ def apply(text, edit):
 GRAMMAR = Path(next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--grammar-path=")), ROOT)).resolve()
 
 
-def parse(path, *args):
-    r = subprocess.run([str(EXE), "parse", "-p", str(GRAMMAR), str(path), *args], cwd=GRAMMAR, capture_output=True)
-    return r.stdout.replace(b"\r\n", b"\n")
-
-
 def run(name, base, edits, tmp):
     base_file, final_file = tmp / f"{name}-base.brs", tmp / f"{name}-final.brs"
     base_file.write_bytes(base)
@@ -74,13 +70,11 @@ def run(name, base, edits, tmp):
     edit_args = [a for e in edits for a in ("--edits", e)]
     problems = []
     for mode in ([], ["--cst"]):
-        incremental = parse(base_file, *mode, *edit_args).replace(str(base_file).encode(), b"FILE")
-        fresh = parse(final_file, *mode).replace(str(final_file).encode(), b"FILE")
-        if not fresh.strip():
-            problems.append(f"no parse output{' (cst)' if mode else ''}")
-        elif incremental != fresh:
+        incremental = parse(base_file, *mode, *edit_args, cwd=GRAMMAR).replace(str(base_file), "FILE")
+        fresh = parse(final_file, *mode, cwd=GRAMMAR).replace(str(final_file), "FILE")
+        if incremental != fresh:
             problems.append(f"incremental != fresh{' (cst)' if mode else ''}")
-    if b"ERROR" in parse(final_file) or b"MISSING" in parse(final_file):
+    if cst(final_file, cwd=GRAMMAR)[0]:
         problems.append("final text does not parse cleanly")
     return problems
 
@@ -92,7 +86,8 @@ def main():
     missing = sorted(set(SCRIPTS) - set(scripts))
     if "--no-spike" not in sys.argv:
         scripts.update({k: (SPIKE_BASE, e) for k, e in SPIKE.items()})
-    fail = []
+    fail = [f"{k}: base fixture absent from the corpus" for k in missing]
+    fail += [f"--only {k}: no such script" for k in only or () if k not in scripts]
     with tempfile.TemporaryDirectory() as d:
         for name, (base, edits) in sorted(scripts.items()):
             if only and name not in only:
@@ -100,10 +95,10 @@ def main():
             problems = run(name, base, edits, Path(d))
             print(f"{name}: {'FAIL ' + '; '.join(problems) if problems else 'PASS'}")
             fail += [f"{name}: {p}" for p in problems]
-    if missing:
-        print(f"not run (base fixture absent from the corpus): {', '.join(missing)}")
     if fail:
         print("FAIL")
+        for x in fail:
+            print("  -", x)
         sys.exit(1)
     print("PASS")
 

@@ -7,7 +7,9 @@ Usage: python scripts/check_schema.py [--print-catalogue]
    generated node-types.json, and no unplanned public node exists. Extras are
    never listed as children in node-types.json, so a planned `comment` child
    is not compared.
-2. Catalogue: the "Catalogue" section equals the table generated from
+2. Spelling table: every token named in its "recoverable from" column (and,
+   for an operator token, every spelling) is a node type in node-types.json.
+3. Catalogue: the "Catalogue" section equals the table generated from
    node-types.json (--print-catalogue prints it). Stdlib only.
 """
 import json
@@ -102,6 +104,21 @@ actual_fields = sorted({f for n in nodes.values() for f in n.get("fields", {})})
 if sorted(planned_fields) != actual_fields:
     fail.append(f"field names: planned {sorted(planned_fields)} != generated {actual_fields}")
 
+# Spelling table: every token the recoverable-from column names (and, for an
+# operator token, every spelling) is a node type in node-types.json.
+anonymous = {n["type"] for n in nt if not n["named"]}
+spelling_tokens = 0
+for construct, spellings, _, recoverable in rows(section(planned, "Spelling and normalization")):
+    if "anonymous" not in recoverable:
+        continue
+    names = re.findall(r"`([^`]+)`", recoverable)
+    if "operator token" in recoverable:
+        names += re.findall(r"`([^`]+)`", spellings)
+    for name in names:
+        spelling_tokens += 1
+        if name not in anonymous and name not in known:
+            fail.append(f"spelling table ({construct}): `{name}` is not a node type in node-types.json")
+
 
 # Catalogue generated from node-types.json.
 def fmt_types(v):
@@ -135,7 +152,7 @@ if catalogue() not in section(doc, "Catalogue"):
     fail.append("the Catalogue section differs from node-types.json (run with --print-catalogue)")
 
 print(f"generated: {len(nodes)} named node types, {len(supertypes)} supertypes, {len(actual_fields)} fields; "
-      f"planned: {len(planned_nodes)} nodes, {len(planned_fields)} fields")
+      f"planned: {len(planned_nodes)} nodes, {len(planned_fields)} fields; spelling-table tokens: {spelling_tokens}")
 if fail:
     print("FAIL")
     for x in fail:

@@ -1,18 +1,22 @@
 """V10 robustness: workloads W06, W07, W08 and W13 (docs/validation/workload-matrix.md).
 
-Usage: python scripts/check_robustness.py [--fuzz-iterations=N] [--skip-fuzz]
+Usage: python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N] [--skip-fuzz]
 
 - W06: deterministic generated inputs (nesting, length, repetition); valid
-  inputs parse without ERROR or MISSING; every input finishes within 10 s and
-  1 GiB peak resident memory.
+  inputs parse with no error (root has_error unset, hidden MISSING included)
+  and invalid ones with an error; every input finishes within 10 s and 1 GiB
+  peak resident memory.
 - W07: invalid UTF-8 and NUL bytes parse without a crash.
 - W08: every negative and recovery corpus input parses with an error and
   without a crash or hang.
 - W13: pathological seeds (one or more for every `unresolved` requirement)
   parse without a crash or hang; `tree-sitter fuzz` over the corpus with
-  N iterations (default 1000) of up to 10 edits reports no failure. The fuzzer
-  signals failures only in its output, so its output is scanned.
-Crash = non-zero exit other than the CLI's parse-error status 1, or a timeout.
+  N iterations (default 1000) of up to 10 edits and seed N (default 1,
+  TREE_SITTER_SEED) reports no failure. The fuzzer signals failures only in
+  its output, so its output is scanned.
+Crash = a timeout, an exit status other than 0 or 1, or status 1 without the
+CLI's parse-error summary line (status 1 also reports failures to run). Error
+state comes from `--cst` (scripts/tscli.py); the timed run uses `--quiet`.
 Stdlib only.
 """
 import os
@@ -23,8 +27,7 @@ import time
 from pathlib import Path
 
 from corpus import ROOT, read_corpus
-
-EXE = ROOT / "node_modules/tree-sitter-cli" / ("tree-sitter.exe" if sys.platform == "win32" else "tree-sitter")
+from tscli import ENV, EXE, cli, cst
 TIME_LIMIT = 10.0
 MEMORY_LIMIT = 1 << 30
 
@@ -99,7 +102,7 @@ def w07_w13_seeds():
 def run(path):
     """Parse one file; return (exit code, seconds, peak bytes, output)."""
     start = time.monotonic()
-    proc = subprocess.Popen([str(EXE), "parse", "--quiet", str(path)], cwd=ROOT,
+    proc = subprocess.Popen([str(EXE), "parse", "--quiet", str(path)], cwd=ROOT, env=ENV,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         out, _ = proc.communicate(timeout=TIME_LIMIT * 3)
@@ -130,14 +133,14 @@ def peak_memory(proc):
 
 def run_posix(path):
     start = time.monotonic()
-    proc = subprocess.Popen([str(EXE), "parse", "--quiet", str(path)], cwd=ROOT,
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    proc = subprocess.Popen([str(EXE), "parse", "--quiet", str(path)], cwd=ROOT, env=ENV,
+                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     deadline = start + TIME_LIMIT * 3
     while True:
         pid, status, usage = os.wait4(proc.pid, os.WNOHANG)
         if pid:
             proc.returncode = os.waitstatus_to_exitcode(status)
-            return proc.returncode, time.monotonic() - start, usage.ru_maxrss * 1024, b""
+            return proc.returncode, time.monotonic() - start, usage.ru_maxrss * 1024, proc.stdout.read()
         if time.monotonic() > deadline:
             proc.kill()
             os.wait4(proc.pid, 0)
@@ -148,20 +151,22 @@ def run_posix(path):
 def check(name, data, want_clean, want_error, tmp, fail):
     path = tmp / "input.brs"
     path.write_bytes(data)
-    code, secs, peak, _ = (run if sys.platform == "win32" else run_posix)(path)
+    code, secs, peak, out = (run if sys.platform == "win32" else run_posix)(path)
     problems = []
     if code is None:
         problems.append("hang (killed)")
-    elif code not in (0, 1):
+    elif code not in (0, 1) or (code == 1 and b"\tParse:" not in out):
         problems.append(f"crash (exit {code})")
     if secs > TIME_LIMIT:
         problems.append(f"{secs:.1f} s")
     if peak > MEMORY_LIMIT:
         problems.append(f"{peak / 2**20:.0f} MiB")
-    if want_clean and code != 0:
-        problems.append("ERROR or MISSING in a valid input")
-    if want_error and code == 0:
-        problems.append("no error in an invalid input")
+    if (want_clean or want_error) and code in (0, 1):
+        has_error = cst(path, timeout=TIME_LIMIT * 3)[0]
+        if want_clean and has_error:
+            problems.append("ERROR or MISSING in a valid input")
+        if want_error and not has_error:
+            problems.append("no error in an invalid input")
     print(f"  {name}: {len(data):,} bytes, {secs:.2f} s, {peak / 2**20:.0f} MiB, exit {code}"
           f"{' FAIL ' + ', '.join(problems) if problems else ''}")
     fail += [f"{name}: {p}" for p in problems]
@@ -171,9 +176,11 @@ def main():
     fail = []
     with tempfile.TemporaryDirectory() as d:
         tmp = Path(d)
+        (tmp / "warm-up.brs").write_bytes(b"x = 1\n")
+        cst(tmp / "warm-up.brs", timeout=600)  # compiles the parser before any timed run
         print("W06 generated inputs")
         for name, text, valid in w06():
-            check(name, text.encode("utf-8"), valid, False, tmp, fail)
+            check(name, text.encode("utf-8"), valid, not valid, tmp, fail)
         print("W07 and W13 seeds (robustness only)")
         for name, data in w07_w13_seeds():
             check(name, data, False, False, tmp, fail)
@@ -184,11 +191,13 @@ def main():
                 check(name, t["input"], False, True, tmp, fail)
     if "--skip-fuzz" not in sys.argv:
         iterations = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--fuzz-iterations=")), "1000")
-        print(f"W13 tree-sitter fuzz: {iterations} iterations x up to 10 edits per corpus test")
+        seed = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--fuzz-seed=")), "1")
+        print(f"W13 tree-sitter fuzz: {iterations} iterations x up to 10 edits per corpus test, seed {seed}")
         start = time.monotonic()
-        r = subprocess.run([str(EXE), "fuzz", "--iterations", iterations, "--edits", "10"], cwd=ROOT,
-                           capture_output=True, timeout=3600)
-        out = (r.stdout + r.stderr).decode("utf-8", "replace")
+        code, stdout, stderr = cli("fuzz", "--iterations", iterations, "--edits", "10", timeout=3600,
+                                   env={"TREE_SITTER_SEED": seed})
+        r = subprocess.CompletedProcess([], code)
+        out = stdout + stderr
         markers = [m for m in ("Incorrect parse", "Unexpected scope change", "failed fuzzing", "leak", "panicked")
                    if m.lower() in out.lower()]
         tests = out.count(". brightscript - corpus")
