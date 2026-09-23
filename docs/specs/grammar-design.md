@@ -100,7 +100,7 @@ with LF alone.
 | assignment operators | `= += -= *= /= \= <<= >>=` | anonymous | `assignment_statement` | BS-STMT-001, 002 |
 | update operators | `++ --` | anonymous | `update_statement` | BS-STMT-003, 004 |
 | block terminators | `end`, a run of `[ \t]`, then `if`, `for`, `while`, `sub`, `function` or `try`, in any case, each **one token**, aliased to the anonymous names `end if`, `end for`, `end while`, `end sub`, `end function`, `end try` | anonymous | block rules | BS-STMT-010, 012, 015, 016, 022, 036, BS-FUNC-001, 002, BS-ERR-001 |
-| directive words | `#` immediately followed by `const`, `if`, `else`, `end` or `error` in any case, one token each, aliased to `#const`, `#if`, `#else`, `#end`, `#error` | anonymous | directive rules | BS-COND-001–005, 008 |
+| directive words | `#` immediately followed by `const`, `if`, `else`, `end` or `error` in any case, one token each, aliased to `#const`, `#if`, `#else`, `#end`, `#error`; no word boundary (§11) | anonymous | directive rules | BS-COND-001–005, 008 |
 | `error_message` | `[^\r\n]+` with lexical precedence 1 (wins over `comment` for the same text); valid only after `#error` | public | `error_directive` | BS-COND-004 |
 
 Details:
@@ -451,7 +451,12 @@ statements or declarations (BS-COND-002–006) and, being statements
 themselves, may appear inside bodies and nest (BS-COND-012). Conditions are
 never evaluated. Because `#end` and `#else` are one-token directive words
 followed by keyword tokens, `#endif`/`#elseif` happen to lex as `#end if` and
-`#else if`; that acceptance is non-contractual (BS-COND-009).
+`#else if`; that acceptance is non-contractual (BS-COND-009). Directive words
+have no word boundary outside a literal-false region: a longer word that
+begins with one is split, without `ERROR` (`#iffy` lexes as `#if fy`,
+`#constant = true` as `#const ant = true`, `#errors here` as `#error` with the
+message `s here`), like the keyword boundaries of §3; no requirement depends
+on such input.
 
 ### Literal-false spike (ADR-0004)
 
@@ -487,6 +492,31 @@ Design V2, tried only if V1 fails a criterion: as V1, but `_inactive_line` has
 lexical precedence 1 and `#if`, `#else`, `#end` precedence 2, so every region
 line, including `'` and REM lines, is hidden text and `inactive_text` has no
 `comment` children.
+Directive-like lines (adopted after the Session 03 review, which found that
+`#ifdef FOO` inside a region lexed as `#if` and opened a nested block, so the
+region swallowed the rest of the file). The `#` alternative of
+`_inactive_line` is split in two:
+
+```text
+_inactive_line := token(choice(
+    prec(0, [^ \t\r\n#][^\r\n]*),
+    prec(0, '#' then a rest that does not begin with if, else or end, in any case),
+    prec(2, '#' then if, else or end run on into a longer word, except the words
+            elseif and endif, then [^\r\n]*)))
+```
+
+A region line that starts with the whole word `#if`, `#else` or `#end`
+(`#elseif`, `#endif` included) is a directive exactly as before: no
+`_inactive_line` alternative matches those words as a prefix, so the lexer
+cannot continue past a completed directive word into the lower-precedence
+text alternative. A longer word (`#ifdef`, `#iffy`, `#elsewhere`,
+`#endregion`, `#endnote:`) matches the precedence-2 alternative, which beats
+the completed directive word, and the line is hidden text. Without lookahead
+the exclusion of `elseif`/`endif` cannot tell a word that ends early at the
+line end, so a line consisting of exactly `#endi` or `#elsei` still lexes as
+the directive word and yields a local `ERROR`. Fixture:
+`BS-COND-007: directive-like words inside a false region`.
+
 
 No other design is tried. A design is adopted when it meets C1–C5 and the
 PASS expectation, for that design, of all fifteen fixtures in the

@@ -545,7 +545,16 @@ module.exports = grammar({
 
     _inactive_item: $ => choice($._inactive_line, $._newline, $._inactive_if),
 
-    _inactive_line: _ => token(prec(0, choice(/[^ \t\r\n#][^\r\n]*/, /#[^\r\n]*/))),
+    // A `#` line is text unless it starts with the whole word `#if`, `#else`
+    // or `#end` (`#elseif` and `#endif` included): the second alternative never
+    // matches those words as a prefix, and a longer word (`#ifdef`, `#elsewhere`,
+    // `#endregion`) is text through the third, whose precedence 2 beats the
+    // completed directive word (grammar-design §11).
+    _inactive_line: _ => token(choice(
+      prec(0, /[^ \t\r\n#][^\r\n]*/),
+      prec(0, /#([^iIeE\r\n][^\r\n]*|[iI]([^fF\r\n][^\r\n]*)?|[eE]([^lLnN\r\n][^\r\n]*|[lL]([^sS\r\n][^\r\n]*|[sS]([^eE\r\n][^\r\n]*)?)?|[nN]([^dD\r\n][^\r\n]*)?)?)?/),
+      prec(2, /#([iI][fF][A-Za-z0-9_]|([eE][lL][sS][eE]|[eE][nN][dD])([A-HJ-Za-hj-z0-9_]|[iI]([^fF\r\n]|[fF][A-Za-z0-9_])))[^\r\n]*/),
+    )),
 
     _inactive_if: $ => seq(
       directive('if', 1), optional($._inactive_line), $._newline,

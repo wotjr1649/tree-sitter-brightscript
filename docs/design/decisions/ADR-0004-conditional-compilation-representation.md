@@ -88,6 +88,15 @@ baseline COND fixture still passes; no `conflicts` entry and no external
 scanner. `inactive_text` is public, E1–E6 stay in workload W10, and KL-001
 is retired unused.
 
+Review correction (Session 03, same day; refines the design, not the
+decision): the independent review found that C1 had tested only `falsey`, and
+that a region line beginning with a longer word such as `#ifdef` lexed as the
+directive `#if`, opening a nested block that swallowed the rest of the file.
+Such lines are now hidden text (grammar-design §11, "Directive-like lines";
+fixture `BS-COND-007: directive-like words inside a false region`), and the C4
+check now also compares the nodes before the malformed line and each node's
+has-error mark. C1–C5 pass again with the corrected design.
+
 ## Validation / enforcement
 
 - Spike acceptance criteria above, recorded with fixtures and V5 results.

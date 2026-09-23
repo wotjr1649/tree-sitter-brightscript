@@ -459,6 +459,7 @@ the spike passed with design V1, so the corpus uses the PASS column.
 | `BS-COND-007: spike S10 quotes and comments inside a false region` | `#if false↵    Don't "stop" here↵    ' a real comment↵    REM another comment↵#end if` | `(source_file (if_directive condition: (false) consequence: (inactive_text (comment) (comment))))` | `:error` |
 | `BS-COND-007: spike S11 #else if false` | `#if DEBUG↵    x = 1↵#else if false↵    Prose line.↵#end if` | `(source_file (if_directive condition: (identifier) consequence: (block (assignment_statement left: (identifier) right: (number))) alternative: (else_if_directive condition: (false) consequence: (inactive_text))))` | `:error` |
 | `BS-COND-007: spike S12 REM-like prose inside a false region` | `#if false↵    Remember this.↵    REMARK: prose.↵    remote control↵#end if` | `(source_file (if_directive condition: (false) consequence: (inactive_text)))` | `:error` |
+| `BS-COND-007: directive-like words inside a false region` | `#if false↵    #ifdef FOO↵    #endregion notes↵    #elsewhere prose↵    #iffy↵#end if↵x = 1` | `(source_file (if_directive condition: (false) consequence: (inactive_text)) (assignment_statement left: (identifier) right: (number)))` | `:error` |
 | `BS-COND-007: spike R1 error before a false region` | `x = = 1↵#if false↵    Prose.↵#end if↵function foo()↵end function` | `:error` (C4 check in grammar-design §11) | `:error` |
 | `BS-COND-007: spike R2 error after a false region` | `#if false↵    Prose.↵#end if↵x = = 1↵function foo()↵end function` | `:error` (C4 check) | `:error` |
 | `BS-COND-007: spike R3 false region without #end if` | `#if false↵    Prose without an end.` | `:error` | `:error` |
@@ -488,8 +489,8 @@ terminator or delimiter its construct is documented to have.
 
 | Item | Count |
 |---|---|
-| registry fixtures catalogued | 222 |
-| positive (including 4 guards; on a spike FAIL, 9 literal-false fixtures take their `:error` form) | 193 |
+| registry fixtures catalogued | 223 |
+| positive (including 4 guards; on a spike FAIL, 10 literal-false fixtures take their `:error` form) | 194 |
 | negative (`invalid` evidence) | 13 |
 | recovery (including spike R1–R3) | 16 |
 | corpus files | 13 (`bytes/` counted once) |
