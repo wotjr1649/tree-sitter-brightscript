@@ -9,7 +9,8 @@ link to it rather than restate it.
 | [design/architecture.md](design/architecture.md) | Pipeline, ownership, layout, principles, decision index | Starting any work |
 | [design/decisions/](design/decisions/) | ADRs: why each architectural decision was made | Changing or questioning a decision |
 | [specs/grammar-contract.md](specs/grammar-contract.md) | What the grammar promises; acceptance policy; non-goals | Designing or reviewing grammar rules |
-| [specs/language-conformance.md](specs/language-conformance.md) | Requirement IDs, record format, statuses, registry | Adding requirements, rules or fixtures |
+| [specs/language-conformance.md](specs/language-conformance.md) | Requirement IDs, record format, statuses, registry, reconciliations | Adding requirements, rules or fixtures |
+| [specs/grammar-design.md](specs/grammar-design.md) | Planned tokens, rule families, precedence, statement boundaries, conditional-compilation spike, implementation order | Writing or changing `grammar.js` |
 | [specs/tree-schema.md](specs/tree-schema.md) | Public tree policy, naming, versioning, node catalogue | Adding or changing nodes, fields or queries |
 | [provenance/source-policy.md](provenance/source-policy.md) | Source levels (L1–L5), citation, promotion, refresh | Using any source |
 | [provenance/upstream-sources.md](provenance/upstream-sources.md) | Dated identities of sources and toolchain | Citing a source; refreshing; selecting the generator |

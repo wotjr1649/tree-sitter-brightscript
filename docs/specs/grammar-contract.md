@@ -82,10 +82,11 @@ differs between Tree-sitter runtime versions.
 
 ## 7. Line endings and encoding
 
-**Requirement.** Accepted line terminators, end-of-file handling and source
-encoding are open questions to be recorded as requirements with their
-evidence status. Fixtures whose bytes matter are stored so that Git does not
-normalize them (see validation).
+**Requirement.** Line terminators, end-of-file handling and source encoding are
+requirements with their own evidence status (BS-LEX-005–008, 033, 034 in
+[language-conformance.md](language-conformance.md)); the planned mechanism is
+the line model in [grammar-design.md](grammar-design.md). Fixtures whose bytes
+matter are stored so that Git does not normalize them (see validation).
 
 ## Non-goals
 
