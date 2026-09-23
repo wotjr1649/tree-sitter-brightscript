@@ -10,11 +10,24 @@
 /// <reference types="tree-sitter-cli/dsl" />
 // @ts-check
 
+/** Regex source matching `word` in any letter case. */
+function ci(word) {
+  return word.replace(/[a-z]/gi, c => `[${c.toLowerCase()}${c.toUpperCase()}]`);
+}
+
+/** Case-insensitive keyword, aliased to its lower-case anonymous name (BS-LEX-001). */
+function kw(word) {
+  return alias(new RegExp(ci(word)), word);
+}
+
 module.exports = grammar({
   name: 'brightscript',
 
   // BS-LEX-002, 003: space and tab only. Newlines are tokens (grammar-design §2).
   extras: $ => [/[ \t]/, $.comment],
+
+  // BS-LEX-026: keyword boundaries (grammar-design §3, §4).
+  word: $ => $.identifier,
 
   rules: {
     // BS-LEX-008 (grammar-design §2).
@@ -24,10 +37,17 @@ module.exports = grammar({
     _terminator: $ => choice($._newline, ':'),
     _newline: _ => /\r?\n/,
 
-    // BS-LEX-012–014: `'` or whole-word REM, to the end of the line.
+    // BS-LEX-012–014: `'` or whole-word REM, to the end of the line. Declared
+    // before `identifier`: for exactly `rem` both tokens match three characters
+    // and the earlier token wins (REM mechanism 1, grammar-design §3).
     comment: _ => token(choice(
       /'[^\r\n]*/,
       /[rR][eE][mM]([ \t][^\r\n]*)?/,
     )),
+
+    // BS-LEX-015, 017, 018: the designator is part of the identifier. Defined
+    // last: an equal-length match goes to the earlier token, so every keyword
+    // token wins its tie with `identifier` (grammar-design §4).
+    identifier: _ => /[A-Za-z_][A-Za-z0-9_]*[$%!#&]?/,
   },
 });

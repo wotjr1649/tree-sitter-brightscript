@@ -103,10 +103,26 @@ with LF alone.
 
 Details:
 
-- Keyword boundaries come from keyword extraction: the lexer first matches the
-  `word` token and only then checks the keyword table, so `iffy` or `endpoint`
-  is one identifier (Level 3, "Keyword Extraction"; `crates/generate/src/build_tables.rs`
-  @ `v0.27.0`).
+- Keyword boundaries. Every `kw()` token matches only strings that
+  `identifier` also matches. An equal-length match goes to the token with the
+  higher lexical precedence, then to a string over a pattern, then to the
+  earlier token (Level 3, `prefer_token` in
+  `crates/generate/src/build_tables/token_conflicts.rs` @ `v0.27.0`). `kw()`
+  tokens are patterns, so `identifier` is the last rule in `grammar.js` and
+  every keyword wins its tie; a longer identifier still wins by length
+  (`iffy`, `endpoint`). The generator moves a keyword into its keyword table
+  (keyword extraction: the lexer matches the `word` token first and then looks
+  the word up) only when substituting the word token would not change the
+  keyword's conflicts with other tokens (`identify_keywords` in
+  `crates/generate/src/build_tables.rs` @ `v0.27.0`). `comment` overlaps
+  `identifier` on `rem`, so keywords that are valid in a state where
+  `identifier` is not (for example `then`, `to`, `in`, `as`, `mod`, `and`,
+  `or`, `catch` and the type names) are not extracted and are recognised by
+  context-aware lexing in the main lexer. Valid input gets the same tree either
+  way. Invalid input can differ: where such a keyword is valid and `identifier`
+  is not, a word that merely begins with it is split (`x = a modx` lexes as
+  `a mod x`, without `ERROR`). No requirement depends on that input
+  (grammar-contract non-goals: not every invalid program is rejected).
 - The two-word block terminators are single tokens. After a line terminator
   inside a block, both an END statement (`end`) and the block's own terminator
   are valid; with `end` and `if` as two tokens one token of lookahead could not
@@ -153,10 +169,12 @@ Details:
 ## 4. Reserved words
 
 Strategy: `word: $ => $.identifier`, every keyword through `kw()`, and **no
-`reserved` word sets**. The runtime returns a keyword only where it has a parse
-action in the current state (or is a reserved word there); otherwise the word
-stays an `identifier` (Level 3, `lib/src/parser.c` @ `v0.27.0`,
-`ts_parser__lex`). This makes every keyword contextual.
+`reserved` word sets**. The runtime returns an extracted keyword only where it
+has a parse action in the current state (or is a reserved word there);
+otherwise the word stays an `identifier` (Level 3, `lib/src/parser.c` @
+`v0.27.0`, `ts_parser__lex`). A keyword the generator does not extract (§3)
+is lexed only in states where it is valid (context-aware lexing). Either way
+every keyword is contextual.
 
 | Category | Words | Treatment | Requirements |
 |---|---|---|---|
