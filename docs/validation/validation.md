@@ -2,8 +2,8 @@
 
 Defines validation levels (V0–V10; distinct from the source levels L1–L5 in
 `docs/provenance/source-policy.md`), the claims each supports, gates, and how
-failures are handled. Automated tooling is built with the grammar; until then
-V0 is the manual checklist below.
+failures are handled. The V0 checklist below is automated by
+`scripts/check_v0.py` (items 1–5) and `scripts/check_generated.py` (item 6).
 
 ## Validation levels
 
@@ -42,6 +42,13 @@ does not prove either tree is right.
 | V9 | — | only for integration claims | only for integration claims |
 | V10 | — | pathological inputs and a bounded fuzz run (workload W13) | fuzzing |
 
+Hosted CI (`.github/workflows/ci.yml`, Windows and Ubuntu) runs on every push
+V0, generation drift (V1), the registry, schema and corpus checks (V2, V3), V4,
+the W03 and W05 checks, V5 (W10) and V10 (W06–W08, W13 with fuzzing); the
+commands are in [workload-matrix.md](workload-matrix.md) "Automation". It never
+fetches Roku documentation, so the registry's research-inventory and ambiguity
+reconciliations, which read the local `_ref/`, run only locally.
+
 V9 evidence is produced in `go-treesitter`, not here
 ([ADR-0006](../design/decisions/ADR-0006-downstream-integration-boundary.md)).
 
@@ -50,7 +57,11 @@ link here.
 
 A **session gate** is met when V0 and every check the Gates table requires for
 the session's changes are `PASS`, or `NOT_RUN`/`BLOCKED` with a recorded
-reason; any `FAIL` means the gate is not met.
+reason; a `FAIL` of any of those checks means the gate is not met. A level the
+table does not require for the session's changes (for example V7, or V9
+without an integration claim) may still be run; its `FAIL` is recorded and
+disclosed, does not by itself fail the session gate, and supports no claim of
+that level.
 
 ## Release candidate (0.x)
 
@@ -72,6 +83,7 @@ every row below is `PASS`. Workload sets are defined in
 | Robustness | W06, W07 and W13 show no crash, hang or runaway memory. |
 | Level 1 refresh | A new dated snapshot of the ten Level 1 pages is taken before the candidate and stored beside `roku-docs-2026-09-23` (source-policy refresh rules); for every page whose content-region SHA-256 changed, each citing requirement is reviewed and the outcome recorded in `upstream-sources.md`. |
 | Provenance | Generator identity, Level 1 snapshot identity and SHA-256 of every generated file are recorded. |
+| Hosted CI | The workflow `.github/workflows/ci.yml` passes on Windows and Ubuntu for the candidate commit, pushed to the session branch; a local run does not substitute. |
 | Downstream | V9 is not required; it is run only when the work in `go-treesitter` is authorized, and then must pass before a pin change is proposed there. |
 | Review | An independent adversarial review is complete; every material finding is fixed or disclosed as a `KL-NNN` or `provisional` row, and the affected gates were rerun. |
 
@@ -82,7 +94,7 @@ reconciliation (planned vs `node-types.json`); results of W01–W13 with the
 commands used; known limitations; `provisional` and `tolerated` requirements;
 downstream results if run; review findings and their disposition; the verdict.
 
-## V0 checklist (manual until automated)
+## V0 checklist
 
 1. No `_ref/`, `docs/prompts/`, `docs/plans/`, `artifacts/` or `.work/` content
    is staged or tracked.
@@ -93,6 +105,9 @@ downstream results if run; review findings and their disposition; the verdict.
 4. License metadata is MIT everywhere it appears.
 5. Tracked text files contain no CR bytes and end with a newline, except
    files under paths marked `-text` in `.gitattributes` (byte fixtures).
+   Generator-owned files (item 6) are exempt from the final-newline rule: the
+   generator writes `src/grammar.json` and `src/node-types.json` without one,
+   and item 6 checks them byte for byte.
 6. Once a grammar exists: regeneration with the pinned generator reproduces
    every generated file byte for byte, and no `src/scanner.c` exists without
    an accepted ADR.
@@ -112,6 +127,17 @@ Every recorded result names: grammar commit, generator version, ABI,
 SHA-256 of the generated files, runtime version (V5, V6, V9), Level 1 snapshot
 ID (V3), and date. A result for one identity is never reused for another.
 
+The Tree-sitter CLI caches a compiled parser by grammar name alone, so a
+parser compiled from another checkout can be loaded silently. Every check
+script therefore runs the CLI with a private parser-library directory
+(`TREE_SITTER_LIBDIR`, `scripts/tscli.py`) and an empty private configuration
+directory (`TREE_SITTER_DIR`), so that a user's `parser-directories` cannot
+select another grammar for `.brs` files; a manual `tree-sitter test` used as
+evidence is run the same way. "No error" means
+the root has-error state is unset, read from `--cst` output: the CLI's exit
+status and default output omit hidden `MISSING` nodes, and exit status 1 also
+reports failures to run, so a check accepts a run only if a tree was printed.
+
 ## Failures and known limitations
 
 - No retry-until-green. A failing check is investigated; the fix or the
@@ -125,7 +151,7 @@ ID (V3), and date. A result for one identity is never reused for another.
 
 | ID | State | Requirement | Behaviour | Demonstrating fixture |
 |---|---|---|---|---|
-| KL-001 | contingent: active only if the ADR-0004 literal-`false` spike fails; otherwise retired unused | BS-COND-007 | A literal-`false` conditional branch whose text is not BrightScript (the documented block-comment idiom) produces `ERROR` nodes | `BS-COND-007: block comment with prose` and the spike fixtures S3, S5–S8, S10–S12, asserted with `:error` |
+| KL-001 | retired (unused): the ADR-0004 spike passed with design V1 on 2026-09-23 | BS-COND-007 | A literal-`false` conditional branch whose text is not BrightScript (the documented block-comment idiom) produces `ERROR` nodes | `BS-COND-007: block comment with prose` and the spike fixtures S3, S5–S8, S10–S12, asserted with `:error` |
 
 ## Fixture rules
 

@@ -1,0 +1,390 @@
+================================================================================
+BS-STMT-007: single-line IF with THEN
+================================================================================
+if x > 127 then print "out of range"
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (binary_expression
+      left: (identifier)
+      right: (number))
+    consequence: (block
+      (print_statement
+        (string)))))
+
+================================================================================
+BS-STMT-007: single-line IF without THEN
+================================================================================
+if debug print "timeout"
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (print_statement
+        (string)))))
+
+================================================================================
+BS-STMT-007: single-line IF with ELSE
+================================================================================
+if caveman = "fred" then print "flintstone" else print "rubble"
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (binary_expression
+      left: (identifier)
+      right: (string))
+    consequence: (block
+      (print_statement
+        (string)))
+    alternative: (else_clause
+      body: (block
+        (print_statement
+          (string))))))
+
+================================================================================
+BS-STMT-007: colon-separated statements in a single-line branch
+================================================================================
+if myname="fred" then yourname = "barney" : ? yourname
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (binary_expression
+      left: (identifier)
+      right: (string))
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (string))
+      (print_statement
+        (identifier)))))
+
+================================================================================
+BS-STMT-007: documented statement kinds in single-line branches
+================================================================================
+if k <> 0 then exit while
+if fruit = "lemon" then continue for
+if m.owner <> invalid then return m.owner
+if x then stop
+if y then f(1)
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (binary_expression
+      left: (identifier)
+      right: (number))
+    consequence: (block
+      (exit_statement)))
+  (if_statement
+    condition: (binary_expression
+      left: (identifier)
+      right: (string))
+    consequence: (block
+      (continue_statement)))
+  (if_statement
+    condition: (binary_expression
+      left: (member_expression
+        object: (identifier)
+        property: (identifier))
+      right: (invalid))
+    consequence: (block
+      (return_statement
+        value: (member_expression
+          object: (identifier)
+          property: (identifier)))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (stop_statement)))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (call_expression
+        function: (identifier)
+        arguments: (argument_list
+          (number))))))
+
+================================================================================
+BS-STMT-008: THEN followed by a comment starts a block IF
+================================================================================
+if x then ' comment
+  y = 1
+end if
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    (comment)
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))))
+
+================================================================================
+BS-STMT-008: THEN followed by a colon starts a block IF
+================================================================================
+if x then : y = 1 : end if
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))))
+
+================================================================================
+BS-STMT-009: nested single-line IF with ELSE
+================================================================================
+if a then if b then x = 1 else x = 2
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (if_statement
+        condition: (identifier)
+        consequence: (block
+          (assignment_statement
+            left: (identifier)
+            right: (number)))
+        alternative: (else_clause
+          body: (block
+            (assignment_statement
+              left: (identifier)
+              right: (number))))))))
+
+================================================================================
+BS-STMT-009: single-line ELSE IF nests an IF
+================================================================================
+if a then x = 1 else if b then x = 2 else x = 3
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))
+    alternative: (else_clause
+      body: (block
+        (if_statement
+          condition: (identifier)
+          consequence: (block
+            (assignment_statement
+              left: (identifier)
+              right: (number)))
+          alternative: (else_clause
+            body: (block
+              (assignment_statement
+                left: (identifier)
+                right: (number)))))))))
+
+================================================================================
+BS-STMT-009: other statement kinds in single-line branches
+================================================================================
+if a then goto done
+if b then end
+if c then throw "e"
+if d then dim x[2]
+if e then n++
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (goto_statement
+        label: (identifier))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (end_statement)))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (throw_statement
+        value: (string))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (dim_statement
+        name: (identifier)
+        dimension: (number))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (update_statement
+        operand: (identifier)))))
+
+================================================================================
+BS-STMT-010: block IF with ELSE IF and ELSE
+================================================================================
+if n < 0 then
+  throw "negative"
+else if n = 0 then
+  return 1
+else
+  return n * f(n-1)
+end if
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (binary_expression
+      left: (identifier)
+      right: (number))
+    consequence: (block
+      (throw_statement
+        value: (string)))
+    alternative: (else_if_clause
+      condition: (binary_expression
+        left: (identifier)
+        right: (number))
+      consequence: (block
+        (return_statement
+          value: (number))))
+    alternative: (else_clause
+      body: (block
+        (return_statement
+          value: (binary_expression
+            left: (identifier)
+            right: (call_expression
+              function: (identifier)
+              arguments: (argument_list
+                (binary_expression
+                  left: (identifier)
+                  right: (number))))))))))
+
+================================================================================
+BS-STMT-010: ELSEIF and ENDIF spellings
+================================================================================
+if a then
+  x = 1
+elseif b then
+  x = 2
+endif
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))
+    alternative: (else_if_clause
+      condition: (identifier)
+      consequence: (block
+        (assignment_statement
+          left: (identifier)
+          right: (number))))))
+
+================================================================================
+BS-STMT-010: block IF without THEN
+================================================================================
+if msg.isFullResult()
+  return 9
+end if
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (call_expression
+      function: (member_expression
+        object: (identifier)
+        property: (identifier))
+      arguments: (argument_list))
+    consequence: (block
+      (return_statement
+        value: (number)))))
+
+================================================================================
+BS-STMT-010: ELSE IF and ELSEIF without THEN
+================================================================================
+if a
+  x = 1
+else if b
+  x = 2
+elseif c
+  x = 3
+end if
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))
+    alternative: (else_if_clause
+      condition: (identifier)
+      consequence: (block
+        (assignment_statement
+          left: (identifier)
+          right: (number))))
+    alternative: (else_if_clause
+      condition: (identifier)
+      consequence: (block
+        (assignment_statement
+          left: (identifier)
+          right: (number))))))
+
+================================================================================
+BS-STMT-011: ELSE and ELSE IF headers followed by comments and colons
+================================================================================
+if a then
+  x = 1
+else if b then ' second
+  x = 2
+else : x = 3
+end if
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))
+    alternative: (else_if_clause
+      condition: (identifier)
+      (comment)
+      consequence: (block
+        (assignment_statement
+          left: (identifier)
+          right: (number))))
+    alternative: (else_clause
+      body: (block
+        (assignment_statement
+          left: (identifier)
+          right: (number))))))
+
+================================================================================
+BS-LEX-032: IF with an optional call starts a block IF
+================================================================================
+IF x?("Hello")
+  PRINT "Hi"
+END IF
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (string)))
+    consequence: (block
+      (print_statement
+        (string)))))

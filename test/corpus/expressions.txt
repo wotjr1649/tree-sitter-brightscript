@@ -1,0 +1,302 @@
+================================================================================
+BS-EXP-001: primary expressions
+================================================================================
+x = [a, 1, "s", true, invalid, LINE_NUM, (b), {k: 1}, function() : return 1 : end function]
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (array_literal
+      (identifier)
+      (number)
+      (string)
+      (true)
+      (invalid)
+      (source_literal)
+      (parenthesized_expression
+        (identifier))
+      (associative_array_literal
+        (associative_array_entry
+          key: (identifier)
+          value: (number)))
+      (anonymous_function
+        parameters: (parameter_list)
+        body: (block
+          (return_statement
+            value: (number)))))))
+
+================================================================================
+BS-EXP-003: call forms
+================================================================================
+print five()
+print fivevar()
+print array[1]()
+obj.add()
+m.f(1, 2)
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list)))
+  (print_statement
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list)))
+  (print_statement
+    (call_expression
+      function: (index_expression
+        object: (identifier)
+        index: (number))
+      arguments: (argument_list)))
+  (call_expression
+    function: (member_expression
+      object: (identifier)
+      property: (identifier))
+    arguments: (argument_list))
+  (call_expression
+    function: (member_expression
+      object: (identifier)
+      property: (identifier))
+    arguments: (argument_list
+      (number)
+      (number))))
+
+================================================================================
+BS-EXP-004: member access chains
+================================================================================
+i.ifInt.SetInt(5)
+x = (1+2).tostr()
+y = f().a.b
+--------------------------------------------------------------------------------
+
+(source_file
+  (call_expression
+    function: (member_expression
+      object: (member_expression
+        object: (identifier)
+        property: (identifier))
+      property: (identifier))
+    arguments: (argument_list
+      (number)))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (member_expression
+        object: (parenthesized_expression
+          (binary_expression
+            left: (number)
+            right: (number)))
+        property: (identifier))
+      arguments: (argument_list)))
+  (assignment_statement
+    left: (identifier)
+    right: (member_expression
+      object: (member_expression
+        object: (call_expression
+          function: (identifier)
+          arguments: (argument_list))
+        property: (identifier))
+      property: (identifier))))
+
+================================================================================
+BS-EXP-005: index access and chained indexing
+================================================================================
+x = a[1]
+y = a[1][2]
+z = f()[0]
+w = a.b[i + 1]
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (index_expression
+      object: (identifier)
+      index: (number)))
+  (assignment_statement
+    left: (identifier)
+    right: (index_expression
+      object: (index_expression
+        object: (identifier)
+        index: (number))
+      index: (number)))
+  (assignment_statement
+    left: (identifier)
+    right: (index_expression
+      object: (call_expression
+        function: (identifier)
+        arguments: (argument_list))
+      index: (number)))
+  (assignment_statement
+    left: (identifier)
+    right: (index_expression
+      object: (member_expression
+        object: (identifier)
+        property: (identifier))
+      index: (binary_expression
+        left: (identifier)
+        right: (number)))))
+
+================================================================================
+BS-EXP-006: attribute operator
+================================================================================
+n = rsp.photos@perpage
+t = m.xml@title
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (attribute_expression
+      object: (member_expression
+        object: (identifier)
+        property: (identifier))
+      attribute: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (attribute_expression
+      object: (member_expression
+        object: (identifier)
+        property: (identifier))
+      attribute: (identifier))))
+
+================================================================================
+BS-EXP-007: optional chaining chain
+================================================================================
+x = array?[3]?.foo?.bar?()
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (member_expression
+        object: (member_expression
+          object: (index_expression
+            object: (identifier)
+            index: (number))
+          property: (identifier))
+        property: (identifier))
+      arguments: (argument_list))))
+
+================================================================================
+BS-EXP-007: optional call and optional index with arguments
+================================================================================
+x = i?(1, "String", explode())
+y = i?[explode()]
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number)
+        (string)
+        (call_expression
+          function: (identifier)
+          arguments: (argument_list)))))
+  (assignment_statement
+    left: (identifier)
+    right: (index_expression
+      object: (identifier)
+      index: (call_expression
+        function: (identifier)
+        arguments: (argument_list)))))
+
+================================================================================
+BS-EXP-008: optional index as an assignment target
+:error
+================================================================================
+array?[12] = x
+--------------------------------------------------------------------------------
+
+================================================================================
+BS-EXP-008: optional member as an assignment target
+:error
+================================================================================
+a?.b = 1
+--------------------------------------------------------------------------------
+
+================================================================================
+BS-EXP-009: standalone optional call statement
+:error
+================================================================================
+f?()
+--------------------------------------------------------------------------------
+
+================================================================================
+BS-EXP-009: standalone optional call on a member
+:error
+================================================================================
+a.b?()
+--------------------------------------------------------------------------------
+
+
+================================================================================
+BS-EXP-010: optional chaining inside statement subexpressions
+================================================================================
+f(array?[12])
+f(foo?.bar).member = 5
+--------------------------------------------------------------------------------
+
+(source_file
+  (call_expression
+    function: (identifier)
+    arguments: (argument_list
+      (index_expression
+        object: (identifier)
+        index: (number))))
+  (assignment_statement
+    left: (member_expression
+      object: (call_expression
+        function: (identifier)
+        arguments: (argument_list
+          (member_expression
+            object: (identifier)
+            property: (identifier))))
+      property: (identifier))
+    right: (number)))
+
+================================================================================
+BS-LEX-029: optional-chaining tokens after whitespace
+================================================================================
+a = b ?. c
+x = s ?[ 5 ]
+y = f ?( 1 )
+z = e ?@ id
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (member_expression
+      object: (identifier)
+      property: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (index_expression
+      object: (identifier)
+      index: (number)))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number))))
+  (assignment_statement
+    left: (identifier)
+    right: (attribute_expression
+      object: (identifier)
+      attribute: (identifier))))
+
+================================================================================
+BS-LEX-030: split optional-chaining token
+:error
+================================================================================
+a = b ? . c
+--------------------------------------------------------------------------------

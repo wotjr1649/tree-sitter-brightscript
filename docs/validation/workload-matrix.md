@@ -7,7 +7,8 @@ and gates are defined in [validation.md](validation.md); planned node names and
 placement rules in [tree-schema.md](../specs/tree-schema.md); rule design in
 [grammar-design.md](../specs/grammar-design.md).
 
-Nothing here has been run: there is no grammar yet.
+Every set is automated (see Automation below). Results belong to one grammar
+identity and are recorded in the release-candidate report, not here.
 
 ## Workload sets
 
@@ -15,17 +16,17 @@ Nothing here has been run: there is no grammar yet.
 |---|---|---|---|---|
 | W01 corpus | V2, V3 | every file under `test/corpus/` (catalogue below) | every fixture passes; each registry fixture exists exactly once; `:error` only on negative, recovery and KL-demonstrating fixtures; `:skip` only on a fixture listed under a `KL-NNN` | whole run ≤ 60 s |
 | W02 byte-sensitive | V2, V3 | `test/corpus/bytes/` (CR bytes, byte-order mark) | as W01; trees equal their LF or BOM-less counterparts | — |
-| W03 composite samples | V3, V6, V10 | `test/samples/*.brs`, independently written programs (below) | no `ERROR`/`MISSING`; recorded in V6 | ≤ 1 s each |
+| W03 composite samples | V3, V6, V10 | `test/samples/*.brs`, independently written programs (below) | no error (root has-error state, hidden `MISSING` included); exactly the catalogued files; `program-crlf.brs` is the CRLF byte copy of `program.brs`; recorded in V6 | ≤ 1 s each |
 | W04 precedence | V3 | fixtures of BS-EXP-002, 011–021, 027, covering every grouping case of grammar-design §5 | groupings exactly as listed | — |
 | W05 equivalent spellings | V3 | pairs below | the two trees are identical after removing anonymous nodes and byte ranges | — |
-| W06 nesting, length, repetition | V10 | generated inputs below | valid inputs: no `ERROR`; all inputs: no crash, no hang | per input ≤ 10 s, ≤ 1 GiB resident |
+| W06 nesting, length, repetition | V10 | generated inputs below | valid inputs: no error (root has-error state, hidden `MISSING` included); invalid inputs: an error; all inputs: no crash, no hang | per input ≤ 10 s, ≤ 1 GiB resident |
 | W07 UTF-8 | V3, V10 | BS-LEX-033 fixtures; samples with non-ASCII strings and comments; invalid UTF-8 and NUL bytes (robustness only) | valid: no `ERROR`; invalid bytes: no crash | — |
 | W08 recovery | V3, V10 | recovery and negative fixtures (catalogue) | `:error` holds; no crash; no hang | — |
 | W09 conditional compilation | V3, V5 | BS-COND fixtures including the spike fixtures; E1–E6 | baseline fixtures pass; spike decided PASS or FAIL by grammar-design §11 | — |
-| W10 incremental edits | V5 | edit scripts below | the final tree of `tree-sitter parse --edits` equals a fresh parse of the final text (same S-expression and ranges); every script ends on error-free text | — |
+| W10 incremental edits | V5 | edit scripts below | the final tree of `tree-sitter parse --edits` equals a fresh parse of the final text (default and `--cst` output); every script ends on text with no error (root has-error state) | — |
 | W11 highlights | V4 | `queries/highlights.scm`, `test/highlight/*.brs` | query compiles; every capture assertion passes | — |
-| W12 native oracle | V6 | all corpus inputs and `test/samples/*.brs` | output recorded per identity (validation.md identity binding) | — |
-| W13 fuzz and pathological | V10 | `tree-sitter fuzz` over the corpus; W06 inputs; seeds below | no crash, no hang, no runaway memory | fuzz: 1,000 iterations × 10 edits per fixture at release candidates |
+| W12 native oracle | V6 | all corpus inputs and `test/samples/*.brs` | output recorded per identity (validation.md identity binding); two recordings of one identity on one platform give byte-identical `inputs/`, `trees/`, `cst/` and `manifest.json` (the CLI timings are dropped; the date and the compiled-library hash go to `run.json`) | — |
+| W13 fuzz and pathological | V10 | `tree-sitter fuzz` over the corpus; W06 inputs; seeds below | no crash, no hang, no runaway memory | fuzz: 1,000 iterations × 10 edits per fixture at release candidates, with a recorded seed (default 1) |
 | W14 downstream parity | V9 (in `go-treesitter`) | W12 inputs and W10 edits for the same grammar identity | ordered trees equal the native V6 records; `CGO_ENABLED=0` build and tests pass | run only when that work is authorized |
 
 ### W03 composite samples
@@ -70,7 +71,7 @@ implementation; the files themselves are not committed.
 | postfix chain `a.b.c…` with calls and indexes | 2,000 links |
 | string literal | 1 MiB |
 | file of functions | 50,000 lines |
-| unterminated constructs (IF, FOR, AA, string, `#if`) at EOF | 1 each (robustness only) |
+| unterminated constructs (IF, FOR, AA, string, `#if`) at EOF | 1 each (an error expected) |
 
 ### W10 incremental edit scripts
 
@@ -144,8 +145,24 @@ Bare CR line endings (BS-LEX-007); non-ASCII identifiers (BS-LEX-016); NUL
 bytes and invalid UTF-8 (BS-LEX-034); line breaks in argument lists, after
 `(` of a parameter list and after binary operators (BS-EXP-023, 024,
 BS-FUNC-007); lone `"`, `#`, `?`, `&h`; 10,000 `(`; 10,000 `:`; `#if` without
-`#end if`; every other unresolved form listed in the registry. Only the
-robustness criterion applies to them.
+`#end if`; directive-like region lines that end at a word boundary
+(grammar-design §11); every other unresolved form listed in the registry. Only
+the robustness criterion applies to them.
+
+## Automation
+
+Every command runs from the repository root; hosted CI (`.github/workflows/ci.yml`)
+runs all of them except W12 and W14 on Windows and Ubuntu.
+
+| Set | Command |
+|---|---|
+| W01, W02, W04, W07 (valid), W09 (fixtures), W11 | `npx tree-sitter test` (with a private `TREE_SITTER_LIBDIR` or `--rebuild`, validation.md "Identity binding") and `python scripts/check_registry.py --complete` |
+| W03 | `python scripts/check_samples.py` |
+| W05 | `python scripts/check_spellings.py` |
+| W06, W07 (invalid bytes), W08, W13 | `python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N]` |
+| W09 (C4), W10 (C5 included) | `python scripts/check_spike.py`, `python scripts/check_incremental.py` |
+| W12 | `python scripts/record_oracle.py` (clean tree; output under `artifacts/oracle/`) |
+| W14 | in `go-treesitter`, from the W12 inputs and W10 edits of the same identity |
 
 ## Corpus fixture catalogue
 
@@ -182,6 +199,7 @@ token.
 | `BS-LEX-008: final line with a line terminator` | `x = 1↵` | same tree as the previous fixture |
 | `BS-LEX-008: empty file` | (empty) | `(source_file)` |
 | `BS-LEX-008: only comments and blank lines` | `' a↵↵REM b↵` | `(source_file (comment) (comment))` |
+| `BS-LEX-008: only indented blank lines` | `  ↵⇥↵  ` | `(source_file)` |
 | `BS-LEX-009: blank lines around and inside blocks` | `↵↵sub main()↵↵  x = 1↵↵end sub↵↵` | `(source_file (function_declaration name: (identifier) parameters: (parameter_list) body: (block (assignment_statement …))))` |
 | `BS-LEX-010: colon-separated statements` | `x=5:print 25; " is"; x^2` | `(assignment_statement …)`, `(print_statement (number) (string) (binary_expression …))` |
 | `BS-LEX-010: colon-separated statements in a block body` | `sub main()↵  a = 1 : b = 2 : print a↵end sub` | `block` holding two `assignment_statement`s and a `print_statement` |
@@ -198,10 +216,14 @@ token.
 | `BS-LEX-017: designators on parameters and loop and catch variables` | `sub f(a$, n%)↵  for i% = 1 to n%↵  end for↵  for each s$ in list↵  end for↵  try↵    x = 1↵  catch e$↵  end try↵end sub` | `parameter name: (identifier)` twice; `for_statement counter: (identifier)`; `for_each_statement item: (identifier)`; `catch_clause variable: (identifier)` |
 | `BS-LEX-018: LongInteger designator on a variable` | `id& = 9876543210&` | `(assignment_statement left: (identifier) right: (number))` |
 | `BS-LEX-021: reserved keywords in statement positions` | `Function f() As Integer↵  Dim a[2]↵  For i = 1 To 2 Step 1↵    If a[i] = Invalid Then Exit For↵  Next↵  While True : Exit While : End While↵  Goto done↵done:↵  Return 1↵End Function` | `function_declaration` whose `block` holds `dim_statement`, `for_statement` (with `if_statement` → `exit_statement`), `while_statement` (→ `exit_statement`), `goto_statement`, `label_statement`, `return_statement` |
+| `BS-LEX-021: reserved keywords in mixed case` | `Sub Main()↵  For Each v In list↵    If v = False And Not x Or y Then↵      Print LINE_NUM↵    ElseIf v Then↵      Stop↵    Else↵      While z↵        ExitWhile↵      EndWhile↵    EndIf↵  Next↵EndSub↵Function F()↵EndFunction` | `(source_file (function_declaration name: (identifier) parameters: (parameter_list) body: (block (for_each_statement item: (identifier) collection: (identifier) body: (block (if_statement condition: (binary_expression left: (binary_expression left: (binary_expression left: (identifier) right: (false)) right: (unary_expression operand: (identifier))) right: (identifier)) consequence: (block (print_statement (source_literal))) alternative: (else_if_clause condition: (identifier) consequence: (block (stop_statement))) alternative: (else_clause body: (block (while_statement condition: (identifier) body: (block (exit_statement)))))))))) (function_declaration name: (identifier) parameters: (parameter_list) body: (block)))` |
 | `BS-LEX-022: reserved built-in function calls` | `o = CreateObject("roList")↵t = Type(o)↵b = Box(1)↵g = GetGlobalAA()↵e = GetLastRunCompileError()↵print tab(5) pos(0)` | each right side `(call_expression function: (identifier) arguments: (argument_list …))`; `print_statement` with two `call_expression`s |
+| `BS-LEX-022: Eval, Run and GetLastRunRunTimeError calls` | `r = Eval("x = 1")↵Run("pkg:/source/other.brs")↵e = GetLastRunRunTimeError()` | `(source_file (assignment_statement left: (identifier) right: (call_expression function: (identifier) arguments: (argument_list (string)))) (call_expression function: (identifier) arguments: (argument_list (string))) (assignment_statement left: (identifier) right: (call_expression function: (identifier) arguments: (argument_list))))` |
 | `BS-LEX-024: keywords as member names` | `list.next()↵player.stop()↵x = obj.end + obj.if + obj.print` | two `call_expression` statements over `member_expression property: (identifier)`; `binary_expression`s over three `member_expression`s |
 | `BS-LEX-024: keywords as associative-array keys` | `aa = { function: "main()", end: 1, if: 2, next: 3 }` | four `(associative_array_entry key: (identifier) value: …)` |
+| `BS-LEX-024: function as a member name after an index` | `name = e.backtrace[i].function` | `(source_file (assignment_statement left: (identifier) right: (member_expression object: (index_expression object: (member_expression object: (identifier) property: (identifier)) index: (identifier)) property: (identifier))))` |
 | `BS-LEX-025: non-reserved keyword words as identifiers` | `mod = 3↵x = mod + in + as + integer + string↵y = a mod b` | `assignment_statement left: (identifier)`; `binary_expression`s over five `identifier`s; a `binary_expression` for `a mod b` |
+| `BS-LEX-025: more non-reserved words as identifiers` | `x = continue + library + throw + try + catch + endtry↵y = float + double + boolean + object + dynamic + void` | `(source_file (assignment_statement left: (identifier) right: (binary_expression left: (binary_expression left: (binary_expression left: (binary_expression left: (binary_expression left: (identifier) right: (identifier)) right: (identifier)) right: (identifier)) right: (identifier)) right: (identifier))) (assignment_statement left: (identifier) right: (binary_expression left: (binary_expression left: (binary_expression left: (binary_expression left: (binary_expression left: (identifier) right: (identifier)) right: (identifier)) right: (identifier)) right: (identifier)) right: (identifier))))` |
 | `BS-LEX-026: identifiers beginning with keywords` | `iffy = 1 : endpoint = 2 : format = 3 : printer = 4 : nextItem = 5 : stepSize = 6 : notify = 7 : order = 8 : android = 9 : returnValue = 10 : falsey = 11` | eleven `(assignment_statement left: (identifier) right: (number))` |
 | `BS-LEX-033: UTF-8 text in comments and strings` | `' café ☕↵s = "Grüße, 世界"` | `(source_file (comment) (assignment_statement left: (identifier) right: (string)))` |
 
@@ -255,6 +277,7 @@ The last input line, just before the divider, ends with LF alone
 | `BS-EXP-008: optional index as an assignment target` | `array?[12] = x` | `:error` |
 | `BS-EXP-008: optional member as an assignment target` | `a?.b = 1` | `:error` |
 | `BS-EXP-009: standalone optional call statement` | `f?()` | `:error` |
+| `BS-EXP-009: standalone optional call on a member` | `a.b?()` | `:error` |
 | `BS-EXP-010: optional chaining inside statement subexpressions` | `f(array?[12])↵f(foo?.bar).member = 5` | call statement with an `index_expression` argument; `(assignment_statement left: (member_expression object: (call_expression …) property: (identifier)) right: (number))` |
 | `BS-LEX-029: optional-chaining tokens after whitespace` | `a = b ?. c↵x = s ?[ 5 ]↵y = f ?( 1 )↵z = e ?@ id` | (token) `member_expression`, `index_expression`, `call_expression`, `attribute_expression` |
 | `BS-LEX-030: split optional-chaining token` | `a = b ? . c` | `:error` |
@@ -291,6 +314,7 @@ The last input line, just before the divider, ends with LF alone
 | `BS-STMT-023: RETURN with and without a value` | `function f()↵  if x then return↵  return 1↵end function` | `(return_statement)`; `(return_statement value: (number))` |
 | `BS-STMT-024: PRINT separators and trailing semicolon` | `print 25; " is equal to"; x^2↵print "zone 1","zone 2"↵print a$;a$,a$;" ";a$↵print "no newline";` | four `print_statement`s with 3, 2, 5 and 1 expression children |
 | `BS-STMT-024: question-mark PRINT with separators` | `? 25; " is"; x^2` | `(print_statement (number) (string) (binary_expression …))` |
+| `BS-STMT-024: PRINT with a trailing comma` | `print a, b,` | `(source_file (print_statement (identifier) (identifier)))` |
 | `BS-STMT-025: adjacent PRINT items` | `print "this is a five " 5 "!!"` | `(print_statement (string) (number) (string))` |
 | `BS-STMT-025: TAB and POS items` | `print tab(5)"tabbed 5";tab(25)"tabbed 25"↵print tab(40) pos(0)↵print "these" tab(pos(0)+5)"words"` | items alternate `call_expression` and `string` as written |
 | `BS-STMT-026: ambiguous adjacent PRINT items` | `print a -1↵print a (1)` | `(print_statement (binary_expression …))`; `(print_statement (call_expression …))` |
@@ -324,6 +348,7 @@ The last input line, just before the divider, ends with LF alone
 | `BS-STMT-010: block IF with ELSE IF and ELSE` | `if n < 0 then↵  throw "negative"↵else if n = 0 then↵  return 1↵else↵  return n * f(n-1)↵end if` | `(if_statement condition: (binary_expression …) consequence: (block (throw_statement value: (string))) alternative: (else_if_clause condition: (binary_expression …) consequence: (block (return_statement value: (number)))) alternative: (else_clause body: (block (return_statement value: (binary_expression …)))))` |
 | `BS-STMT-010: ELSEIF and ENDIF spellings` | `if a then↵  x = 1↵elseif b then↵  x = 2↵endif` | `(if_statement condition: (identifier) consequence: (block (assignment_statement …)) alternative: (else_if_clause condition: (identifier) consequence: (block (assignment_statement …))))` |
 | `BS-STMT-010: block IF without THEN` | `if msg.isFullResult()↵  return 9↵end if` | `(if_statement condition: (call_expression …) consequence: (block (return_statement value: (number))))` |
+| `BS-STMT-010: ELSE IF and ELSEIF without THEN` | `if a↵  x = 1↵else if b↵  x = 2↵elseif c↵  x = 3↵end if` | `(source_file (if_statement condition: (identifier) consequence: (block (assignment_statement left: (identifier) right: (number))) alternative: (else_if_clause condition: (identifier) consequence: (block (assignment_statement left: (identifier) right: (number)))) alternative: (else_if_clause condition: (identifier) consequence: (block (assignment_statement left: (identifier) right: (number))))))` |
 | `BS-STMT-011: ELSE and ELSE IF headers followed by comments and colons` | `if a then↵  x = 1↵else if b then ' second↵  x = 2↵else : x = 3↵end if` | `(source_file (if_statement condition: (identifier) consequence: (block (assignment_statement left: (identifier) right: (number))) alternative: (else_if_clause condition: (identifier) (comment) consequence: (block (assignment_statement left: (identifier) right: (number)))) alternative: (else_clause body: (block (assignment_statement left: (identifier) right: (number))))))` |
 | `BS-LEX-032: IF with an optional call starts a block IF` | `IF x?("Hello")↵  PRINT "Hi"↵END IF` | (token) `(source_file (if_statement condition: (call_expression function: (identifier) arguments: (argument_list (string))) consequence: (block (print_statement (string)))))` |
 
@@ -340,8 +365,11 @@ The last input line, just before the divider, ends with LF alone
 | `BS-STMT-019: CONTINUE FOR and CONTINUE WHILE` | `for each fruit in fruits↵  if fruit = "lemon" then continue for↵end for↵while c < 3↵  c++↵  continue while↵end while` | two `continue_statement`s |
 | `BS-STMT-020: ENDWHILE and EXITWHILE` | `while true↵  exitwhile↵endwhile` | `(while_statement condition: (true) body: (block (exit_statement)))` |
 | `BS-STMT-022: multi-word keywords with extra spacing` | `for each⇥x in xs↵  if x then↵  end   if↵end⇥for` | `(for_each_statement item: (identifier) collection: (identifier) body: (block (if_statement condition: (identifier) consequence: (block))))` |
+| `BS-STMT-022: more multi-word keywords with extra spacing` | `function f()↵  for i = 1 to 2↵    if a then↵      exit  for↵    else  if b then↵      continue⇥for↵    end if↵  end  for↵  while x↵    exit⇥while↵  end  while↵  try↵  catch e↵  end  try↵end  function↵sub s()↵end⇥sub` | `(source_file (function_declaration name: (identifier) parameters: (parameter_list) body: (block (for_statement counter: (identifier) start: (number) end: (number) body: (block (if_statement condition: (identifier) consequence: (block (exit_statement)) alternative: (else_if_clause condition: (identifier) consequence: (block (continue_statement)))))) (while_statement condition: (identifier) body: (block (exit_statement))) (try_statement body: (block) handler: (catch_clause variable: (identifier) body: (block))))) (function_declaration name: (identifier) parameters: (parameter_list) body: (block)))` |
 | `BS-STMT-035: one-line loop and TRY bodies with colons` | `for i = 1 to 3 : print i : end for↵while x : x = x - 1 : end while↵try : f() : catch e : print e : end try` | `for_statement`, `while_statement`, `try_statement`, each body holding one statement |
+| `BS-STMT-035: FOR EACH header ending with a colon` | `for each v in list : print v : end for` | `(source_file (for_each_statement item: (identifier) collection: (identifier) body: (block (print_statement (identifier)))))` |
 | `BS-STMT-036: nested blocks close with their own terminators` | `for i = 1 to 2↵  if x then↵    while y↵      y = false↵    end while↵  end if↵end for` | `for_statement` → `if_statement` → `while_statement`, nested in that order |
+| `BS-STMT-036: compact terminators close their own constructs` | `function f()↵  try↵    while x↵      if y then↵        x = false↵      endif↵    endwhile↵  catch e↵  endtry↵endfunction↵sub s()↵endsub` | `(source_file (function_declaration name: (identifier) parameters: (parameter_list) body: (block (try_statement body: (block (while_statement condition: (identifier) body: (block (if_statement condition: (identifier) consequence: (block (assignment_statement left: (identifier) right: (false))))))) handler: (catch_clause variable: (identifier) body: (block))))) (function_declaration name: (identifier) parameters: (parameter_list) body: (block)))` |
 
 ### `test/corpus/functions.txt`
 
@@ -408,13 +436,16 @@ The last input line, just before the divider, ends with LF alone
 | `BS-COND-005: directives in mixed case` | `#CONST Flag = TRUE↵#If flag↵  x = 1↵#Else If other↵#ELSE↵#End If` | `(source_file (const_directive name: (identifier) value: (true)) (if_directive condition: (identifier) consequence: (block (assignment_statement …)) alternative: (else_if_directive condition: (identifier) consequence: (block)) alternative: (else_directive body: (block))))` |
 | `BS-COND-006: #if around function declarations` | `#if DEBUG↵function debugOnly()↵end function↵#end if` | `(source_file (if_directive condition: (identifier) consequence: (block (function_declaration name: (identifier) parameters: (parameter_list) body: (block)))))` |
 | `BS-COND-008: indented directives with comments` | `sub main()↵    #if DEBUG ' debug only↵        print "d"↵    #else   if   OTHER↵    #end⇥if ' done↵end sub` | `(source_file (function_declaration name: (identifier) parameters: (parameter_list) body: (block (if_directive condition: (identifier) (comment) consequence: (block (print_statement (string))) alternative: (else_if_directive condition: (identifier) consequence: (block))) (comment))))` |
+| `BS-COND-008: comments after #const, #else if and #else` | `#const A = true ' note↵#if A↵#else if B ' note↵#else ' note↵#end if` | `(source_file (const_directive name: (identifier) value: (true)) (comment) (if_directive condition: (identifier) consequence: (block) alternative: (else_if_directive condition: (identifier) (comment) consequence: (block)) alternative: (else_directive (comment) body: (block))))` |
 | `BS-COND-012: #if inside a function body` | `sub main()↵#if DEBUG↵  print "d"↵#end if↵end sub` | `(function_declaration … body: (block (if_directive condition: (identifier) consequence: (block (print_statement (string))))))` |
 | `BS-COND-012: nested #if blocks` | `#if A↵  #if B↵    x = 1↵  #end if↵#end if` | `(if_directive condition: (identifier) consequence: (block (if_directive condition: (identifier) consequence: (block (assignment_statement …)))))` |
 | `BS-COND-013: #const with a non-boolean value` | `#const x = 5` | `:error` |
+| `BS-COND-013: #const with a string value` | `#const s = "a"` | `:error` |
 
 ADR-0004 literal-false fixtures (grammar-design §11). The PASS column applies
 to design V1; under V2 every `(comment)` inside `inactive_text` is absent. On
-FAIL, `:error` fixtures are listed as KL-001 demonstrating fixtures.
+FAIL, `:error` fixtures are listed as KL-001 demonstrating fixtures. Outcome:
+the spike passed with design V1, so the corpus uses the PASS column.
 
 | Fixture | Input | PASS (V1) | FAIL |
 |---|---|---|---|
@@ -430,6 +461,7 @@ FAIL, `:error` fixtures are listed as KL-001 demonstrating fixtures.
 | `BS-COND-007: spike S10 quotes and comments inside a false region` | `#if false↵    Don't "stop" here↵    ' a real comment↵    REM another comment↵#end if` | `(source_file (if_directive condition: (false) consequence: (inactive_text (comment) (comment))))` | `:error` |
 | `BS-COND-007: spike S11 #else if false` | `#if DEBUG↵    x = 1↵#else if false↵    Prose line.↵#end if` | `(source_file (if_directive condition: (identifier) consequence: (block (assignment_statement left: (identifier) right: (number))) alternative: (else_if_directive condition: (false) consequence: (inactive_text))))` | `:error` |
 | `BS-COND-007: spike S12 REM-like prose inside a false region` | `#if false↵    Remember this.↵    REMARK: prose.↵    remote control↵#end if` | `(source_file (if_directive condition: (false) consequence: (inactive_text)))` | `:error` |
+| `BS-COND-007: directive-like words inside a false region` | `#if false↵    #ifdef FOO↵    #endregion notes↵    #elsewhere prose↵    #iffy↵#end if↵x = 1` | `(source_file (if_directive condition: (false) consequence: (inactive_text)) (assignment_statement left: (identifier) right: (number)))` | `:error` |
 | `BS-COND-007: spike R1 error before a false region` | `x = = 1↵#if false↵    Prose.↵#end if↵function foo()↵end function` | `:error` (C4 check in grammar-design §11) | `:error` |
 | `BS-COND-007: spike R2 error after a false region` | `#if false↵    Prose.↵#end if↵x = = 1↵function foo()↵end function` | `:error` (C4 check) | `:error` |
 | `BS-COND-007: spike R3 false region without #end if` | `#if false↵    Prose without an end.` | `:error` | `:error` |
@@ -459,9 +491,9 @@ terminator or delimiter its construct is documented to have.
 
 | Item | Count |
 |---|---|
-| registry fixtures catalogued | 210 |
-| positive (including 4 guards; on a spike FAIL, 9 literal-false fixtures take their `:error` form) | 183 |
-| negative (`invalid` evidence) | 11 |
+| registry fixtures catalogued | 224 |
+| positive (including 4 guards; on a spike FAIL, 10 literal-false fixtures take their `:error` form) | 195 |
+| negative (`invalid` evidence) | 13 |
 | recovery (including spike R1–R3) | 16 |
 | corpus files | 13 (`bytes/` counted once) |
 | incremental scripts | 12 + E1–E6 |

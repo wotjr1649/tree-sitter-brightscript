@@ -45,6 +45,16 @@ Present now:
 
 ```text
 LICENSE  README.md  AGENTS.md  .gitignore  .gitattributes
+package.json  package-lock.json   private; exact tree-sitter-cli pin
+tree-sitter.json                  grammar metadata; all bindings disabled
+grammar.js                        canonical grammar source
+src/                              generated parser artifacts (never hand-edited)
+test/corpus/                      requirement fixtures (bytes/ is byte-exact)
+test/samples/                     composite programs (workload W03)
+queries/highlights.scm            highlighting query (workload W11)
+test/highlight/                   highlight assertions
+scripts/                          V0, drift, registry, schema and workload checks
+.github/workflows/ci.yml          hosted CI (Windows, Ubuntu)
 docs/README.md  docs/roadmap.md
 docs/specs/        grammar-contract, language-conformance, grammar-design, tree-schema
 docs/design/       architecture, decisions/ (ADRs)
@@ -52,17 +62,9 @@ docs/provenance/   source-policy, upstream-sources
 docs/validation/   validation, workload-matrix, known-regressions
 ```
 
-Added when grammar implementation begins: `grammar.js`, `tree-sitter.json`
-(all language bindings disabled), a private `package.json` and lockfile that
-pin the generator, `src/**`, `test/corpus/`, `test/samples/`, `scripts/`
-(V0 drift and registry checks, workload generator). CI is added once the
-repository has a remote.
-
-Added before the first release: `queries/highlights.scm`, `test/highlight/`.
-
 Added only when justified: language bindings or WASM artifacts (per consumer
-demand), `queries/tags.scm` (before 1.0) and other queries, fuzzing tools,
-further validation and report documents.
+demand), `queries/tags.scm` (before 1.0) and other queries, fuzzing tools
+beyond `tree-sitter fuzz`, further validation and report documents.
 
 Local only and Git-ignored: `_ref/` (reference evidence), `docs/prompts/`,
 `docs/plans/`, `artifacts/` (validation output, handoffs), `.work/`.

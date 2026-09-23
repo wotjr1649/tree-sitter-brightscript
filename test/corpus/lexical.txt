@@ -1,0 +1,841 @@
+================================================================================
+BS-LEX-001: keywords in upper, lower and mixed case
+================================================================================
+IF x THEN PRINT "a"
+if x then print "a"
+If X Then Print "A"
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (print_statement
+        (string))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (print_statement
+        (string))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (print_statement
+        (string)))))
+
+================================================================================
+BS-LEX-001: identifier spellings differing only in case
+================================================================================
+myVar = 1
+MYVAR = 2
+myvar = 3
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-002: indentation and repeated spaces
+================================================================================
+sub main()
+    x   =   1
+        print    x
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number))
+      (print_statement
+        (identifier)))))
+
+================================================================================
+BS-LEX-003: tab indentation and tabs between tokens
+================================================================================
+sub main()
+	x	=	1
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))))
+
+================================================================================
+BS-LEX-004: keyword directly followed by a string
+================================================================================
+if c <> k then print"error" : stop
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    consequence: (block
+      (print_statement
+        (string))
+      (stop_statement))))
+
+================================================================================
+BS-LEX-004: compact one-line anonymous function
+================================================================================
+photo.GetTitle=function():return m.xml@title:end function
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (member_expression
+      object: (identifier)
+      property: (identifier))
+    right: (anonymous_function
+      parameters: (parameter_list)
+      body: (block
+        (return_statement
+          value: (attribute_expression
+            object: (member_expression
+              object: (identifier)
+              property: (identifier))
+            attribute: (identifier)))))))
+
+================================================================================
+BS-LEX-005: one statement per line
+================================================================================
+x = 1
+y = 2
+print x + y
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (print_statement
+    (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+================================================================================
+BS-LEX-008: final line without a line terminator
+================================================================================
+x = 1
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-008: final line with a line terminator
+================================================================================
+x = 1
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-008: empty file
+================================================================================
+--------------------------------------------------------------------------------
+
+(source_file)
+
+================================================================================
+BS-LEX-008: only comments and blank lines
+================================================================================
+' a
+
+REM b
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (comment)
+  (comment))
+
+================================================================================
+BS-LEX-008: only indented blank lines
+================================================================================
+  
+	
+  
+--------------------------------------------------------------------------------
+
+(source_file)
+
+================================================================================
+BS-LEX-009: blank lines around and inside blocks
+================================================================================
+
+
+sub main()
+
+  x = 1
+
+end sub
+
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))))
+
+================================================================================
+BS-LEX-010: colon-separated statements
+================================================================================
+x=5:print 25; " is"; x^2
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (print_statement
+    (number)
+    (string)
+    (binary_expression
+      left: (identifier)
+      right: (number))))
+
+================================================================================
+BS-LEX-010: colon-separated statements in a block body
+================================================================================
+sub main()
+  a = 1 : b = 2 : print a
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number))
+      (assignment_statement
+        left: (identifier)
+        right: (number))
+      (print_statement
+        (identifier)))))
+
+================================================================================
+BS-LEX-011: repeated, leading and trailing colons
+================================================================================
+: x = 1 :: y = 2 :
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-012: apostrophe comment lines
+================================================================================
+' first
+'second
+x = 1
+--------------------------------------------------------------------------------
+
+(source_file
+  (comment)
+  (comment)
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-012: comment after code on the same line
+================================================================================
+x = 1 ' set x
+y = 2'no space
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (comment)
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (comment))
+
+================================================================================
+BS-LEX-012: apostrophe inside a string
+================================================================================
+s = "don't stop"
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (string)))
+
+================================================================================
+BS-LEX-013: REM comments in mixed case
+================================================================================
+REM upper
+rem lower
+Rem ** mixed **
+--------------------------------------------------------------------------------
+
+(source_file
+  (comment)
+  (comment)
+  (comment))
+
+================================================================================
+BS-LEX-014: identifiers beginning with rem
+================================================================================
+remark = 1
+rem1 = 2
+rem_x = remark + rem1
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+================================================================================
+BS-LEX-014: REM after code and after a colon
+================================================================================
+x = 1 rem note
+y = 2 : REM note
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (comment)
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (comment))
+
+================================================================================
+BS-LEX-014: bare REM line
+================================================================================
+x = 1
+REM
+y = 2
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (comment)
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-015: identifier forms
+================================================================================
+a = boy5 + super_man$ + _x + a_very_long_identifier_name_123
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (binary_expression
+          left: (identifier)
+          right: (identifier))
+        right: (identifier))
+      right: (identifier))))
+
+================================================================================
+BS-LEX-017: variables with type designators
+================================================================================
+a = 1 : a$ = "s" : a% = 2 : a! = 1.5 : a# = 2.5
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (string))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-017: designators on parameters and loop and catch variables
+================================================================================
+sub f(a$, n%)
+  for i% = 1 to n%
+  end for
+  for each s$ in list
+  end for
+  try
+    x = 1
+  catch e$
+  end try
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter
+        name: (identifier))
+      (parameter
+        name: (identifier)))
+    body: (block
+      (for_statement
+        counter: (identifier)
+        start: (number)
+        end: (identifier)
+        body: (block))
+      (for_each_statement
+        item: (identifier)
+        collection: (identifier)
+        body: (block))
+      (try_statement
+        body: (block
+          (assignment_statement
+            left: (identifier)
+            right: (number)))
+        handler: (catch_clause
+          variable: (identifier)
+          body: (block))))))
+
+================================================================================
+BS-LEX-018: LongInteger designator on a variable
+================================================================================
+id& = 9876543210&
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-021: reserved keywords in statement positions
+================================================================================
+Function f() As Integer
+  Dim a[2]
+  For i = 1 To 2 Step 1
+    If a[i] = Invalid Then Exit For
+  Next
+  While True : Exit While : End While
+  Goto done
+done:
+  Return 1
+End Function
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    return_type: (type)
+    body: (block
+      (dim_statement
+        name: (identifier)
+        dimension: (number))
+      (for_statement
+        counter: (identifier)
+        start: (number)
+        end: (number)
+        step: (number)
+        body: (block
+          (if_statement
+            condition: (binary_expression
+              left: (index_expression
+                object: (identifier)
+                index: (identifier))
+              right: (invalid))
+            consequence: (block
+              (exit_statement)))))
+      (while_statement
+        condition: (true)
+        body: (block
+          (exit_statement)))
+      (goto_statement
+        label: (identifier))
+      (label_statement
+        name: (identifier))
+      (return_statement
+        value: (number)))))
+
+================================================================================
+BS-LEX-021: reserved keywords in mixed case
+================================================================================
+Sub Main()
+  For Each v In list
+    If v = False And Not x Or y Then
+      Print LINE_NUM
+    ElseIf v Then
+      Stop
+    Else
+      While z
+        ExitWhile
+      EndWhile
+    EndIf
+  Next
+EndSub
+Function F()
+EndFunction
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (for_each_statement
+        item: (identifier)
+        collection: (identifier)
+        body: (block
+          (if_statement
+            condition: (binary_expression
+              left: (binary_expression
+                left: (binary_expression
+                  left: (identifier)
+                  right: (false))
+                right: (unary_expression
+                  operand: (identifier)))
+              right: (identifier))
+            consequence: (block
+              (print_statement
+                (source_literal)))
+            alternative: (else_if_clause
+              condition: (identifier)
+              consequence: (block
+                (stop_statement)))
+            alternative: (else_clause
+              body: (block
+                (while_statement
+                  condition: (identifier)
+                  body: (block
+                    (exit_statement))))))))))
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block)))
+
+================================================================================
+BS-LEX-022: reserved built-in function calls
+================================================================================
+o = CreateObject("roList")
+t = Type(o)
+b = Box(1)
+g = GetGlobalAA()
+e = GetLastRunCompileError()
+print tab(5) pos(0)
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (string))))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (identifier))))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number))))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list)))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list)))
+  (print_statement
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number)))
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number)))))
+
+================================================================================
+BS-LEX-022: Eval, Run and GetLastRunRunTimeError calls
+================================================================================
+r = Eval("x = 1")
+Run("pkg:/source/other.brs")
+e = GetLastRunRunTimeError()
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (string))))
+  (call_expression
+    function: (identifier)
+    arguments: (argument_list
+      (string)))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      arguments: (argument_list))))
+
+================================================================================
+BS-LEX-024: keywords as member names
+================================================================================
+list.next()
+player.stop()
+x = obj.end + obj.if + obj.print
+--------------------------------------------------------------------------------
+
+(source_file
+  (call_expression
+    function: (member_expression
+      object: (identifier)
+      property: (identifier))
+    arguments: (argument_list))
+  (call_expression
+    function: (member_expression
+      object: (identifier)
+      property: (identifier))
+    arguments: (argument_list))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (member_expression
+          object: (identifier)
+          property: (identifier))
+        right: (member_expression
+          object: (identifier)
+          property: (identifier)))
+      right: (member_expression
+        object: (identifier)
+        property: (identifier)))))
+
+================================================================================
+BS-LEX-024: keywords as associative-array keys
+================================================================================
+aa = { function: "main()", end: 1, if: 2, next: 3 }
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (associative_array_literal
+      (associative_array_entry
+        key: (identifier)
+        value: (string))
+      (associative_array_entry
+        key: (identifier)
+        value: (number))
+      (associative_array_entry
+        key: (identifier)
+        value: (number))
+      (associative_array_entry
+        key: (identifier)
+        value: (number)))))
+
+================================================================================
+BS-LEX-024: function as a member name after an index
+================================================================================
+name = e.backtrace[i].function
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (member_expression
+      object: (index_expression
+        object: (member_expression
+          object: (identifier)
+          property: (identifier))
+        index: (identifier))
+      property: (identifier))))
+
+================================================================================
+BS-LEX-025: non-reserved keyword words as identifiers
+================================================================================
+mod = 3
+x = mod + in + as + integer + string
+y = a mod b
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (binary_expression
+          left: (binary_expression
+            left: (identifier)
+            right: (identifier))
+          right: (identifier))
+        right: (identifier))
+      right: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (identifier)
+      right: (identifier))))
+
+================================================================================
+BS-LEX-025: more non-reserved words as identifiers
+================================================================================
+x = continue + library + throw + try + catch + endtry
+y = float + double + boolean + object + dynamic + void
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (binary_expression
+          left: (binary_expression
+            left: (binary_expression
+              left: (identifier)
+              right: (identifier))
+            right: (identifier))
+          right: (identifier))
+        right: (identifier))
+      right: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (binary_expression
+          left: (binary_expression
+            left: (binary_expression
+              left: (identifier)
+              right: (identifier))
+            right: (identifier))
+          right: (identifier))
+        right: (identifier))
+      right: (identifier))))
+
+================================================================================
+BS-LEX-026: identifiers beginning with keywords
+================================================================================
+iffy = 1 : endpoint = 2 : format = 3 : printer = 4 : nextItem = 5 : stepSize = 6 : notify = 7 : order = 8 : android = 9 : returnValue = 10 : falsey = 11
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-LEX-033: UTF-8 text in comments and strings
+================================================================================
+' café ☕
+s = "Grüße, 世界"
+--------------------------------------------------------------------------------
+
+(source_file
+  (comment)
+  (assignment_statement
+    left: (identifier)
+    right: (string)))

@@ -2,10 +2,15 @@
 
 ## Current maturity
 
-Pre-implementation. Phase 1 (foundation) and Phase 2 (requirement inventory
-and implementation specification) are complete. There is no grammar,
-generated parser, test corpus or query yet, and no syntax support is
-claimed.
+Grammar version 0.1.0, release candidate (Session 03), independently
+audited in Session 04 ([reports/0.1.0-release-audit.md](reports/0.1.0-release-audit.md)),
+verdict `PROMOTION_READY` for `main`; no tag or release.
+Phases 1–5 have their exit evidence in
+[reports/0.1.0-release-candidate.md](reports/0.1.0-release-candidate.md);
+Phase 6 was carried out on a local `go-treesitter` branch that is neither
+merged nor pushed; it did not pass V9 (recovery-tree differences in the Go
+runtime), so no pin change is proposed there. Nothing has been tagged or published; the release itself
+and Phase 7 are later work.
 
 ## Phases
 

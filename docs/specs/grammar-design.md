@@ -1,8 +1,10 @@
 # Grammar design
 
-The planned implementation structure of `grammar.js`: tokens, rule families,
+The implementation structure of `grammar.js`: tokens, rule families,
 precedence, statement boundaries, the conditional-compilation spike and the
-implementation order. **Nothing here is implemented yet.** Requirements and
+implementation order. Designed in Session 02 and implemented as designed in
+Session 03 (grammar version 0.1.0); §3, §4 and §11 record what the
+implementation established. Requirements and
 their statuses are in [language-conformance.md](language-conformance.md);
 acceptance policy in [grammar-contract.md](grammar-contract.md); node and field
 names in [tree-schema.md](tree-schema.md) (planned public schema). Where this
@@ -91,22 +93,42 @@ with LF alone.
 | keywords | `kw(w)`: a character-class regex matching `w` in any letter case (`/[eE][nN][dD]/`), aliased to the lower-case anonymous name `w` | anonymous | per rule | BS-LEX-001, 021, 025 |
 | `number` | decimal: (`\d+(\.\d+)?` or `\.\d+`), optional exponent `[eEdD][+-]?\d+`, optional suffix `[%!#&]`; hex: `&[hH][0-9A-Fa-f]+` with optional `&` | public | `expression` | BS-LIT-003–014 |
 | `string` | `"` then any run of (`[^"\r\n]` or `""`) then `"` | public | `expression`, AA keys, `library_statement` | BS-LIT-015–018 |
-| `source_literal` | `kw('line_num')` aliased | public | `expression` | BS-LIT-019 |
+| `source_literal` | a pattern matching `line_num` in any letter case | public | `expression` | BS-LIT-019 |
 | punctuation | `( ) [ ] { } , ; : . @ ? =` | anonymous | per rule | — |
 | optional chaining | `?.` `?@` `?[` `?(` as single tokens | anonymous | postfix rules | BS-LEX-029, 030 |
 | operators | `^ * / \ + - <> < > <= >= << >>`; words `kw('mod') kw('and') kw('or') kw('not')` | anonymous | `binary_expression`, `unary_expression` | BS-EXP-011–019 |
 | assignment operators | `= += -= *= /= \= <<= >>=` | anonymous | `assignment_statement` | BS-STMT-001, 002 |
 | update operators | `++ --` | anonymous | `update_statement` | BS-STMT-003, 004 |
 | block terminators | `end`, a run of `[ \t]`, then `if`, `for`, `while`, `sub`, `function` or `try`, in any case, each **one token**, aliased to the anonymous names `end if`, `end for`, `end while`, `end sub`, `end function`, `end try` | anonymous | block rules | BS-STMT-010, 012, 015, 016, 022, 036, BS-FUNC-001, 002, BS-ERR-001 |
-| directive words | `#` immediately followed by `const`, `if`, `else`, `end` or `error` in any case, one token each, aliased to `#const`, `#if`, `#else`, `#end`, `#error` | anonymous | directive rules | BS-COND-001–005, 008 |
-| `error_message` | `[^\r\n]+` with lexical precedence 1 (wins over `comment` for the same text); valid only after `#error` | public | `error_directive` | BS-COND-004 |
+| directive words | `#` immediately followed by `const`, `if`, `else`, `end` or `error` in any case, one token each, aliased to `#const`, `#if`, `#else`, `#end`, `#error`; no word boundary (§11) | anonymous | directive rules | BS-COND-001–005, 008 |
+| `error_message` | `[^ \t\r\n][^\r\n]*` with lexical precedence 1 (wins over `comment` for the same text); valid only after `#error` | public | `error_directive` | BS-COND-004 |
 
 Details:
 
-- Keyword boundaries come from keyword extraction: the lexer first matches the
-  `word` token and only then checks the keyword table, so `iffy` or `endpoint`
-  is one identifier (Level 3, "Keyword Extraction"; `crates/generate/src/build_tables.rs`
-  @ `v0.27.0`).
+- Keyword boundaries. Every `kw()` token matches only strings that
+  `identifier` also matches. An equal-length match goes to the token with the
+  higher lexical precedence, then to a string over a pattern, then to the
+  earlier token (Level 3, `prefer_token` in
+  `crates/generate/src/build_tables/token_conflicts.rs` @ `v0.27.0`). `kw()`
+  tokens are patterns, so `identifier` is the last rule in `grammar.js` and
+  every keyword wins its tie; a longer identifier still wins by length
+  (`iffy`, `endpoint`). The generator moves a keyword into its keyword table
+  (keyword extraction: the lexer matches the `word` token first and then looks
+  the word up) only when substituting the word token would not change the
+  keyword's conflicts with other tokens (`identify_keywords` in
+  `crates/generate/src/build_tables.rs` @ `v0.27.0`). `comment` overlaps
+  `identifier` on `rem`, so keywords that are valid in a state where
+  `identifier` is not (for example `then`, `else`, `to`, `in`, `as`, `mod`,
+  `and`, `or`, `catch` and the type names) are not extracted and are
+  recognised by context-aware lexing in the main lexer. Valid input gets the
+  same tree either way. Invalid input can differ: where such a keyword is valid
+  and `identifier` is not, a word that merely begins with it is split, without
+  `ERROR` (`x = a modx` lexes as `a mod x`, `x = a android` as `a and roid`,
+  `for i = 1 tox` as `to x`, `if a then b() elsex = 1` as `else x = 1`, and in
+  a block IF `else iffy = 1` as `else if fy = 1`). By the same rule a
+  single-line `elseif` lexes as `else` `if`, giving the tree of `else if`
+  (single-line ELSE IF has no requirement row). No requirement depends on such
+  input (grammar-contract non-goals: not every invalid program is rejected).
 - The two-word block terminators are single tokens. After a line terminator
   inside a block, both an END statement (`end`) and the block's own terminator
   are valid; with `end` and `if` as two tokens one token of lookahead could not
@@ -147,20 +169,25 @@ Details:
   3. Exclude exactly `rem` (any case) from the identifier pattern by
      construction (an alternation that matches every identifier except that
      word).
+
+  Adopted: mechanism 1. Every BS-LEX-013 and BS-LEX-014 fixture passes with it
+  from WP7 on; mechanisms 2 and 3 were not needed.
 - `#error` text: `error_message` consumes the rest of the line, including
   apostrophes (BS-COND-004).
 
 ## 4. Reserved words
 
 Strategy: `word: $ => $.identifier`, every keyword through `kw()`, and **no
-`reserved` word sets**. The runtime returns a keyword only where it has a parse
-action in the current state (or is a reserved word there); otherwise the word
-stays an `identifier` (Level 3, `lib/src/parser.c` @ `v0.27.0`,
-`ts_parser__lex`). This makes every keyword contextual.
+`reserved` word sets**. The runtime returns an extracted keyword only where it
+has a parse action in the current state (or is a reserved word there);
+otherwise the word stays an `identifier` (Level 3, `lib/src/parser.c` @
+`v0.27.0`, `ts_parser__lex`). A keyword the generator does not extract (§3)
+is lexed only in states where it is valid (context-aware lexing). Either way
+every keyword is contextual.
 
 | Category | Words | Treatment | Requirements |
 |---|---|---|---|
-| A. Reserved grammar keywords | And Dim Each Else ElseIf End EndFunction EndIf EndSub EndWhile Exit ExitWhile False For Function Goto If Invalid LINE_NUM Next Not Or Print Return Step Stop Sub Then To True While (31) + Rem | `kw()` tokens; `Rem` is recognised by the `comment` token | BS-LEX-021, 013 |
+| A. Reserved grammar keywords | And Dim Each Else ElseIf End EndFunction EndIf EndSub EndWhile Exit ExitWhile False For Function Goto If Invalid LINE_NUM Next Not Or Print Return Step Stop Sub Then To True While (31) + Rem | `kw()` tokens, except the literals `True`, `False`, `Invalid` and `LINE_NUM`, which are named nodes matched by case-insensitive patterns (§3); `Rem` is recognised by the `comment` token | BS-LEX-021, 013 |
 | B. Reserved callable names | Box CreateObject Eval GetGlobalAA GetLastRunCompileError GetLastRunRunTimeError ObjFun Pos Run Tab Type (11) | ordinary `identifier`; calls are `call_expression` | BS-LEX-022, 023 |
 | C. Reserved, no documented form | Let (1) | ordinary `identifier`; no LET rule | BS-STMT-034 |
 | D. Syntax words not on the list | As Catch Continue EndTry In Library Mod Throw Try; type names Integer Float Double Boolean String Object Dynamic Void | `kw()` tokens, contextual | BS-LEX-025, BS-ERR-005, BS-TYPE-001 |
@@ -210,6 +237,9 @@ after confirming the fixture matches this document:
 
 The fallback rejects more invalid programs (`step = 1`) and changes no tree of
 a documented or provisional form. Record its adoption in this section.
+
+Not adopted: every fixture listed above passes with the primary strategy
+(Session 03).
 
 ## 5. Expression precedence
 
@@ -425,7 +455,12 @@ statements or declarations (BS-COND-002–006) and, being statements
 themselves, may appear inside bodies and nest (BS-COND-012). Conditions are
 never evaluated. Because `#end` and `#else` are one-token directive words
 followed by keyword tokens, `#endif`/`#elseif` happen to lex as `#end if` and
-`#else if`; that acceptance is non-contractual (BS-COND-009).
+`#else if`; that acceptance is non-contractual (BS-COND-009). Directive words
+have no word boundary outside a literal-false region: a longer word that
+begins with one is split, without `ERROR` (`#iffy` lexes as `#if fy`,
+`#constant = true` as `#const ant = true`, `#errors here` as `#error` with the
+message `s here`), like the keyword boundaries of §3; no requirement depends
+on such input.
 
 ### Literal-false spike (ADR-0004)
 
@@ -457,15 +492,58 @@ hidden text. A lower precedence for `_inactive_line` is not used: the lexer
 would stop at a completed higher-precedence `comment` (`prefer_transition`)
 and split `Remember` after `Rem`.
 
+Directive-like lines (adopted after the Session 03 review, which found that
+`#ifdef FOO` inside a region lexed as `#if` and opened a nested block, so the
+region swallowed the rest of the file). The `#` alternative of
+`_inactive_line` is split in two:
+
+```text
+_inactive_line := token(choice(
+    prec(0, [^ \t\r\n#][^\r\n]*),
+    prec(0, '#' then a rest that does not begin with if, else or end, in any case),
+    prec(2, '#' then if, else or end run on into a longer word, except the words
+            elseif and endif, then [^\r\n]*)))
+```
+
+A region line that starts with the whole word `#if`, `#else` or `#end`
+(`#elseif`, `#endif` included) is a directive exactly as before: no
+`_inactive_line` alternative matches those words as a prefix, so the lexer
+cannot continue past a completed directive word into the lower-precedence
+text alternative. A longer word (`#ifdef`, `#iffy`, `#elsewhere`,
+`#endregion`, `#endnote:`) matches the precedence-2 alternative, which beats
+the completed directive word, and the line is hidden text. Without lookahead
+the exclusion of `elseif`/`endif` cannot tell a word that ends early at the
+line end, so a line consisting of exactly `#endi` or `#elsei` still lexes as
+the directive word. Fixture:
+`BS-COND-007: directive-like words inside a false region`.
+
+The word boundary is `[A-Za-z0-9_]`: a region line whose first word is exactly
+`#if`, `#else` or `#end`, followed by any other character or by the line end,
+is a directive, as the design requires (S6–S9), with these consequences for
+text that is not a directive (the review's probes; no requirement states
+otherwise):
+
+- `#if` alone, or followed by a character such as `-`, `.`, `(`, `:`, `'`,
+  `$` or a non-ASCII letter (`#if-then-else notes`), opens a nested block that
+  needs its own `#end if`; without one the region runs to the end of the file.
+- `#else` in the same position (`#else:`, `#else what`, `#elsei`) closes the
+  region and the following lines are parsed as code, with or without `ERROR`.
+- `#end` in the same position (`#end.`, `#end region`, `#endi`) yields an
+  `ERROR` that can also cover neighbouring region text before or after it
+  (and the `#end` of the closing line); the block still ends at the next
+  `#end if`, and nothing after it is affected.
+
+These inputs are W13 seeds (robustness only).
+
 Design V2, tried only if V1 fails a criterion: as V1, but `_inactive_line` has
 lexical precedence 1 and `#if`, `#else`, `#end` precedence 2, so every region
 line, including `'` and REM lines, is hidden text and `inactive_text` has no
 `comment` children.
 
 No other design is tried. A design is adopted when it meets C1–C5 and the
-PASS expectation, for that design, of all fifteen fixtures in the
+PASS expectation, for that design, of the fifteen spike fixtures in the
 literal-false table of the workload-matrix catalogue (the two registry
-fixtures and S3–S12, R1–R3). Each design first gets the §15 allowance of three
+fixtures and S3–S12, R1–R3; the table's later rows postdate the spike). Each design first gets the §15 allowance of three
 attempts for implementation defects; V1 is judged first, then V2; if neither
 qualifies, the result is FAIL. No question is asked. V1's tie
 analysis above assumes `comment` is a single token (REM mechanism 1 or 3,
@@ -487,11 +565,15 @@ Acceptance criteria (ADR-0004 decision 3), all required:
 | C4 recovery does not swallow text outside the region | R1, R2 (R3: error present, no crash) |
 | C5 incremental equality inside, around and across the region | E1–E6 |
 
-C4 check: parse R1 and R2 with `tree-sitter parse` and parse their repaired
-versions (the malformed line replaced by `x = 1`). C4 holds when the only
-`ERROR` node lies within the malformed line and every node that starts after
-that line has the same type and the same start and end row and column in both
-parses. C5 check: for each script, the final tree of `tree-sitter parse
+C4 check (`scripts/check_spike.py`): parse R1 and R2 with `tree-sitter parse
+--cst` and parse their repaired versions (the malformed line replaced by
+`x = 1`). C4 holds when the repaired version has no error, every `ERROR` or
+`MISSING` node (a named `MISSING` node prints as a zero-width node with the
+has-error mark) lies within the malformed line, and every node that ends before
+that line or starts after it has the same kind, start and end row and column,
+and has-error mark in both parses (so an error hidden elsewhere also fails).
+At the spike the check compared only the nodes after the line; the Session 03
+review widened it. C5 check: for each script, the final tree of `tree-sitter parse
 --edits` equals a fresh parse of the final text (same S-expression and
 ranges); every script ends on error-free text.
 
@@ -500,8 +582,13 @@ the spike; every baseline COND fixture still passes.
 
 | Outcome | Grammar | Schema | Fixtures | Records |
 |---|---|---|---|---|
-| PASS | the adopted design (V1 or V2) | `inactive_text` becomes public | every spike fixture takes its PASS expectation for the adopted design; E1–E6 stay in W10 | ADR-0004 status "literal-false opaque bodies adopted (V1 or V2)" with the C1–C5 evidence; KL-001 set to retired (unused) in validation.md |
+| PASS (taken) | the adopted design (V1 or V2) | `inactive_text` becomes public | every spike fixture takes its PASS expectation for the adopted design; E1–E6 stay in W10 | ADR-0004 status "literal-false opaque bodies adopted (V1 or V2)" with the C1–C5 evidence; KL-001 set to retired (unused) in validation.md |
 | FAIL | spike rules removed; baseline kept (`false` is an ordinary `_cc_condition`) | no `inactive_text` | every spike fixture takes its FAIL expectation: inputs with non-BrightScript text assert `:error` and are listed as KL-001 demonstrating fixtures; code-only inputs stay positive; R1–R3 stay recovery fixtures; E1–E6 are recorded with the spike evidence and not added to W10 | ADR-0004 status "spike failed; baseline retained" with the failing criteria; KL-001 set to active, listing its fixtures |
+
+Result (Session 03, WP15): PASS with design V1 at its first attempt; the
+evidence is in [ADR-0004](../design/decisions/ADR-0004-conditional-compilation-representation.md#spike-result).
+`false` is no longer a `_cc_condition`: after `#if` or `#else if` it selects
+the `inactive_text` form.
 
 ## 12. Rule families
 

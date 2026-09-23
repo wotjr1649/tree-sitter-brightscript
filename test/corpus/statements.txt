@@ -1,0 +1,467 @@
+================================================================================
+BS-STMT-001: assignment to variables, members and indexes
+================================================================================
+a$ = "a rose"
+aa.newkey = "v"
+array[2] = "two"
+c[x, y, z] = k
+f(x).y = 1
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (string))
+  (assignment_statement
+    left: (member_expression
+      object: (identifier)
+      property: (identifier))
+    right: (string))
+  (assignment_statement
+    left: (index_expression
+      object: (identifier)
+      index: (number))
+    right: (string))
+  (assignment_statement
+    left: (index_expression
+      object: (identifier)
+      index: (identifier)
+      index: (identifier)
+      index: (identifier))
+    right: (identifier))
+  (assignment_statement
+    left: (member_expression
+      object: (call_expression
+        function: (identifier)
+        arguments: (argument_list
+          (identifier)))
+      property: (identifier))
+    right: (number)))
+
+================================================================================
+BS-STMT-002: compound assignment operators
+================================================================================
+x+=1
+x-=1
+x*=3
+x/=2
+x\=2
+x<<=8
+x>>=4
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (assignment_statement
+    left: (identifier)
+    right: (number)))
+
+================================================================================
+BS-STMT-003: increment and decrement statements
+================================================================================
+x++
+x--
+counter++
+--------------------------------------------------------------------------------
+
+(source_file
+  (update_statement
+    operand: (identifier))
+  (update_statement
+    operand: (identifier))
+  (update_statement
+    operand: (identifier)))
+
+================================================================================
+BS-STMT-004: increment and decrement on member and index targets
+================================================================================
+a.b++
+a[0]--
+--------------------------------------------------------------------------------
+
+(source_file
+  (update_statement
+    operand: (member_expression
+      object: (identifier)
+      property: (identifier)))
+  (update_statement
+    operand: (index_expression
+      object: (identifier)
+      index: (number))))
+
+================================================================================
+BS-STMT-005: call statements
+================================================================================
+HandleButton(msg.GetInt())
+cavemen.push("fred")
+m.top.observeField("x", "onX")
+--------------------------------------------------------------------------------
+
+(source_file
+  (call_expression
+    function: (identifier)
+    arguments: (argument_list
+      (call_expression
+        function: (member_expression
+          object: (identifier)
+          property: (identifier))
+        arguments: (argument_list))))
+  (call_expression
+    function: (member_expression
+      object: (identifier)
+      property: (identifier))
+    arguments: (argument_list
+      (string)))
+  (call_expression
+    function: (member_expression
+      object: (member_expression
+        object: (identifier)
+        property: (identifier))
+      property: (identifier))
+    arguments: (argument_list
+      (string)
+      (string))))
+
+================================================================================
+BS-STMT-023: RETURN with and without a value
+================================================================================
+function f()
+  if x then return
+  return 1
+end function
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (if_statement
+        condition: (identifier)
+        consequence: (block
+          (return_statement)))
+      (return_statement
+        value: (number)))))
+
+================================================================================
+BS-STMT-024: PRINT separators and trailing semicolon
+================================================================================
+print 25; " is equal to"; x^2
+print "zone 1","zone 2"
+print a$;a$,a$;" ";a$
+print "no newline";
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (number)
+    (string)
+    (binary_expression
+      left: (identifier)
+      right: (number)))
+  (print_statement
+    (string)
+    (string))
+  (print_statement
+    (identifier)
+    (identifier)
+    (identifier)
+    (string)
+    (identifier))
+  (print_statement
+    (string)))
+
+================================================================================
+BS-STMT-024: question-mark PRINT with separators
+================================================================================
+? 25; " is"; x^2
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (number)
+    (string)
+    (binary_expression
+      left: (identifier)
+      right: (number))))
+
+================================================================================
+BS-STMT-024: PRINT with a trailing comma
+================================================================================
+print a, b,
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (identifier)
+    (identifier)))
+
+================================================================================
+BS-STMT-025: adjacent PRINT items
+================================================================================
+print "this is a five " 5 "!!"
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (string)
+    (number)
+    (string)))
+
+================================================================================
+BS-STMT-025: TAB and POS items
+================================================================================
+print tab(5)"tabbed 5";tab(25)"tabbed 25"
+print tab(40) pos(0)
+print "these" tab(pos(0)+5)"words"
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number)))
+    (string)
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number)))
+    (string))
+  (print_statement
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number)))
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number))))
+  (print_statement
+    (string)
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (binary_expression
+          left: (call_expression
+            function: (identifier)
+            arguments: (argument_list
+              (number)))
+          right: (number))))
+    (string)))
+
+================================================================================
+BS-STMT-026: ambiguous adjacent PRINT items
+================================================================================
+print a -1
+print a (1)
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (binary_expression
+      left: (identifier)
+      right: (number)))
+  (print_statement
+    (call_expression
+      function: (identifier)
+      arguments: (argument_list
+        (number)))))
+
+================================================================================
+BS-STMT-039: PRINT with no items
+================================================================================
+print
+?
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement)
+  (print_statement))
+
+================================================================================
+BS-STMT-027: GOTO a label
+================================================================================
+start:
+goto start
+--------------------------------------------------------------------------------
+
+(source_file
+  (label_statement
+    name: (identifier))
+  (goto_statement
+    label: (identifier)))
+
+================================================================================
+BS-STMT-029: END statement
+================================================================================
+if done then end
+end
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (end_statement)))
+  (end_statement))
+
+================================================================================
+BS-STMT-030: STOP statement
+================================================================================
+if x then stop
+stop
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (stop_statement)))
+  (stop_statement))
+
+================================================================================
+BS-STMT-031: LIBRARY at the top of a file
+================================================================================
+Library "v30/bslCore.brs"
+sub main()
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (library_statement
+    path: (string))
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block)))
+
+================================================================================
+BS-STMT-032: LIBRARY after a function declaration
+================================================================================
+sub a()
+end sub
+LIBRARY "v30/bslCore.brs"
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block))
+  (library_statement
+    path: (string)))
+
+================================================================================
+BS-STMT-033: statements at file level
+================================================================================
+x = 1
+print x
+sub main()
+end sub
+if x then y = 2
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (number))
+  (print_statement
+    (identifier))
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))))
+
+================================================================================
+BS-STMT-037: EXIT FOR outside a loop is not rejected
+================================================================================
+exit for
+--------------------------------------------------------------------------------
+
+(source_file
+  (exit_statement))
+
+================================================================================
+BS-LEX-027: label line
+================================================================================
+sub main()
+mylabel:
+  print "here"
+  goto mylabel
+end sub
+--------------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (label_statement
+        name: (identifier))
+      (print_statement
+        (string))
+      (goto_statement
+        label: (identifier)))))
+
+================================================================================
+BS-LEX-028: label followed by a comment
+================================================================================
+start: ' entry point
+goto start
+--------------------------------------------------------------------------------
+
+(source_file
+  (label_statement
+    name: (identifier))
+  (comment)
+  (goto_statement
+    label: (identifier)))
+
+================================================================================
+BS-LEX-031: question-mark PRINT alias forms
+================================================================================
+?("Hello")
+?.1
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (parenthesized_expression
+      (string)))
+  (print_statement
+    (number)))
+
+================================================================================
+BS-LEX-035: question mark followed by a bracket at statement start
+================================================================================
+?[1]
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (array_literal
+      (number))))

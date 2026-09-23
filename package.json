@@ -1,0 +1,17 @@
+{
+  "name": "tree-sitter-brightscript",
+  "version": "0.1.0",
+  "description": "Independent, specification-driven Tree-sitter grammar for Roku BrightScript",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "generate": "tree-sitter generate --abi 15",
+    "test": "tree-sitter test"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "0.27.0"
+  },
+  "allowScripts": {
+    "tree-sitter-cli@0.27.0": true
+  }
+}
