@@ -35,6 +35,11 @@ function kw(word) {
   return alias(new RegExp(ci(word)), word);
 }
 
+/** Two-word block terminator as one token, e.g. `end if` (grammar-design §3, BS-STMT-022). */
+function endKw(word) {
+  return alias(token(new RegExp(`${ci('end')}[ \\t]+${ci(word)}`)), `end ${word}`);
+}
+
 function commaSep1(rule) {
   return seq(rule, repeat(seq(',', rule)));
 }
@@ -84,6 +89,7 @@ module.exports = grammar({
       $.assignment_statement,
       $.update_statement,
       alias($._stmt_call, $.call_expression),
+      $.if_statement,
       $.exit_statement,
       $.continue_statement,
       $.return_statement,
@@ -137,6 +143,61 @@ module.exports = grammar({
     update_statement: $ => seq(
       field('operand', $._assignment_target),
       field('operator', choice('++', '--')),
+    ),
+
+    // BS-STMT-007-011, BS-LEX-032 (grammar-design §6): after the condition and
+    // optional THEN, a terminator (or a comment before it) selects the block
+    // form and a statement start selects the single-line form.
+    if_statement: $ => choice($._block_if, $._single_line_if),
+
+    _block_if: $ => seq(
+      kw('if'),
+      field('condition', $.expression),
+      optional(kw('then')),
+      field('consequence', $.block),
+      repeat(field('alternative', $.else_if_clause)),
+      optional(field('alternative', $.else_clause)),
+      choice(endKw('if'), kw('endif')),
+    ),
+
+    else_if_clause: $ => seq(
+      choice(seq(kw('else'), kw('if')), kw('elseif')),
+      field('condition', $.expression),
+      optional(kw('then')),
+      field('consequence', $.block),
+    ),
+
+    else_clause: $ => seq(kw('else'), field('body', $.block)),
+
+    // Right precedence: `:` and ELSE continue the innermost single-line IF.
+    _single_line_if: $ => prec.right(PREC.LIST, seq(
+      kw('if'),
+      field('condition', $.expression),
+      optional(kw('then')),
+      field('consequence', alias($._inline_block, $.block)),
+      optional(field('alternative', alias($._inline_else, $.else_clause))),
+    )),
+
+    _inline_else: $ => seq(kw('else'), field('body', alias($._inline_block, $.block))),
+
+    _inline_block: $ => prec.right(PREC.LIST, seq(
+      $._inline_statement,
+      repeat(seq(repeat1(':'), $._inline_statement)),
+    )),
+
+    _inline_statement: $ => choice(
+      $.assignment_statement,
+      $.update_statement,
+      alias($._stmt_call, $.call_expression),
+      $.print_statement,
+      $.return_statement,
+      $.exit_statement,
+      $.continue_statement,
+      $.stop_statement,
+      $.goto_statement,
+      $.end_statement,
+      $.dim_statement,
+      alias($._single_line_if, $.if_statement),
     ),
 
     // BS-STMT-018-020, 037.

@@ -16,6 +16,22 @@ a = true : b = FALSE : c = True
     right: (true)))
 
 ================================================================================
+BS-LIT-002: invalid literal
+================================================================================
+if x = invalid then x = INVALID
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (binary_expression
+      left: (identifier)
+      right: (invalid))
+    consequence: (block
+      (assignment_statement
+        left: (identifier)
+        right: (invalid)))))
+
+================================================================================
 BS-LIT-003: decimal integers
 ================================================================================
 x = 0 : y = 255 : z = 2147483647
@@ -170,6 +186,43 @@ a = 125% : b = 100%
   (assignment_statement
     left: (identifier)
     right: (number)))
+
+================================================================================
+BS-LIT-014: method call on a numeric literal
+================================================================================
+print 5.tostr() + "th"
+if 100%.tostr() <> "100" then stop
+x = (-5).tostr()
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (binary_expression
+      left: (call_expression
+        function: (member_expression
+          object: (number)
+          property: (identifier))
+        arguments: (argument_list))
+      right: (string)))
+  (if_statement
+    condition: (binary_expression
+      left: (call_expression
+        function: (member_expression
+          object: (number)
+          property: (identifier))
+        arguments: (argument_list))
+      right: (string))
+    consequence: (block
+      (stop_statement)))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (member_expression
+        object: (parenthesized_expression
+          (unary_expression
+            operand: (number)))
+        property: (identifier))
+      arguments: (argument_list))))
 
 ================================================================================
 BS-LIT-014: method call on a string literal

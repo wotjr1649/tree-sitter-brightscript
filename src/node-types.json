@@ -102,6 +102,10 @@
         "named": true
       },
       {
+        "type": "if_statement",
+        "named": true
+      },
+      {
         "type": "label_statement",
         "named": true
       },
@@ -421,6 +425,21 @@
     }
   },
   {
+    "type": "block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "statement",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "call_expression",
     "named": true,
     "fields": {
@@ -498,6 +517,48 @@
     }
   },
   {
+    "type": "else_clause",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "else_if_clause",
+    "named": true,
+    "fields": {
+      "condition": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      },
+      "consequence": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "end_statement",
     "named": true,
     "fields": {}
@@ -517,6 +578,46 @@
         "types": [
           {
             "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "if_statement",
+    "named": true,
+    "fields": {
+      "alternative": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "else_clause",
+            "named": true
+          },
+          {
+            "type": "else_if_clause",
+            "named": true
+          }
+        ]
+      },
+      "condition": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      },
+      "consequence": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
             "named": true
           }
         ]
@@ -960,7 +1061,23 @@
     "named": false
   },
   {
+    "type": "else",
+    "named": false
+  },
+  {
+    "type": "elseif",
+    "named": false
+  },
+  {
     "type": "end",
+    "named": false
+  },
+  {
+    "type": "end if",
+    "named": false
+  },
+  {
+    "type": "endif",
     "named": false
   },
   {
@@ -986,6 +1103,10 @@
   {
     "type": "identifier",
     "named": true
+  },
+  {
+    "type": "if",
+    "named": false
   },
   {
     "type": "invalid",
@@ -1030,6 +1151,10 @@
   {
     "type": "string",
     "named": true
+  },
+  {
+    "type": "then",
+    "named": false
   },
   {
     "type": "true",

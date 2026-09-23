@@ -1,4 +1,29 @@
 ================================================================================
+BS-LEX-001: keywords in upper, lower and mixed case
+================================================================================
+IF x THEN PRINT "a"
+if x then print "a"
+If X Then Print "A"
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (print_statement
+        (string))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (print_statement
+        (string))))
+  (if_statement
+    condition: (identifier)
+    consequence: (block
+      (print_statement
+        (string)))))
+
+================================================================================
 BS-LEX-001: identifier spellings differing only in case
 ================================================================================
 myVar = 1
@@ -16,6 +41,22 @@ myvar = 3
   (assignment_statement
     left: (identifier)
     right: (number)))
+
+================================================================================
+BS-LEX-004: keyword directly followed by a string
+================================================================================
+if c <> k then print"error" : stop
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    consequence: (block
+      (print_statement
+        (string))
+      (stop_statement))))
 
 ================================================================================
 BS-LEX-005: one statement per line

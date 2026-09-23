@@ -278,6 +278,27 @@ w = not a <> b and c or d
       right: (identifier))))
 
 ================================================================================
+BS-EXP-020: equals inside an expression is comparison
+================================================================================
+x = a = b
+if a=5 then print "a is 5"
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (identifier)
+      right: (identifier)))
+  (if_statement
+    condition: (binary_expression
+      left: (identifier)
+      right: (number))
+    consequence: (block
+      (print_statement
+        (string)))))
+
+================================================================================
 BS-EXP-021: mixed postfix chain
 ================================================================================
 x = a?.b.c?[0]?(1)
