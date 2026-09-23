@@ -1,0 +1,229 @@
+================================================================================
+BS-STMT-012: FOR with and without STEP
+================================================================================
+for i = 10 to 1 Step -1
+  print i
+end for
+for j = 1 to n
+end for
+--------------------------------------------------------------------------------
+
+(source_file
+  (for_statement
+    counter: (identifier)
+    start: (number)
+    end: (number)
+    step: (unary_expression
+      operand: (number))
+    body: (block
+      (print_statement
+        (identifier))))
+  (for_statement
+    counter: (identifier)
+    start: (number)
+    end: (identifier)
+    body: (block)))
+
+================================================================================
+BS-STMT-013: NEXT terminates FOR and FOR EACH
+================================================================================
+for i=10 to 1 step -1
+  print i
+next
+for each n in aa
+  print n;aa[n]
+next
+--------------------------------------------------------------------------------
+
+(source_file
+  (for_statement
+    counter: (identifier)
+    start: (number)
+    end: (number)
+    step: (unary_expression
+      operand: (number))
+    body: (block
+      (print_statement
+        (identifier))))
+  (for_each_statement
+    item: (identifier)
+    collection: (identifier)
+    body: (block
+      (print_statement
+        (identifier)
+        (index_expression
+          object: (identifier)
+          index: (identifier))))))
+
+================================================================================
+BS-STMT-015: FOR EACH over an expression
+================================================================================
+for each caveman in cavemen
+  print caveman
+end for
+for each k in m.getList()
+end for
+--------------------------------------------------------------------------------
+
+(source_file
+  (for_each_statement
+    item: (identifier)
+    collection: (identifier)
+    body: (block
+      (print_statement
+        (identifier))))
+  (for_each_statement
+    item: (identifier)
+    collection: (call_expression
+      function: (member_expression
+        object: (identifier)
+        property: (identifier))
+      arguments: (argument_list))
+    body: (block)))
+
+================================================================================
+BS-STMT-016: WHILE loop
+================================================================================
+while k = 0
+  k = 1
+end while
+--------------------------------------------------------------------------------
+
+(source_file
+  (while_statement
+    condition: (binary_expression
+      left: (identifier)
+      right: (number))
+    body: (block
+      (assignment_statement
+        left: (identifier)
+        right: (number)))))
+
+================================================================================
+BS-STMT-017: WHILE terminated by NEXT
+:error
+================================================================================
+while x
+  x = x - 1
+next
+--------------------------------------------------------------------------------
+
+================================================================================
+BS-STMT-018: EXIT FOR and EXIT WHILE
+================================================================================
+for i = 1 to 3
+  if i = 2 then exit for
+end for
+while true
+  exit while
+end while
+--------------------------------------------------------------------------------
+
+(source_file
+  (for_statement
+    counter: (identifier)
+    start: (number)
+    end: (number)
+    body: (block
+      (if_statement
+        condition: (binary_expression
+          left: (identifier)
+          right: (number))
+        consequence: (block
+          (exit_statement)))))
+  (while_statement
+    condition: (true)
+    body: (block
+      (exit_statement))))
+
+================================================================================
+BS-STMT-019: CONTINUE FOR and CONTINUE WHILE
+================================================================================
+for each fruit in fruits
+  if fruit = "lemon" then continue for
+end for
+while c < 3
+  c++
+  continue while
+end while
+--------------------------------------------------------------------------------
+
+(source_file
+  (for_each_statement
+    item: (identifier)
+    collection: (identifier)
+    body: (block
+      (if_statement
+        condition: (binary_expression
+          left: (identifier)
+          right: (string))
+        consequence: (block
+          (continue_statement)))))
+  (while_statement
+    condition: (binary_expression
+      left: (identifier)
+      right: (number))
+    body: (block
+      (update_statement
+        operand: (identifier))
+      (continue_statement))))
+
+================================================================================
+BS-STMT-020: ENDWHILE and EXITWHILE
+================================================================================
+while true
+  exitwhile
+endwhile
+--------------------------------------------------------------------------------
+
+(source_file
+  (while_statement
+    condition: (true)
+    body: (block
+      (exit_statement))))
+
+================================================================================
+BS-STMT-022: multi-word keywords with extra spacing
+================================================================================
+for each	x in xs
+  if x then
+  end   if
+end	for
+--------------------------------------------------------------------------------
+
+(source_file
+  (for_each_statement
+    item: (identifier)
+    collection: (identifier)
+    body: (block
+      (if_statement
+        condition: (identifier)
+        consequence: (block)))))
+
+================================================================================
+BS-STMT-036: nested blocks close with their own terminators
+================================================================================
+for i = 1 to 2
+  if x then
+    while y
+      y = false
+    end while
+  end if
+end for
+--------------------------------------------------------------------------------
+
+(source_file
+  (for_statement
+    counter: (identifier)
+    start: (number)
+    end: (number)
+    body: (block
+      (if_statement
+        condition: (identifier)
+        consequence: (block
+          (while_statement
+            condition: (identifier)
+            body: (block
+              (assignment_statement
+                left: (identifier)
+                right: (false)))))))))

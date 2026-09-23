@@ -90,6 +90,9 @@ module.exports = grammar({
       $.update_statement,
       alias($._stmt_call, $.call_expression),
       $.if_statement,
+      $.for_statement,
+      $.for_each_statement,
+      $.while_statement,
       $.exit_statement,
       $.continue_statement,
       $.return_statement,
@@ -198,6 +201,38 @@ module.exports = grammar({
       $.end_statement,
       $.dim_statement,
       alias($._single_line_if, $.if_statement),
+    ),
+
+    // BS-STMT-012, 013, 015, 036: each loop closes only with its own
+    // terminator; bare NEXT ends the innermost FOR or FOR EACH.
+    for_statement: $ => seq(
+      kw('for'),
+      field('counter', $.identifier),
+      '=',
+      field('start', $.expression),
+      kw('to'),
+      field('end', $.expression),
+      optional(seq(kw('step'), field('step', $.expression))),
+      field('body', $.block),
+      choice(endKw('for'), kw('next')),
+    ),
+
+    for_each_statement: $ => seq(
+      kw('for'),
+      kw('each'),
+      field('item', $.identifier),
+      kw('in'),
+      field('collection', $.expression),
+      field('body', $.block),
+      choice(endKw('for'), kw('next')),
+    ),
+
+    // BS-STMT-016, 017, 020: NEXT does not close a WHILE.
+    while_statement: $ => seq(
+      kw('while'),
+      field('condition', $.expression),
+      field('body', $.block),
+      choice(endKw('while'), kw('endwhile')),
     ),
 
     // BS-STMT-018-020, 037.
