@@ -102,8 +102,17 @@ ID (V3), and date. A result for one identity is never reused for another.
   a requirement specifies the recovery shape, because recovery trees differ
   between runtimes.
 - Corpus files are LF text. Fixtures whose bytes matter (CRLF, CR, BOM,
-  missing final newline) live under a dedicated path that `.gitattributes`
-  marks `-text` when the first one is added.
+  missing final newline) live under `test/corpus/bytes/`; the commit that adds
+  the first of them adds `test/corpus/bytes/** -text` to `.gitattributes`
+  (likewise for `test/samples/program-crlf.brs`).
+- Every registry fixture exists exactly once in the corpus; inputs and
+  expectations are catalogued in [workload-matrix.md](workload-matrix.md),
+  together with the validation sets W01–W14.
+- `unresolved` forms have no corpus fixture; they appear only as V10 seeds.
+  Out-of-scope "guard" fixtures assert that semantically invalid but
+  well-formed code parses without `ERROR`.
+- Defects of earlier grammars that must not recur are listed in
+  [known-regressions.md](known-regressions.md) with their guarding checks.
 - Generated-artifact drift checks cover every generated file, not only
   `src/parser.c`.
 

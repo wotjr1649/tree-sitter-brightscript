@@ -8,8 +8,10 @@ implemented.** Every requirement was promoted from the local research
 inventory in `_ref/normative/roku-docs/notes/` after re-checking it against the
 Level 1 snapshot, following [source-policy.md](../provenance/source-policy.md).
 The `Grammar` column names planned rule families (`planned: …`) defined in
-`docs/specs/grammar-design.md`; fixture inputs are catalogued in
-`docs/validation/workload-matrix.md`. No requirement is `covered` yet.
+[grammar-design.md](grammar-design.md); planned node names are in
+[tree-schema.md](tree-schema.md); fixture inputs are catalogued in
+[workload-matrix.md](../validation/workload-matrix.md). No requirement is
+`covered` yet.
 
 ## Traceability chain
 
@@ -193,7 +195,7 @@ kept so that the record format stays uniform. `—` means no known limitation.
 | BS-EXP-005 | Index access `[expr]`, chained (`a[1][2]`) and applied to member and call results. | EVT §Array operator | baseline | documented | planned: `index_expression` | `BS-EXP-005: index access and chained indexing` | n/a | none | — | EXP-04 |
 | BS-EXP-006 | XML attribute operator `@`: `element@name` (`rsp.photos@perpage`, `m.xml@title`). | CA §Attribute operator | baseline | documented | planned: `attribute_expression` | `BS-EXP-006: attribute operator` | n/a | none | — | EXP-05 |
 | BS-EXP-007 | Optional chaining `?.`, `?@`, `?[`, `?(` in expressions, freely chained (`array?[3]?.foo?.bar?()`); each shares its node type with the non-optional form. | EVT §Optional chaining operators; RN §Roku OS 11.0 | 11.0 | documented | planned: `member_expression`, `attribute_expression`, `index_expression`, `call_expression` | `BS-EXP-007: optional chaining chain`<br>`BS-EXP-007: optional call and optional index with arguments` | n/a | none | — | EXP-06, VER-19 |
-| BS-EXP-008 | An optional-chaining operator as the outermost accessor of an assignment target (`array?[12] = x`, `a?.b = 1`). | EVT §Optional chaining operators › Support details ("Not supported") | 11.0 | invalid | planned: `_assignment_target` excludes optional accessors | n/a | `BS-EXP-008: optional accessor as an assignment target` | none | — | EXP-06, ASN-01, AMB-16 |
+| BS-EXP-008 | An optional-chaining operator as the outermost accessor of an assignment target (`array?[12] = x`, `a?.b = 1`). | EVT §Optional chaining operators › Support details ("Not supported") | 11.0 | invalid | planned: `_assignment_target` excludes optional accessors | n/a | `BS-EXP-008: optional index as an assignment target`<br>`BS-EXP-008: optional member as an assignment target` | none | — | EXP-06, ASN-01, AMB-16 |
 | BS-EXP-009 | A standalone call statement whose outermost call is `?(` (`f?()`). | EVT §Optional chaining operators › Support details ("Not supported") | 11.0 | invalid | planned: call statements require `(` as the outermost call | n/a | `BS-EXP-009: standalone optional call statement` | none | — | EXP-06, STM-17 |
 | BS-EXP-010 | Optional chaining inside subexpressions of call statements and assignment targets (`f(array?[12])`, `f(foo?.bar).member = 5`). | EVT §Optional chaining operators › Support details | 11.0 | documented | planned: `call_expression`, `assignment_statement` | `BS-EXP-010: optional chaining inside statement subexpressions` | n/a | none | — | EXP-06 |
 | BS-EXP-011 | `^` exponentiation, right associative (`2^3^2` = `2^(3^2)`). | EVT §Operators, §Exponentiation operator | baseline | documented | planned: `binary_expression` (exponent level, right) | `BS-EXP-011: exponentiation is right associative` | n/a | none | — | EXP-07 |

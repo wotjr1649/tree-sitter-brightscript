@@ -15,6 +15,8 @@ link to it rather than restate it.
 | [provenance/source-policy.md](provenance/source-policy.md) | Source levels (L1–L5), citation, promotion, refresh | Using any source |
 | [provenance/upstream-sources.md](provenance/upstream-sources.md) | Dated identities of sources and toolchain | Citing a source; refreshing; selecting the generator |
 | [validation/validation.md](validation/validation.md) | Validation levels (V0–V10), gates, V0 checklist, failure handling, Level 2 policy | Claiming anything; closing a session; preparing a release |
+| [validation/workload-matrix.md](validation/workload-matrix.md) | Validation sets W01–W14 and the catalogue of every corpus fixture | Writing fixtures; running V2–V10 |
+| [validation/known-regressions.md](validation/known-regressions.md) | Defects of earlier grammars and the checks that prevent them | Reviewing grammar or generation changes |
 
 Repository-wide operating rules for contributors and coding agents are in
 `AGENTS.md` at the repository root.
