@@ -60,7 +60,7 @@ every row below is `PASS`. Workload sets are defined in
 
 | Area | Condition |
 |---|---|
-| Requirements | Every `documented` and `provisional` requirement has its rule and all of its listed fixtures pass (Coverage `covered`); every `invalid` requirement's negative fixtures pass; a `documented` requirement that is not covered is a disclosed `KL-NNN`; `unresolved`, `tolerated` and `out-of-scope` rows are reported as they stand; no coverage claim exceeds the registry. |
+| Requirements | Every `documented`, `provisional` and `tolerated` requirement has its rule and all of its listed fixtures pass (Coverage `covered`); every `invalid` requirement's negative fixtures pass; a `documented` requirement that is not covered is a disclosed `KL-NNN`; `unresolved` and `out-of-scope` rows are reported as they stand; no coverage claim exceeds the registry. |
 | Generation | The generator is pinned by the ADR-0002 adoption procedure; generated files are committed; regeneration reproduces every generated file byte for byte. |
 | Corpus | W01 and W02 pass. |
 | Valid conformance | No positive fixture and no W03 sample contains `ERROR` or `MISSING`, except a fixture that cites its `KL-NNN`. |
@@ -90,7 +90,8 @@ downstream results if run; review findings and their disposition; the verdict.
    `src/tree_sitter/*`) and `package-lock.json` are not.
 3. Relative Markdown links in tracked documents resolve.
 4. License metadata is MIT everywhere it appears.
-5. Tracked text files contain no CR bytes and end with a newline.
+5. Tracked text files contain no CR bytes and end with a newline, except
+   files under paths marked `-text` in `.gitattributes` (byte fixtures).
 6. Once a grammar exists: regeneration with the pinned generator reproduces
    every generated file byte for byte, and no `src/scanner.c` exists without
    an accepted ADR.
@@ -123,17 +124,20 @@ ID (V3), and date. A result for one identity is never reused for another.
 
 | ID | State | Requirement | Behaviour | Demonstrating fixture |
 |---|---|---|---|---|
-| KL-001 | contingent: active only if the ADR-0004 literal-`false` spike fails; otherwise retired unused | BS-COND-007 | A literal-`false` conditional branch whose text is not BrightScript (the documented block-comment idiom) produces `ERROR` nodes | `BS-COND-007: block comment with prose`, asserted with `:error` |
+| KL-001 | contingent: active only if the ADR-0004 literal-`false` spike fails; otherwise retired unused | BS-COND-007 | A literal-`false` conditional branch whose text is not BrightScript (the documented block-comment idiom) produces `ERROR` nodes | `BS-COND-007: block comment with prose` and the spike fixtures S3, S5–S8, S10–S12, asserted with `:error` |
 
 ## Fixture rules
 
 - Recovery and negative fixtures assert that an error occurs (`:error`) unless
   a requirement specifies the recovery shape, because recovery trees differ
   between runtimes.
-- Corpus files are LF text. Fixtures whose bytes matter (CRLF, CR, BOM,
-  missing final newline) live under `test/corpus/bytes/`; the commit that adds
-  the first of them adds `test/corpus/bytes/** -text` to `.gitattributes`
-  (likewise for `test/samples/program-crlf.brs`).
+- Positive expectations are written from the specification, never generated
+  with `tree-sitter test --update`; a mismatch is investigated against the
+  specification before either side changes.
+- Corpus files are LF text. Fixtures whose bytes matter (CR bytes, byte-order
+  mark) live under `test/corpus/bytes/`; the commit that adds the first of
+  them adds `test/corpus/bytes/** -text` to `.gitattributes` (likewise for
+  `test/samples/program-crlf.brs`).
 - Every registry fixture exists exactly once in the corpus; inputs and
   expectations are catalogued in [workload-matrix.md](workload-matrix.md),
   together with the validation sets W01–W14.

@@ -78,12 +78,24 @@ Implementation rules per status (frozen for the first implementation):
 - `documented` and `provisional`: the rule is implemented exactly as stated and
   every listed positive fixture passes. A `provisional` row is implemented, not
   deferred; it states the chosen behaviour.
+- `tolerated`: implemented as stated with its positive fixture; marked
+  non-normative; it must not change the tree of any documented form.
 - `invalid`: every listed negative fixture yields `ERROR` or `MISSING`.
 - `unresolved`: no rule is added for the form and no corpus fixture asserts its
   tree. Whatever the grammar built for documented forms produces is
   non-contractual. Such inputs may appear only as robustness seeds (V10).
 - `out-of-scope`: no rule. Rows marked "(guard)" have a positive fixture that
   shows the grammar does **not** enforce the semantic rule.
+
+How grammar-contract §3 is applied: `provisional` is used only for a choice
+about text the grammar must handle anyway — token boundaries and character
+sets, line terminators, precedence and association, the choice between forms,
+where a documented construct may be placed, and what a reserved compact word
+stands for. Accepting an extra construct, operand kind, punctuation or empty
+form that no documented form needs is an undocumented variant: `tolerated`
+when §3.3 evidence exists, otherwise `unresolved`. Every `tolerated` row cites
+BrighterScript parsing the variant in plain BrightScript mode without any
+error diagnostic (neither `warnIfNotBrighterScriptMode` nor another one).
 
 ## Fixture naming
 
@@ -120,36 +132,37 @@ kept so that the record format stays uniform. `—` means no known limitation.
 | BS-LEX-002 | Space characters separate tokens; indentation and repeated spaces are insignificant. | SS, PS examples | baseline | documented | planned: extras (whitespace) | `BS-LEX-002: indentation and repeated spaces` | n/a | none | — | LEX-02 |
 | BS-LEX-003 | Horizontal tab is whitespace equivalent to a space. No other character (form feed, vertical tab, U+00A0, other Unicode spaces) is whitespace. | L1 does not list whitespace characters | unknown | provisional | planned: extras (whitespace) | `BS-LEX-003: tab indentation and tabs between tokens` | n/a | none | — | LEX-02, AMB-32. Level 2 could widen the set; widening is compatible. |
 | BS-LEX-004 | Adjacent tokens need no whitespace where the boundary is unambiguous (`print"error"`, `x=5:print 25`, `function():return m.xml@title:end function`, `tab(5)"tabbed 5"`). A keyword directly followed by identifier characters is one word (BS-LEX-026). | PS §DIM, §PRINT item list; CA §Attribute operator | baseline | documented | planned: lexer (no rule) | `BS-LEX-004: keyword directly followed by a string`<br>`BS-LEX-004: compact one-line anonymous function` | n/a | none | — | LEX-02, AMB-32 |
-| BS-LEX-005 | The language is line oriented: a statement ends at the end of its line unless another follows after `:`. There is no line-continuation character. | SS (body); PS §IF expression THEN statements | baseline | documented | planned: `_newline`, `_terminator` | `BS-LEX-005: one statement per line` | n/a — continuation is BS-EXP-023 | none | — | LEX-03, LEX-05, LINE-01 |
-| BS-LEX-006 | LF and CRLF both terminate a line; one file may mix them; trees are identical apart from byte offsets. | L1 does not name terminator bytes | unknown | provisional | planned: `_newline` | `BS-LEX-006: CRLF line endings`<br>`BS-LEX-006: mixed LF and CRLF line endings` | n/a | none | — | LEX-03, AMB-07. Byte fixtures (validation fixture rules). |
+| BS-LEX-005 | The language is line oriented: a statement ends at the end of its line unless another statement follows after `:`. | SS (body); PS §IF expression THEN statements | baseline | documented | planned: `_newline`, `_terminator` | `BS-LEX-005: one statement per line` | n/a | none | — | LEX-03, LEX-05, LINE-01. No continuation syntax is documented; continuation forms are BS-EXP-023 (unresolved). |
+| BS-LEX-006 | LF and CRLF both terminate a line; one file may mix them; trees are identical apart from byte offsets. | L1 does not name terminator bytes | unknown | provisional | planned: `_newline` | `BS-LEX-006: CRLF line endings`<br>`BS-LEX-006: mixed LF and CRLF line endings`<br>`BS-LEX-006: CRLF between comment lines` | n/a | none | — | LEX-03, AMB-07. Byte fixtures (validation fixture rules). |
 | BS-LEX-007 | A bare CR (not followed by LF) as a line terminator. | none | unknown | unresolved | none — bare CR is neither whitespace nor terminator | n/a — unresolved | n/a | none | — | LEX-03, AMB-07 |
 | BS-LEX-008 | End of file terminates the last line: a final statement, comment or block terminator needs no line terminator; an empty file and a file of only blank lines and comments parse without error. | L1 silent | unknown | provisional | planned: `source_file` | `BS-LEX-008: final line without a line terminator`<br>`BS-LEX-008: final line with a line terminator`<br>`BS-LEX-008: empty file`<br>`BS-LEX-008: only comments and blank lines` | n/a | none | — | LINE-04, AMB-07 |
 | BS-LEX-009 | Blank lines may appear before, between and after statements, inside block bodies and before block terminators. | multi-line examples on SS, PS, EVT, CC | baseline | documented | planned: `source_file`, `block` | `BS-LEX-009: blank lines around and inside blocks` | n/a | none | — | LINE-03 |
 | BS-LEX-010 | `:` separates statements on one line in every statement list: file level, block bodies and single-line IF branches. | SS (body, example); PS §PRINT item list, §DIM | baseline | documented | planned: `_terminator` | `BS-LEX-010: colon-separated statements`<br>`BS-LEX-010: colon-separated statements in a block body` | n/a | none | — | LEX-04, LINE-02 |
-| BS-LEX-011 | In file-level and block statement lists any run of `:` and line terminators separates statements; leading, repeated and trailing colons produce no node. | L1 silent | unknown | provisional | planned: `_terminator` | `BS-LEX-011: repeated, leading and trailing colons` | n/a | none | — | AMB-08. Single-line IF branches: BS-STMT-009. |
+| BS-LEX-011 | Any run of `:` and line terminators separates statements in file-level and block statement lists (leading, repeated and trailing colons produce no node), and repeated `:` separates statements of a single-line IF branch. Non-normative. | Level 4: BrighterScript @ `01a359c6` `src/parser/Parser.ts` `body()`, `block()` and `consumeStatementSeparators()` accept runs of colons and newlines, including leading ones, and `inlineConditionalBranch()` accepts repeated colons, all without an error diagnostic; L1 silent | unknown | tolerated | planned: `_terminator`, `_inline_block` | `BS-LEX-011: repeated, leading and trailing colons` | n/a | none | — | AMB-08. Changes no documented tree. A trailing `:` in a single-line branch has no contractual behaviour (BS-STMT-009). |
 | BS-LEX-012 | `'` starts a comment that runs to the end of the line; it may stand alone or follow code; inside a string it is text. | EVT §Comments › In BrightScript; PS §REM | baseline | documented | planned: `comment` (extra) | `BS-LEX-012: apostrophe comment lines`<br>`BS-LEX-012: comment after code on the same line`<br>`BS-LEX-012: apostrophe inside a string` | n/a | none | — | LEX-06 |
-| BS-LEX-013 | `REM` in any letter case starts a comment that runs to the end of the line, including a line that holds only `REM`. | PS §REM; SS; EVT §Comments | baseline | documented | planned: `comment` (extra) | `BS-LEX-013: REM comments in mixed case`<br>`BS-LEX-013: bare REM line` | n/a | none | — | LEX-06, STM-13 |
-| BS-LEX-014 | `REM` starts a comment only as a whole word followed by space, tab, line end or file end, at line start, after code and after `:`. `remark`, `rem1`, `rem_x` are identifiers. `rem` directly followed by another character (`rem:`, `rem(`) has no contractual behaviour. After `.` the same rule applies, so `obj.rem` at line end is a comment. | L1 silent on the boundary | unknown | provisional | planned: `comment` token shape | `BS-LEX-014: identifiers beginning with rem`<br>`BS-LEX-014: REM after code and after a colon` | n/a | none | — | AMB-12 |
+| BS-LEX-013 | `REM` in any letter case followed by text starts a comment that runs to the end of the line. | PS §REM; SS; EVT §Comments | baseline | documented | planned: `comment` (extra) | `BS-LEX-013: REM comments in mixed case` | n/a | none | — | LEX-06, STM-13 |
+| BS-LEX-014 | `REM` starts a comment only as a whole word followed by space, tab, line end or file end, including a line that holds only `REM`, at line start, after code and after `:`. `remark`, `rem1`, `rem_x` are identifiers. `rem` directly followed by another character (`rem:`, `rem(`) and `rem` as a member name or AA key have no contractual behaviour. | L1 silent on the boundary | unknown | provisional | planned: `comment` token shape | `BS-LEX-014: identifiers beginning with rem`<br>`BS-LEX-014: REM after code and after a colon`<br>`BS-LEX-014: bare REM line` | n/a | none | — | AMB-12 |
 | BS-LEX-015 | Identifier: an ASCII letter or `_`, then ASCII letters, digits or `_`, any length. | EVT §Identifiers | baseline | documented | planned: `identifier` (word token) | `BS-LEX-015: identifier forms` | n/a | none | — | LEX-07 |
 | BS-LEX-016 | Non-ASCII letters in identifiers. | EVT §Identifiers ("a – z") | unknown | unresolved | none | n/a — unresolved | n/a | none | — | LEX-07, AMB-09 |
-| BS-LEX-017 | A variable name may end with one designator `$`, `%`, `!` or `#`. The designator is part of the identifier token, so `a`, `a$` and `a%` are different identifiers. | EVT §Identifiers, §Type declaration characters | baseline | documented | planned: `identifier` | `BS-LEX-017: variables with type designators` | n/a | none | — | LEX-08, TYP-03 |
+| BS-LEX-017 | A variable name may end with one designator `$`, `%`, `!` or `#`, including parameters, FOR and FOR EACH variables and CATCH variables. The designator is part of the identifier token, so `a`, `a$` and `a%` are different identifiers. | EVT §Identifiers ("If a variable"), §Type declaration characters; PS §FUNCTION (parameters), §FOR ("counter-variable"), §FOR EACH ("the variable item"), §TRY / CATCH ("a simple variable") | baseline | documented | planned: `identifier` | `BS-LEX-017: variables with type designators`<br>`BS-LEX-017: designators on parameters and loop and catch variables` | n/a | none | — | LEX-08, TYP-03 |
 | BS-LEX-018 | The `&` designator (LongInteger) on variable names (`A&`, `ID&`). | EVT §Type declaration characters, §Types | 7.0 | documented | planned: `identifier` | `BS-LEX-018: LongInteger designator on a variable` | n/a | none | — | LEX-08, VER-10 |
 | BS-LEX-019 | Function names do not take type designators. Compile-time rule; the shared identifier token accepts a designator on a function name. | EVT §Identifiers | baseline | out-of-scope | none | n/a | n/a | none | — | FUN-04 |
-| BS-LEX-020 | Designators on parameters, loop variables, CATCH variables, member names, AA identifier keys, labels and GOTO targets. | none | unknown | unresolved | none added — the shared identifier token accepts them | n/a — unresolved | n/a | none | — | AMB-09 |
+| BS-LEX-020 | Designators on member names, AA identifier keys, labels and GOTO targets. | none | unknown | unresolved | none added — the shared identifier token accepts them | n/a — unresolved | n/a | none | — | AMB-09 |
 | BS-LEX-021 | Reserved words that are grammar keywords (`And Dim Each Else ElseIf End EndFunction EndIf EndSub EndWhile Exit ExitWhile False For Function Goto If Invalid LINE_NUM Next Not Or Print Rem Return Step Stop Sub Then To True While`) are recognised as keywords in any letter case wherever the grammar expects them. | RW; PS; EVT | baseline | documented | planned: `kw()`, `word: identifier` | `BS-LEX-021: reserved keywords in statement positions` | n/a | none | — | LEX-09, AMB-01 |
-| BS-LEX-022 | Reserved callable names (`Box CreateObject Eval GetGlobalAA GetLastRunCompileError GetLastRunRunTimeError ObjFun Pos Run Tab Type`) use ordinary call syntax and parse as a `call_expression` on an `identifier`, including `Tab`/`Pos` in PRINT lists. | RW; RF; PS §PRINT item list | baseline | documented | planned: `identifier`, `call_expression` | `BS-LEX-022: reserved built-in function calls` | n/a | none | — | FUN-07, AMB-01, AMB-24 |
+| BS-LEX-022 | Reserved words documented as functions (`Box CreateObject Eval GetGlobalAA GetLastRunCompileError GetLastRunRunTimeError Pos Run Tab Type`) use ordinary call syntax and parse as a `call_expression` on an `identifier`, including `Tab`/`Pos` in PRINT lists. `ObjFun` is reserved but undocumented and is an ordinary identifier (BS-LEX-023). | RW; RF; PS §PRINT item list | baseline | documented | planned: `identifier`, `call_expression` | `BS-LEX-022: reserved built-in function calls` | n/a | none | — | FUN-07, AMB-01, AMB-24 |
 | BS-LEX-023 | A reserved word used as a variable, function, parameter or label name is a compile error. The grammar rejects such a use only where the word is a grammar keyword in that position (statement-initial `end = 1`); `step = 1` or `box = 1` are not rejected. | RW | baseline | out-of-scope | none — keyword extraction only | n/a | n/a | none | — | AMB-01, AMB-24 |
-| BS-LEX-024 | Keyword words are accepted as member names after `.`/`?.` and as identifier keys in associative-array literals (`{ function: "main()" }`, `list.next()`), except `rem` (BS-LEX-014). | EH §Invalid throws (`function` used as a key in source code); conflicts with EVT §Identifiers prose | unknown | provisional | planned: `identifier` through contextual keyword extraction | `BS-LEX-024: keywords as member names`<br>`BS-LEX-024: keywords as associative-array keys` | n/a | none | — | AMB-01, LIT-12, EXP-03. Tightening later would reject the L1 example. |
+| BS-LEX-024 | Keyword words are accepted as member names after `.`/`?.` and as identifier keys in associative-array literals (`e.backtrace[i].function`, `{ function: "main()" }`, `list.next()`), except `rem` (BS-LEX-014). | EH §The backtrace (`.function` as a member name) and §Invalid throws (`function` as a key) in source code; EVT §Identifiers and §Associative array literals prose ("Key names must be valid identifiers") point the other way | unknown | provisional | planned: `identifier` through contextual keyword extraction | `BS-LEX-024: keywords as member names`<br>`BS-LEX-024: keywords as associative-array keys` | n/a | none | — | AMB-01, LIT-12, EXP-03. Tightening later would reject the L1 examples. |
 | BS-LEX-025 | Words that act as syntax but are not on the reserved list (`As Catch Continue In Library Mod Throw Try`, the `AS` type names, `EndTry`) are keywords only where the grammar expects them and identifiers elsewhere (`mod = 3`, `x = in + as`). Statement-initial `try`, `throw`, `continue`, `library`, and statement-initial `catch` inside a TRY body, always start their statements. | RW (absence); PS §TRY / CATCH, §THROW; EVT §Operators; CA §Script libraries | unknown | provisional | planned: `kw()` with contextual keyword extraction | `BS-LEX-025: non-reserved keyword words as identifiers` | n/a | none | — | LEX-10, AMB-02; candidate "`mod` as a variable name" (Level 4 claim, not used as evidence). Known incompatibility: pre-9.4 and pre-11.5 code using `try`, `catch`, `throw`, `continue` as statement-initial names. |
 | BS-LEX-026 | Keyword recognition respects word boundaries: an identifier that begins with a keyword (`iffy`, `endpoint`, `format`, `printer`, `nextItem`, `stepSize`, `notify`, `order`, `android`, `returnValue`, `falsey`) is one identifier. | EVT §Identifiers | baseline | documented | planned: `word: identifier` | `BS-LEX-026: identifiers beginning with keywords` | n/a | none | — | LEX-07 |
 | BS-LEX-027 | A label is an identifier followed by `:` on a line by itself; it is the target of GOTO. | PS §GOTO label; CA §Scope | baseline | documented | planned: `label_statement` | `BS-LEX-027: label line` | n/a | none | — | LEX-11 |
 | BS-LEX-028 | A label line may end with a comment. Code after a label on the same line has no contractual behaviour. | L1 silent | unknown | provisional | planned: `label_statement` | `BS-LEX-028: label followed by a comment` | n/a | none | — | AMB-08 |
 | BS-LEX-029 | Optional-chaining operators `?.`, `?@`, `?[`, `?(` are indivisible tokens; whitespace may precede them (`a = b ?. c`, `x = s ?[ 5 ]`). | EVT §Optional chaining operators › Notes | 11.0 | documented | planned: tokens `?.` `?@` `?[` `?(` | `BS-LEX-029: optional-chaining tokens after whitespace` | n/a | none | — | LEX-12, AMB-16 |
 | BS-LEX-030 | `?` separated from `.` by whitespace (`a = b ? . c`) is not an optional-chaining operator. | EVT §Optional chaining operators › Notes ("Do not write") | 11.0 | invalid | planned: tokenization | n/a | `BS-LEX-030: split optional-chaining token` | none | — | AMB-16 |
-| BS-LEX-031 | At the start of a statement `?` is PRINT, also when directly followed by `(`, `.`+digit or `[` (`?("Hello")`, `?.1`, `?[1]`). | EVT §Optional chaining operators › Support details; SS | baseline | documented | planned: `print_statement` | `BS-LEX-031: question-mark PRINT alias forms` | n/a | none | — | LEX-13, AMB-16 |
+| BS-LEX-031 | At the start of a statement `?` is PRINT, also when directly followed by `(` or by `.` and a digit (`?("Hello")`, `?.1`). | EVT §Optional chaining operators › Support details; SS | baseline | documented | planned: `print_statement` | `BS-LEX-031: question-mark PRINT alias forms` | n/a | none | — | LEX-13, AMB-16 |
 | BS-LEX-032 | `IF x?("Hello")` at the end of its line begins a block IF whose condition is an optional call; it does not print. | EVT §Optional chaining operators › Support details | unknown | documented | planned: `if_statement`, `call_expression` | `BS-LEX-032: IF with an optional call starts a block IF` | n/a | none | — | VER-20, AMB-16. Known incompatibility: older firmware printed. |
-| BS-LEX-033 | Source text is UTF-8; a leading UTF-8 byte-order mark is ignored; non-ASCII characters are ordinary content in comments and strings. | CA §BrightScript XML support (encoding stated for XML only); Tree-sitter `lib/src/lexer.c` @ `v0.27.0` skips a leading BOM (Level 3) | unknown | provisional | planned: `string`, `comment` | `BS-LEX-033: UTF-8 text in comments and strings`<br>`BS-LEX-033: leading byte-order mark` | n/a | none | — | LINE-06, AMB-11 |
+| BS-LEX-033 | Source text is UTF-8; a leading UTF-8 byte-order mark is ignored; non-ASCII characters are ordinary content in comments and strings. | L1 states an encoding only for XML (CA §BrightScript XML support). The Tree-sitter runtime skips a leading BOM before the grammar sees the input (runtime behaviour, `lib/src/lexer.c` @ `v0.27.0`), which the fixture records | unknown | provisional | planned: `string`, `comment` | `BS-LEX-033: UTF-8 text in comments and strings`<br>`BS-LEX-033: leading byte-order mark` | n/a | none | — | LINE-06, AMB-11 |
 | BS-LEX-034 | Other encodings (UTF-16, Latin-1), invalid UTF-8 and NUL bytes. | none | unknown | unresolved | none | n/a — unresolved | n/a | none | — | LINE-06 |
+| BS-LEX-035 | At the start of a statement `?` directly followed by `[` is PRINT followed by an array literal (`?[1]`). | L1 shows only `?(` and `?.1` (EVT §Optional chaining operators › Support details) | unknown | provisional | planned: `print_statement` (context-aware lexing) | `BS-LEX-035: question mark followed by a bracket at statement start` | n/a | none | — | AMB-16 |
 
 ### LIT
 
@@ -167,7 +180,7 @@ kept so that the record format stays uniform. `—` means no known limitation.
 | BS-LIT-010 | Lowercase `d` exponent (`1.5d-3`). | L1 examples use uppercase only | unknown | provisional | planned: `number` | `BS-LIT-010: lowercase d exponent` | n/a | none | — | AMB-10 |
 | BS-LIT-011 | LongInteger literal: `&` suffix on decimal (`9876543210&`) and hex (`&hFEDCBA9876543210&`) integers. | EVT §Numeric literals, §Types; RN §Roku OS 7.0 | 7.0 | documented | planned: `number` | `BS-LIT-011: LongInteger literals` | n/a | none | — | LIT-07, VER-10 |
 | BS-LIT-012 | `%` suffix on integer literals (`125%`, `100%`). | EVT §Type declaration characters; CA §Use of wrapper functions on intrinsic types | baseline | documented | planned: `number` | `BS-LIT-012: integer suffix on a literal` | n/a | none | — | LIT-08 |
-| BS-LIT-013 | Other numeric forms: trailing dot (`5.`), suffixes other than `&` on hex (`&hFF%`), `&h` without digits, `5.e3`. | none | unknown | unresolved | none beyond the planned `number` token shape | n/a — unresolved | n/a | none | — | AMB-10 |
+| BS-LIT-013 | Other numeric forms: trailing dot (`5.`), suffixes other than `&` on hex (`&hFF%`), `&h` without digits, `5.e3`, and designators on literals other than those shown (`5$`, `1.5%`, `2.5&`). | EVT §Type declaration characters allows a designator "at the end of either a variable or a literal" without listing the combinations | unknown | unresolved | none beyond the planned `number` token shape | n/a — unresolved | n/a | none | — | AMB-10 |
 | BS-LIT-014 | After digits, `.` followed by a letter is member access, not a fraction: `5.tostr()`, `100%.tostr()`, `"5".toint()`, `"01234567".left(3)`. | CA §Use of wrapper functions on intrinsic types | baseline | documented | planned: `number` token shape, `member_expression` | `BS-LIT-014: method call on a numeric literal`<br>`BS-LIT-014: method call on a string literal` | n/a | none | — | LIT-09 |
 | BS-LIT-015 | String literal: text between double quotes on one line. | EVT §String literals | baseline | documented | planned: `string` | `BS-LIT-015: string literals` | `BS-LIT-015: unterminated string at end of line` (recovery) | none | — | LIT-10 |
 | BS-LIT-016 | `""` inside a string is one quotation mark; `""""` is a one-character string. | EVT §String literals; RN §Roku OS 6.2 | 6.2 | documented | planned: `string` | `BS-LIT-016: doubled quotation marks` | n/a | none | — | LIT-10, VER-08 |
@@ -180,7 +193,7 @@ kept so that the record format stays uniform. `—` means no known limitation.
 
 | ID | Requirement | Evidence | Since | Status | Grammar | Positive fixtures | Negative / recovery fixtures | Coverage | KL | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|
-| BS-TYPE-001 | `AS` type names in any letter case: `Integer Float Double Boolean String Object Dynamic Function`, plus `Void` for return types. One `type` rule serves parameters and return types. | PS §FUNCTION(…) AS type; RN §Roku OS 3.0, §Roku OS 4.1 ("typed values in function parameters and returns") | 3.0 | documented | planned: `type` | `BS-TYPE-001: parameter and return type names` | n/a | none | — | TYP-01, VER-01. `void` on a parameter is accepted by the shared rule (non-contractual). |
+| BS-TYPE-001 | `AS` type names in any letter case: `Integer Float Double Boolean String Object Dynamic Function`, plus `Void` for return types. One `type` rule serves parameters and return types. | PS §FUNCTION(…) AS type | baseline | documented | planned: `type` | `BS-TYPE-001: parameter and return type names` | n/a | none | — | TYP-01, VER-01. RN §Roku OS 3.0 lists "typed values in function parameters and returns", but its compatibility note shows declared return types already existed in BrightScript v2.0, so no version boundary is established for the syntax. `void` on a parameter is accepted by the shared rule (non-contractual). |
 | BS-TYPE-002 | `LongInteger`, `Interface` and `Invalid` as `AS` type names. | EVT §Types lists the types, not their use in `AS` | unknown | unresolved | none | n/a — unresolved | n/a | none | — | TYP-02, AMB-26 |
 | BS-TYPE-003 | Dynamic typing, declared-type conversion, promotion, rounding, autoboxing and `type()` results. | EVT §Types, §Type conversion (promotion), §Effects of type conversions on accuracy; CA | baseline | out-of-scope | none | n/a | n/a | none | — | TYP-04 |
 
@@ -197,7 +210,7 @@ kept so that the record format stays uniform. `—` means no known limitation.
 | BS-EXP-007 | Optional chaining `?.`, `?@`, `?[`, `?(` in expressions, freely chained (`array?[3]?.foo?.bar?()`); each shares its node type with the non-optional form. | EVT §Optional chaining operators; RN §Roku OS 11.0 | 11.0 | documented | planned: `member_expression`, `attribute_expression`, `index_expression`, `call_expression` | `BS-EXP-007: optional chaining chain`<br>`BS-EXP-007: optional call and optional index with arguments` | n/a | none | — | EXP-06, VER-19 |
 | BS-EXP-008 | An optional-chaining operator as the outermost accessor of an assignment target (`array?[12] = x`, `a?.b = 1`). | EVT §Optional chaining operators › Support details ("Not supported") | 11.0 | invalid | planned: `_assignment_target` excludes optional accessors | n/a | `BS-EXP-008: optional index as an assignment target`<br>`BS-EXP-008: optional member as an assignment target` | none | — | EXP-06, ASN-01, AMB-16 |
 | BS-EXP-009 | A standalone call statement whose outermost call is `?(` (`f?()`). | EVT §Optional chaining operators › Support details ("Not supported") | 11.0 | invalid | planned: call statements require `(` as the outermost call | n/a | `BS-EXP-009: standalone optional call statement` | none | — | EXP-06, STM-17 |
-| BS-EXP-010 | Optional chaining inside subexpressions of call statements and assignment targets (`f(array?[12])`, `f(foo?.bar).member = 5`). | EVT §Optional chaining operators › Support details | 11.0 | documented | planned: `call_expression`, `assignment_statement` | `BS-EXP-010: optional chaining inside statement subexpressions` | n/a | none | — | EXP-06 |
+| BS-EXP-010 | Optional chaining inside the argument lists and index expressions of call statements and assignment targets (`f(array?[12])`, `f(foo?.bar).member = 5`). | EVT §Optional chaining operators › Support details | 11.0 | documented | planned: `call_expression`, `assignment_statement` | `BS-EXP-010: optional chaining inside statement subexpressions` | n/a | none | — | EXP-06. Optional operators in the statement chain itself: BS-STMT-006. |
 | BS-EXP-011 | `^` exponentiation, right associative (`2^3^2` = `2^(3^2)`). | EVT §Operators, §Exponentiation operator | baseline | documented | planned: `binary_expression` (exponent level, right) | `BS-EXP-011: exponentiation is right associative` | n/a | none | — | EXP-07 |
 | BS-EXP-012 | Unary `-` and `+` bind looser than postfix operators and `^`, tighter than multiplicative operators (`-5.tostr()` = `-(5.tostr())`, `-2^2` = `-(2^2)`, `-a*b` = `(-a)*b`). | EVT §Operators, §Negation operator; CA §Use of wrapper functions on intrinsic types | baseline | documented | planned: `unary_expression` (unary level) | `BS-EXP-012: unary minus against postfix and exponent`<br>`BS-EXP-012: unary operators against multiplication` | n/a | none | — | EXP-08 |
 | BS-EXP-013 | `*`, `/` and `MOD` share one level, left associative. | EVT §Operators, §Multiplicative operators | baseline | documented | planned: `binary_expression` (multiplicative level) | `BS-EXP-013: multiplicative operators are left associative` | n/a | none | — | EXP-09, AMB-13 (`*` lost in the rendered table; prose and examples keep it) |
@@ -210,26 +223,27 @@ kept so that the record format stays uniform. `—` means no known limitation.
 | BS-EXP-020 | Inside an expression `=` is comparison; assignment is a statement, never an expression (`if a=5 then …`, `x = a = b`). | EVT §= operator | baseline | documented | planned: `binary_expression`, `assignment_statement` | `BS-EXP-020: equals inside an expression is comparison` | n/a | none | — | EXP-16 |
 | BS-EXP-021 | Call, `.`, `[]`, `@` and their optional forms form one postfix level applied left to right; `@` binds like `.` (`x@y.z` = `(x@y).z`, `a.b@c` = `(a.b)@c`). | EVT §Operators (the table lists postfix operators on separate rows and omits `@`) | unknown | provisional | planned: postfix level | `BS-EXP-021: mixed postfix chain`<br>`BS-EXP-021: attribute operator inside a member chain` | n/a | none | — | EXP-15, AMB-13 |
 | BS-EXP-022 | Adjacent operands without an operator outside PRINT (`"a"b"c"`). | CA §Attribute operator (unexplained example) | unknown | unresolved | none | n/a — unresolved | n/a | none | — | EXP-17, AMB-28. The example is excluded from fixtures. |
-| BS-EXP-023 | A line break after a binary operator, inside grouping parentheses or inside index brackets. | none | unknown | unresolved | none | n/a — unresolved | n/a | none | — | LEX-05, AMB-07 |
-| BS-EXP-024 | Line breaks inside argument lists: after `(`, after a `,`, and before `)`. | L1 shows it for a parameter list only (BS-FUNC-006) | unknown | provisional | planned: `argument_list` | `BS-EXP-024: call arguments across lines` | n/a | none | — | LINE-05, AMB-07 |
-| BS-EXP-025 | Calls and indexing apply to identifiers, parenthesized expressions and postfix expressions; member access also applies to numeric, string, array and associative-array literals. A call or index applied directly to a literal (`"a"(1)`, `5[0]`, `[1][0]`) has no contractual behaviour. | L1 examples show only these operand kinds | unknown | provisional | planned: `_postfix_operand` | `BS-EXP-025: postfix operand kinds` | n/a | none | — | EXP-02, EXP-03, LIT-09. Keeps PRINT item boundaries deterministic (BS-STMT-026). |
+| BS-EXP-023 | A line break after a binary operator, inside grouping parentheses or inside index brackets. | none | unknown | unresolved | none | n/a — unresolved | n/a | none | — | LEX-05, AMB-07. BrighterScript (Level 4, `src/RokuConstants.ts` @ `01a359c6`) enables continuation after binary operators from Roku OS 15.3, citing release notes whose 15.3 section in snapshot `roku-docs-2026-09-23` does not mention it; the claim is not used; revisit at the next snapshot refresh. |
+| BS-EXP-024 | Line breaks inside argument lists (after `(`, after a `,`, before `)`). | L1 shows a line break only in a parameter list (BS-FUNC-006) | unknown | unresolved | none | n/a — unresolved | n/a | none | — | LINE-05, AMB-07. BrighterScript (Level 4) accepts them only with its Roku OS 15.3 line-continuation capability (see BS-EXP-023). |
+| BS-EXP-025 | Postfix operators on operand kinds that Level 1 does not show: a call or index applied directly to a literal (`"a"(1)`, `5[0]`), and member or index access on array or associative-array literals (`[1, 2].count()`, `[1][0]`). | L1 shows postfix operators on identifiers, on results of postfix operators, on parenthesized expressions and (member access only) on numeric and string literals | unknown | unresolved | none — the planned operand kinds (grammar-design §5) exclude them | n/a — unresolved | n/a | none | — | EXP-02, EXP-03, LIT-09 |
 | BS-EXP-026 | Operator semantics: numeric promotion, concatenation, short-circuit evaluation, runtime errors, `?.` on interface names, the `TYPE?(` compile error. | EVT §Operators subsections; CA | baseline | out-of-scope | none | n/a | n/a | none | — | EXP-14, AMB-35 |
+| BS-EXP-027 | A prefix operator may start the right operand of a tighter binary operator and applies to that operand at its own level: `2^-2` = `2^(-2)`, `x * -y` = `x * (-y)`, `a < not b` = `a < (not b)`. | L1 shows a prefix operator on the right only where it binds tighter than the operator (`<>-1.1`, CA §Use of wrapper functions on intrinsic types) | unknown | provisional | planned: `unary_expression` inside `binary_expression` | `BS-EXP-027: prefix operators as right operands` | n/a | none | — | AMB-13. Provisional, not tolerated: the form needs no extra rule (a prefix operator starts any operand); what is chosen is the tree shape. BrighterScript (Level 4) accepts these forms but is not evidence for their shape. |
 
 ### STMT
 
 | ID | Requirement | Evidence | Since | Status | Grammar | Positive fixtures | Negative / recovery fixtures | Coverage | KL | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|
-| BS-STMT-001 | Assignment `target = expression`. Targets: identifier (with designator), member access, index access with one or more indexes, including chains whose inner parts are calls (`f(x).y = 1`). | PS §variable = expression; EVT §Dot operator, §Array operator | baseline | documented | planned: `assignment_statement`, `_assignment_target` | `BS-STMT-001: assignment to variables, members and indexes` | `BS-STMT-001: assignment missing its value` (recovery) | none | — | ASN-01 |
+| BS-STMT-001 | Assignment `target = expression`. A target is an identifier (with designator) or a chain of `.` member access, index access (one or more indexes) and calls that starts with an identifier and ends with `.name` or `[…]` (`aa.newkey`, `c[x, y, z]`, `f(x).y`). | PS §variable = expression; EVT §Dot operator, §Array operator, §Optional chaining operators › Support details (`f(foo?.bar).member = 5`) | baseline | documented | planned: `assignment_statement`, `_assignment_target` | `BS-STMT-001: assignment to variables, members and indexes` | `BS-STMT-001: assignment missing its value` (recovery) | none | — | ASN-01. Chains containing `?.`, `?[` or `@`: BS-EXP-008, BS-STMT-006. |
 | BS-STMT-002 | Compound assignment `+=`, `-=`, `*=`, `/=`, `\=`, `<<=`, `>>=` on the same targets. `^=`, `MOD=` and other spellings are not accepted (no rule). | EVT §Mathematical and bitshift assignment operators (examples); RN §Roku OS 7.1 (list) | 7.1 | documented | planned: `assignment_statement` | `BS-STMT-002: compound assignment operators` | n/a | none | — | ASN-02, VER-12, AMB-14 |
 | BS-STMT-003 | `x++` and `x--` statements on a variable. | EVT §Increment and decrement operators; PS §CONTINUE FOR / CONTINUE WHILE; RN §Roku OS 7.1 | 7.1 | documented | planned: `update_statement` | `BS-STMT-003: increment and decrement statements` | n/a | none | — | ASN-03, VER-11 |
-| BS-STMT-004 | `++`/`--` on member and index targets (`a.b++`, `a[0]--`). Prefix forms and use inside expressions have no contractual behaviour. | L1 silent | unknown | provisional | planned: `update_statement` over `_assignment_target` | `BS-STMT-004: increment and decrement on member and index targets` | n/a | none | — | ASN-03, AMB-15 |
-| BS-STMT-005 | Call statement: a call expression whose outermost call uses `(` and whose chain starts with an identifier (`HandleButton(msg.GetInt())`, `cavemen.push("fred")`). | PS, EVT, CA examples | baseline | documented | planned: `call_expression` in `statement` | `BS-STMT-005: call statements` | n/a | none | — | STM-17 |
-| BS-STMT-006 | Other bare expressions as statements (`x`, `a + b`, `a.b`) and call statements whose chain starts with something other than an identifier (`(f)()`, `"x".len()`). | none | unknown | unresolved | none | n/a — unresolved | n/a | none | — | STM-17, AMB-16 |
-| BS-STMT-007 | Single-line IF: `IF condition [THEN] statements [ELSE statements]` on one line; THEN optional; each branch holds one or more statements separated by `:` and extends to the end of the line. | PS §IF expression THEN statements [ELSE statements]; SS (example) | baseline | documented | planned: `if_statement` (single-line form), `else_clause` | `BS-STMT-007: single-line IF with THEN`<br>`BS-STMT-007: single-line IF without THEN`<br>`BS-STMT-007: single-line IF with ELSE`<br>`BS-STMT-007: colon-separated statements in a single-line branch` | n/a | none | — | STM-01, AMB-04, AMB-05 |
+| BS-STMT-004 | `++`/`--` on member and index targets (`a.b++`, `a[0]--`). Non-normative. Prefix forms and use inside expressions have no contractual behaviour. | Level 4: BrighterScript @ `01a359c6` `src/parser/Parser.ts` `expressionStatement()` accepts `++`/`--` after any non-call expression with no error diagnostic; L1 shows only variables | unknown | tolerated | planned: `update_statement` over `_assignment_target` | `BS-STMT-004: increment and decrement on member and index targets` | n/a | none | — | ASN-03, AMB-15. Changes no documented tree. |
+| BS-STMT-005 | Call statement: a chain of `.` member access, index access and calls that starts with an identifier and ends with a call using `(` (`HandleButton(msg.GetInt())`, `cavemen.push("fred")`). | PS, EVT, CA examples | baseline | documented | planned: `call_expression` in `statement` (`_stmt_call`) | `BS-STMT-005: call statements` | n/a | none | — | STM-17 |
+| BS-STMT-006 | Other statements built from expressions: bare expressions (`x`, `a + b`, `a.b`); call statements whose chain starts with something other than an identifier (`(f)()`, `"x".len()`); call statements and assignment or update targets whose chain contains `?.`, `?[`, `?(` or `@` before the last step (`a?.b.c()`, `a?.b.c = 1`, `x@y.z = 1`). | L1 says optional chaining "cannot be used directly in a standalone function call or as the target of an assignment" without defining "directly" | unknown | unresolved | none — statement chains contain only `.`, index access and `(` calls | n/a — unresolved | n/a | none | — | STM-17, AMB-16 |
+| BS-STMT-007 | Single-line IF: `IF condition [THEN] statements [ELSE statements]` on one line; THEN optional; each branch holds one or more statements separated by `:` and extends to the end of the line. Statement kinds shown in single-line branches: assignment, call, PRINT (`?`), RETURN, EXIT WHILE, CONTINUE FOR, STOP. | PS §IF expression THEN statements [ELSE statements], §DIM, §WHILE, §CONTINUE FOR / CONTINUE WHILE; SS (example); CA §Attribute operator; EH §Reacting to an error without handling it | baseline | documented | planned: `if_statement` (single-line form), `else_clause` | `BS-STMT-007: single-line IF with THEN`<br>`BS-STMT-007: single-line IF without THEN`<br>`BS-STMT-007: single-line IF with ELSE`<br>`BS-STMT-007: colon-separated statements in a single-line branch`<br>`BS-STMT-007: documented statement kinds in single-line branches` | n/a | none | — | STM-01, AMB-04, AMB-05 |
 | BS-STMT-008 | After the condition and optional THEN, a line end, comment or `:` selects the block form; any statement start selects the single-line form. | EVT §Optional chaining operators › Support details (comment case); L1 silent on `:` | unknown | provisional | planned: `if_statement` factoring | `BS-STMT-008: THEN followed by a comment starts a block IF`<br>`BS-STMT-008: THEN followed by a colon starts a block IF` | n/a | none | — | STM-02, AMB-04 |
-| BS-STMT-009 | Single-line IF composition: ELSE belongs to the nearest single-line IF; a branch may hold a nested single-line IF; `ELSE IF` in single-line form is an ELSE branch holding a nested IF. Branch statements are assignment, update, call, PRINT, RETURN, EXIT, CONTINUE, GOTO, END, STOP, THROW, DIM and single-line IF. Repeated `:` between branch statements is accepted; a trailing `:` is not. | L1 silent | unknown | provisional | planned: `_inline_statement`, `if_statement` | `BS-STMT-009: nested single-line IF with ELSE`<br>`BS-STMT-009: single-line ELSE IF nests an IF` | n/a | none | — | AMB-05 |
+| BS-STMT-009 | Single-line IF composition: ELSE belongs to the nearest single-line IF; a branch may hold a nested single-line IF; `ELSE IF` in single-line form is an ELSE branch holding a nested IF; branches also accept GOTO, END, THROW, DIM and update statements. A trailing `:` in a branch and block statements in a branch have no contractual behaviour. | L1 silent | unknown | provisional | planned: `_inline_statement`, `if_statement` | `BS-STMT-009: nested single-line IF with ELSE`<br>`BS-STMT-009: single-line ELSE IF nests an IF`<br>`BS-STMT-009: other statement kinds in single-line branches` | n/a | none | — | AMB-05. Repeated `:` in a branch: BS-LEX-011. |
 | BS-STMT-010 | Block IF: `IF condition [THEN]`, line end, statements, any number of `ELSEIF`/`ELSE IF condition [THEN]` clauses, optional `ELSE`, closed by `END IF` or `ENDIF`. | PS §Block IF, ELSEIF, THEN, ENDIF | baseline | documented | planned: `if_statement`, `else_if_clause`, `else_clause` | `BS-STMT-010: block IF with ELSE IF and ELSE`<br>`BS-STMT-010: ELSEIF and ENDIF spellings`<br>`BS-STMT-010: block IF without THEN` | `BS-STMT-010: block IF missing END IF` (recovery) | none | — | STM-02, AMB-03 |
-| BS-STMT-011 | In a block IF, `ELSE` and `ELSE IF … [THEN]` headers end at a line end, `:` or comment. Code directly after them on the same line has no contractual behaviour. | L1 silent | unknown | provisional | planned: `else_clause`, `else_if_clause` | `BS-STMT-011: ELSE and ELSE IF headers followed by comments and colons` | n/a | none | — | AMB-04, AMB-05 |
+| BS-STMT-011 | In a block IF, the `ELSE` and `ELSE IF … [THEN]` headers may end with `:` instead of a line end; a comment may follow them as it may follow any code (BS-LEX-012). Code directly after them on the same line has no contractual behaviour. Non-normative. | Level 4: BrighterScript @ `01a359c6` `src/parser/Parser.ts` `ifStatement()` → `blockConditionalBranch()` → `block()`, which starts with `consumeStatementSeparators(true)`, without an error diagnostic; L1 shows these headers only at line ends | unknown | tolerated | planned: `else_clause`, `else_if_clause` (`block` starts with `_terminator`) | `BS-STMT-011: ELSE and ELSE IF headers followed by comments and colons` | n/a | none | — | AMB-04, AMB-05. Changes no documented tree. |
 | BS-STMT-012 | Counted loop `FOR counter = start TO end [STEP increment]`, body, `END FOR`. | PS §FOR counter = exp TO exp [STEP exp] / END FOR | baseline | documented | planned: `for_statement` | `BS-STMT-012: FOR with and without STEP` | `BS-STMT-012: FOR missing END FOR` (recovery) | none | — | STM-03 |
 | BS-STMT-013 | Bare `NEXT` terminates FOR and FOR EACH. | PS §FOR …, §FOR EACH item IN object | baseline | documented | planned: `for_statement`, `for_each_statement` | `BS-STMT-013: NEXT terminates FOR and FOR EACH` | n/a | none | — | STM-03, AMB-06, VER-26 |
 | BS-STMT-014 | `NEXT counter` and `NEXT i, j`. | none | unknown | unresolved | none | n/a — unresolved | n/a | none | — | AMB-06 |
@@ -244,7 +258,7 @@ kept so that the record format stays uniform. `—` means no known limitation.
 | BS-STMT-023 | `RETURN [expression]`. | PS §RETURN [expression] | baseline | documented | planned: `return_statement` | `BS-STMT-023: RETURN with and without a value` | n/a | none | — | STM-07 |
 | BS-STMT-024 | `PRINT` (or `?`) followed by items separated by `,` or `;`; a trailing `;` or `,` is allowed. | PS §PRINT item list; SS | baseline | documented | planned: `print_statement` | `BS-STMT-024: PRINT separators and trailing semicolon`<br>`BS-STMT-024: question-mark PRINT with separators` | n/a | none | — | STM-08 |
 | BS-STMT-025 | PRINT items may be adjacent without a separator (`print "a " 5 "!!"`, `print tab(5)"x";tab(25)"y"`, `print tab(40) pos(0)`). | PS §PRINT item list | baseline | documented | planned: `print_statement` | `BS-STMT-025: adjacent PRINT items`<br>`BS-STMT-025: TAB and POS items` | n/a | none | — | STM-08, AMB-17 |
-| BS-STMT-026 | PRINT item boundaries: an item extends as far as the expression grammar allows (`print a -1` is one item `a - 1`, `print a (1)` is a call, `print "a" (1)` is two items). `PRINT` with no items is accepted. | L1 silent | unknown | provisional | planned: `print_statement` precedence | `BS-STMT-026: ambiguous adjacent PRINT items`<br>`BS-STMT-026: PRINT with no items` | n/a | none | — | AMB-17 |
+| BS-STMT-026 | PRINT item boundaries: an item extends as far as the expression grammar allows (`print a -1` is one item `a - 1`; `print a (1)` is a call). | L1 silent | unknown | provisional | planned: `print_statement` precedence | `BS-STMT-026: ambiguous adjacent PRINT items` | n/a | none | — | AMB-17 |
 | BS-STMT-027 | `GOTO label`. | PS §GOTO label; SS | baseline | documented | planned: `goto_statement` | `BS-STMT-027: GOTO a label` | n/a | none | — | STM-10 |
 | BS-STMT-028 | GOTO with a line number. | PS §GOTO label (prose mentions a line number, no form) | unknown | unresolved | none | n/a — unresolved | n/a | none | — | AMB-31 |
 | BS-STMT-029 | `END` terminates execution. | PS §END; SS | baseline | documented | planned: `end_statement` | `BS-STMT-029: END statement` | n/a | none | — | STM-11, AMB-25 |
@@ -253,10 +267,11 @@ kept so that the record format stays uniform. `—` means no known limitation.
 | BS-STMT-032 | LIBRARY is accepted wherever a statement is accepted; placement rules are not grammar. | L1 silent on placement | unknown | provisional | planned: `library_statement` in `statement` | `BS-STMT-032: LIBRARY after a function declaration` | n/a | none | — | STM-16, AMB-19 |
 | BS-STMT-033 | A file is a sequence of statements: declarations, LIBRARY, directives and ordinary statements are all accepted at file level. | CA §Scope (named functions are global); L1 silent on statements outside functions | unknown | provisional | planned: `source_file` | `BS-STMT-033: statements at file level` | n/a | none | — | FUN-06, AMB-27 |
 | BS-STMT-034 | `LET` statement. | RW only | unknown | unresolved | none | n/a — unresolved | n/a | none | — | ASN-04, AMB-23 |
-| BS-STMT-035 | Every block header (IF, ELSE IF, ELSE, FOR, FOR EACH, WHILE, TRY, CATCH, FUNCTION, SUB) ends at a line end, `:` or comment, so a body may be written on one line with colons. | FUNCTION bodies documented (BS-FUNC-010); L1 silent for the others | unknown | provisional | planned: `block` starts with `_terminator` | `BS-STMT-035: one-line loop and TRY bodies with colons` | n/a | none | — | AMB-08 |
-| BS-STMT-036 | A block terminator closes only its own construct: `END IF`/`ENDIF` an IF, `END FOR`/`NEXT` a FOR or FOR EACH, `END WHILE`/`ENDWHILE` a WHILE, `END TRY`/`ENDTRY` a TRY, `END FUNCTION`/`ENDFUNCTION` a function, `END SUB`/`ENDSUB` a sub. | PS (each statement defines its terminator) | baseline | documented | planned: per-construct terminators | `BS-STMT-036: nested blocks close with their own terminators` | `BS-STMT-036: END IF closing a FOR body` (recovery) | none | — | KR-005 (`docs/validation/known-regressions.md`) |
+| BS-STMT-035 | The headers of block IF, FOR, FOR EACH, WHILE, TRY and CATCH may end with `:` instead of a line end, so such a body may be written on one line with colons (FUNCTION and SUB: BS-FUNC-010). Non-normative. | Level 4: BrighterScript @ `01a359c6` `src/parser/Parser.ts` `block()` starts with `consumeStatementSeparators(true)`; `whileStatement()` and `tryCatchStatement()` consume separators before their blocks; no error diagnostic; L1 shows the form only for FUNCTION | unknown | tolerated | planned: `block` starts with `_terminator` | `BS-STMT-035: one-line loop and TRY bodies with colons` | n/a | none | — | AMB-08. Changes no documented tree. |
+| BS-STMT-036 | A block terminator closes only its own construct: `END IF`/`ENDIF` an IF, `END FOR`/`NEXT` a FOR or FOR EACH, `END WHILE` a WHILE, `END TRY`/`ENDTRY` a TRY, `END FUNCTION` a function, `END SUB` a sub; the compact forms of BS-STMT-020 and BS-FUNC-003 likewise. | PS (each statement defines its terminator) | baseline | documented | planned: per-construct terminator tokens | `BS-STMT-036: nested blocks close with their own terminators` | `BS-STMT-036: END IF closing a FOR body` (recovery)<br>`BS-STMT-036: END SUB closing a FUNCTION` (recovery) | none | — | KR-005 (`docs/validation/known-regressions.md`). The recovery inputs lack the terminator PS documents for their construct; BrighterScript's `mismatchedEndCallableKeyword` error is reference only. |
 | BS-STMT-037 | EXIT/CONTINUE inside a matching loop, GOTO target existence, label scope and reachability. | PS; CA §Scope | baseline | out-of-scope | none | `BS-STMT-037: EXIT FOR outside a loop is not rejected` (guard) | n/a | none | — | AMB-35 |
 | BS-STMT-038 | Runtime meaning of statements: FOR bound evaluation, enumeration order, PRINT zones and number formatting, TAB/POS behaviour, END/STOP effects. | PS | baseline | out-of-scope | none | n/a | n/a | none | — | — |
+| BS-STMT-039 | `PRINT` (or `?`) with no items. Non-normative. | Level 4: BrighterScript @ `01a359c6` `src/parser/Parser.ts` `printStatement()` ("print statements can be empty") with no error diagnostic; L1 silent | unknown | tolerated | planned: `print_statement` | `BS-STMT-039: PRINT with no items` | n/a | none | — | AMB-17. Changes no documented tree. |
 
 ### FUNC
 
@@ -268,11 +283,11 @@ kept so that the record format stays uniform. `—` means no known limitation.
 | BS-FUNC-004 | An `AS` return type on SUB. | none | unknown | unresolved | none | n/a — unresolved | n/a | none | — | FUN-02, AMB-26 |
 | BS-FUNC-005 | Parameters: zero or more, comma-separated, each `name [= default] [AS type]`; a default may reference earlier parameters (`b=a+5 as Integer`). | PS §FUNCTION(…) | baseline | documented | planned: `parameter_list`, `parameter` | `BS-FUNC-005: parameters with defaults and types` | n/a | none | — | FUN-03 |
 | BS-FUNC-006 | A line break after a comma in a parameter list. | CA §Attribute operator (example function declaration) | baseline | documented | planned: `parameter_list` | `BS-FUNC-006: parameter list continued after a comma` | n/a | none | — | LEX-05, LINE-05 |
-| BS-FUNC-007 | Line breaks after `(` and before `)` in a parameter list. | L1 silent | unknown | provisional | planned: `parameter_list` | `BS-FUNC-007: parameter list opened and closed on separate lines` | n/a | none | — | AMB-07 |
+| BS-FUNC-007 | Line breaks after `(` and before `)` in a parameter list. | L1 shows a line break only after a comma (BS-FUNC-006) | unknown | unresolved | none | n/a — unresolved | n/a | none | — | AMB-07 |
 | BS-FUNC-008 | Once a parameter has a default value, every following parameter needs one. | PS §FUNCTION(…) | baseline | out-of-scope | none | `BS-FUNC-008: default-parameter order is not enforced` (guard) | n/a | none | — | FUN-03, AMB-35 |
 | BS-FUNC-009 | Anonymous function `FUNCTION (parameters) [AS type]`, body, `END FUNCTION`, usable wherever an expression is. | PS §Anonymous functions, §FUNCTION(…) heading | baseline | documented | planned: `anonymous_function` | `BS-FUNC-009: anonymous function assigned to a variable`<br>`BS-FUNC-009: anonymous function as an associative-array value` | n/a | none | — | FUN-05 |
-| BS-FUNC-010 | One-line bodies with `:` (`FUNCTION explode() : THROW "Kaboom!" : END FUNCTION`, `function():return m.xml@title:end function`). | EVT §Optional chaining operators › Notes; CA §Attribute operator, §Creating and using intrinsic objects | baseline | documented | planned: `block` | `BS-FUNC-010: one-line function bodies` | n/a | none | — | FUN-05, LEX-04 |
-| BS-FUNC-011 | Anonymous `SUB (parameters)`, body, `END SUB`, same node type as an anonymous function. | PS §FUNCTION (Sub shortcut); anonymous form not shown | unknown | provisional | planned: `anonymous_function` | `BS-FUNC-011: anonymous sub` | n/a | none | — | AMB-22 |
+| BS-FUNC-010 | One-line bodies with `:` (`FUNCTION explode() : THROW "Kaboom!" : END FUNCTION`, `function():return m.xml@title:end function`). | EVT §Optional chaining operators › Notes; CA §Attribute operator, §"m" the BrightScript "this pointer" | baseline | documented | planned: `block` | `BS-FUNC-010: one-line function bodies` | n/a | none | — | FUN-05, LEX-04 |
+| BS-FUNC-011 | Anonymous `SUB (parameters)`, body, `END SUB`, same node type as an anonymous function. Non-normative. | Level 4: BrighterScript @ `01a359c6` `src/parser/Parser.ts` `anonymousFunction()` accepts `sub` and `function` alike with no error diagnostic; L1 shows only `function` | unknown | tolerated | planned: `anonymous_function` | `BS-FUNC-011: anonymous sub` | n/a | none | — | AMB-22. Changes no documented tree. |
 | BS-FUNC-012 | Named declarations nested inside a body. | CA §Scope (named functions are global) | unknown | unresolved | none added — the shared statement list accepts them | n/a — unresolved | n/a | none | — | FUN-06, AMB-27 |
 | BS-FUNC-013 | `m` is an ordinary identifier. | PS §FUNCTION; CA §"m" the BrightScript "this pointer" | baseline | documented | planned: `identifier` | `BS-FUNC-013: m used as an identifier` | n/a | none | — | FUN-08 |
 | BS-FUNC-014 | Function semantics: scope, `m` binding, no closures, Void returns, unused-variable `_` tagging (11.0), stack depth (16.0), function-count limit (5.0). | PS; EVT §Types; CA §Scope; RN | baseline | out-of-scope | none | n/a | n/a | none | — | FUN-06, VER-02, VER-05, VER-21, VER-25 |
@@ -283,9 +298,9 @@ kept so that the record format stays uniform. `—` means no known limitation.
 |---|---|---|---|---|---|---|---|---|---|---|
 | BS-ARRAY-001 | Array literal: `[]`, or comma-separated elements (literals or expressions, nesting allowed) on one line. | EVT §Array literals | baseline | documented | planned: `array_literal` | `BS-ARRAY-001: empty, flat and nested array literals` | `BS-ARRAY-001: array literal missing its closing bracket` (recovery) | none | — | LIT-11 |
 | BS-ARRAY-002 | Multi-line array literal: line breaks after `[`, between elements (with or without commas) and before `]`. | EVT §Array literals | baseline | documented | planned: `array_literal` | `BS-ARRAY-002: multi-line array without commas`<br>`BS-ARRAY-002: multi-line array with commas` | n/a | none | — | LIT-11, LINE-05 |
-| BS-ARRAY-003 | A trailing comma before `]`, on the same line or before the closing line break, is accepted; empty elements (`[1,,2]`) are not. | L1 silent | unknown | provisional | planned: `array_literal` | `BS-ARRAY-003: trailing comma in array literals` | n/a | none | — | ARR-04, AMB-07 |
+| BS-ARRAY-003 | A trailing comma before `]`, on the same line or before the closing line break. Empty elements (`[1,,2]`) have no contractual behaviour. Non-normative. | Level 4: BrighterScript @ `01a359c6` `src/parser/Parser.ts` `arrayLiteral()` stops at `]` after a separator with no error diagnostic; L1 silent | unknown | tolerated | planned: `array_literal` | `BS-ARRAY-003: trailing comma in array literals` | n/a | none | — | ARR-04, AMB-07. Changes no documented tree. |
 | BS-ARRAY-004 | `DIM name[d1, …, dk]` with expression dimensions. | PS §DIM (examples); SS; EVT §Array operator | baseline | documented | planned: `dim_statement` | `BS-ARRAY-004: DIM with one and several dimensions` | n/a | none | — | STM-09, ARR-01 |
-| BS-ARRAY-005 | `DIM name(d1, …, dk)`, the parenthesis form of the PS heading, gives the same node. | PS §DIM (heading) | unknown | provisional | planned: `dim_statement` | `BS-ARRAY-005: DIM with parentheses` | n/a | none | — | AMB-18 |
+| BS-ARRAY-005 | `DIM name(d1, …, dk)`, the form of the PS §DIM heading, gives the same node as the bracket form. | PS §DIM (heading; its examples use brackets) | baseline | documented | planned: `dim_statement` | `BS-ARRAY-005: DIM with parentheses` | n/a | none | — | AMB-18 |
 | BS-ARRAY-006 | Several declarators in one DIM (`dim a[1], b[2]`). | none | unknown | unresolved | none | n/a — unresolved | n/a | none | — | AMB-18 |
 | BS-ARRAY-007 | A comma-separated index list `a[1,2,3]` is one index access with three indexes; it is not rewritten to `a[1][2][3]` (their equivalence is semantic). | EVT §Array operator; PS §DIM | baseline | documented | planned: `index_expression` | `BS-ARRAY-007: multiple indexes in one access` | n/a | none | — | EXP-04, ARR-02 |
 | BS-ARRAY-008 | Array semantics: sizing, growth, `roArray` creation, enumeration. | PS §DIM; EVT §Array operator | baseline | out-of-scope | none | n/a | n/a | none | — | ARR-01 |
@@ -297,7 +312,7 @@ kept so that the record format stays uniform. `—` means no known limitation.
 | BS-AA-001 | Associative-array literal: `{}` or `{ }`, or comma-separated `key: value` entries on one line; keys are identifiers; values are any expression including anonymous functions. | EVT §Associative array literals; PS §Anonymous functions | baseline | documented | planned: `associative_array_literal`, `associative_array_entry` | `BS-AA-001: empty and one-line associative arrays`<br>`BS-AA-001: anonymous functions as values` | `BS-AA-001: associative array missing its closing brace` (recovery) | none | — | LIT-12 |
 | BS-AA-002 | String-literal keys (`{ "Jane Doe": 1001 }`). | EVT §Associative array literals; RN §Roku OS 7.0 | 7.0 | documented | planned: `associative_array_entry` | `BS-AA-002: string keys` | n/a | none | — | LIT-12, VER-09 |
 | BS-AA-003 | Multi-line associative array: line breaks after `{`, between entries (with or without commas) and before `}`. | EVT §Associative array literals; PS §FUNCTION (`obj = { add: add … }`) | baseline | documented | planned: `associative_array_literal` | `BS-AA-003: multi-line associative array without commas`<br>`BS-AA-003: multi-line associative array with commas` | n/a | none | — | LIT-12, LINE-05 |
-| BS-AA-004 | A trailing comma is accepted; empty entries (`{a:1,,b:2}`) are not. | L1 silent | unknown | provisional | planned: `associative_array_literal` | `BS-AA-004: trailing comma in associative arrays` | n/a | none | — | ARR-04, AMB-07 |
+| BS-AA-004 | A trailing comma before `}`, on the same line or before the closing line break. Empty entries (`{a:1,,b:2}`) have no contractual behaviour. Non-normative. | Level 4: BrighterScript @ `01a359c6` `src/parser/Parser.ts` `aaLiteral()` stops at `}` after a separator with no error diagnostic; L1 silent | unknown | tolerated | planned: `associative_array_literal` | `BS-AA-004: trailing comma in associative arrays` | n/a | none | — | ARR-04, AMB-07. Changes no documented tree. |
 | BS-AA-005 | Duplicate keys, key case folding (identifier keys lower-cased; quoted keys case-preserving since Roku OS 8) and lookup semantics. | EVT §Dot operator; RN §Roku OS 8 | baseline | out-of-scope | none | `BS-AA-005: duplicate keys are not rejected` (guard) | n/a | none | — | ARR-03, VER-15 |
 
 ### ERR
@@ -308,7 +323,7 @@ kept so that the record format stays uniform. `—` means no known limitation.
 | BS-ERR-002 | TRY statements nest inside TRY and CATCH bodies. | PS §Nested TRY/CATCH statements | 9.4 | documented | planned: `try_statement` | `BS-ERR-002: nested TRY in TRY and CATCH bodies` | n/a | none | — | ERR-01 |
 | BS-ERR-003 | A CATCH clause without a simple variable: no variable, an index, a member, a literal or an expression. | PS §TRY / CATCH variable / END TRY (listed as not legal) | 9.4 | invalid | planned: `catch_clause` | n/a | `BS-ERR-003: CATCH without a variable`<br>`BS-ERR-003: CATCH with an index`<br>`BS-ERR-003: CATCH with a member`<br>`BS-ERR-003: CATCH with a literal`<br>`BS-ERR-003: CATCH with an expression` | none | — | ERR-01 |
 | BS-ERR-004 | `THROW expression` (string, associative-array literal, variable). | PS §THROW expression; EH §Throwing exceptions | 9.4 | documented | planned: `throw_statement` | `BS-ERR-004: THROW forms` | n/a | none | — | ERR-02 |
-| BS-ERR-005 | `TRY` and `THROW` are keywords at statement start, `CATCH` at statement start inside a TRY body; elsewhere the three words are identifiers. | PS §TRY / CATCH ("not keywords … reserved identifiers"), §THROW ("is a keyword") | 9.4 | provisional | planned: contextual `kw('try')`, `kw('catch')`, `kw('throw')` | `BS-ERR-005: try, catch and throw as identifiers` | n/a | none | — | ERR-03, AMB-02. Known incompatibility: legacy code using them as statement-initial names. |
+| BS-ERR-005 | `TRY` is a keyword at statement start and `CATCH` at statement start directly inside a TRY body; elsewhere both are identifiers, including `catch = 1` inside other bodies. `THROW` is a keyword at statement start; `throw` elsewhere has no contractual behaviour. | PS §TRY / CATCH ("not keywords … reserved identifiers"), §THROW ("is a keyword") | 9.4 | provisional | planned: contextual `kw('try')`, `kw('catch')`, `kw('throw')`; `_try_body` | `BS-ERR-005: try and catch as identifiers` | n/a | none | — | ERR-03, AMB-02. Statement-initial `try` as a name is rejected (Known incompatibilities). |
 | BS-ERR-006 | TRY without CATCH. | PS schematic always shows CATCH | unknown | unresolved | none — the grammar requires CATCH | n/a — unresolved | n/a | none | — | AMB-33 |
 | BS-ERR-007 | Exception object fields, re-throw, `ERR_USER`/`ERR_BAD_THROW`, uncatchable STOP, the minimum-OS declaration, and the rule that a GOTO label may not appear between TRY and CATCH. | PS §TRY / CATCH, §THROW; EH | 9.4 | out-of-scope | none | `BS-ERR-007: label inside a TRY body is not rejected` (guard) | n/a | none | — | ERR-05, ERR-06, AMB-35 |
 
@@ -321,42 +336,43 @@ kept so that the record format stays uniform. `—` means no known limitation.
 | BS-COND-003 | `#else if condition` and `#else` branches. | CC §Uses | unknown | documented | planned: `else_if_directive`, `else_directive` | `BS-COND-003: #else if and #else branches` | n/a | none | — | CC-02 |
 | BS-COND-004 | `#error message`; the message is free text to the end of the line. | CC §Uses | unknown | documented | planned: `error_directive`, `error_message` | `BS-COND-004: #error with free text` | n/a | none | — | CC-03 |
 | BS-COND-005 | Directive words and constant names in any letter case. | CC §Criteria; SS | unknown | documented | planned: directive tokens | `BS-COND-005: directives in mixed case` | n/a | none | — | CC-04, LEX-01 |
-| BS-COND-006 | Directives at file level (wrapping declarations) and inside bodies (wrapping statements); conditional blocks nest. | CC §Uses, §Block comments | unknown | documented | planned: `if_directive` in `statement` | `BS-COND-006: #if around function declarations`<br>`BS-COND-006: nested #if blocks` | n/a | none | — | CC-07, CC-08 |
-| BS-COND-007 | Block-comment idiom: a literal-`false` branch whose content is not BrightScript. Represented per the ADR-0004 spike: PASS → `inactive_text`; FAIL → known limitation KL-001. | CC §Block comments; ADR-0004 | unknown | documented | planned: `if_directive` + `inactive_text` (spike-gated) | `BS-COND-007: block comment with prose`<br>`BS-COND-007: commented-out function` | spike fixtures (`docs/specs/grammar-design.md`) | none | KL-001 (only if the spike fails) | CC-07, AMB-20 |
-| BS-COND-008 | A directive occupies its own line: it may be indented; `#const`, `#if`, `#else if`, `#else` and `#end if` may be followed by a comment; `#` is immediately followed by the directive word; the two words of `#else if`/`#end if` may be separated by spaces or tabs. | L1 silent | unknown | provisional | planned: directive tokens | `BS-COND-008: indented directives with comments` | n/a | none | — | CC-08, AMB-21 |
-| BS-COND-009 | Compact `#elseif`/`#endif`, whitespace between `#` and the word, operators or parentheses in conditions (`#if not DEBUG`), expressions in `#const`. | none; `#if not` was observed only in a Level 4 test description | unknown | unresolved | none | n/a — unresolved | n/a | none | — | CC-02, AMB-21; candidate "`#if not NAME`" |
+| BS-COND-006 | Directives at file level, wrapping function declarations and statements. | CC §Block comments (declaration), §Undefined constants (statement) | unknown | documented | planned: `if_directive` in `statement` | `BS-COND-006: #if around function declarations` | n/a | none | — | CC-07, CC-08 |
+| BS-COND-007 | Block-comment idiom: a literal-`false` branch whose content is not BrightScript. Represented per the ADR-0004 spike: PASS → `inactive_text`; FAIL → known limitation KL-001. Fixture expectations for both outcomes are in the workload matrix. | CC §Block comments; ADR-0004 | unknown | documented | planned: `if_directive` + `inactive_text` (spike-gated) | `BS-COND-007: block comment with prose`<br>`BS-COND-007: commented-out function`<br>`BS-COND-007: spike S3 case variants of #if false`<br>`BS-COND-007: spike S4 #if falsey is code`<br>`BS-COND-007: spike S5 comment after #if false`<br>`BS-COND-007: spike S6 #else after a false branch`<br>`BS-COND-007: spike S7 #else if after a false branch`<br>`BS-COND-007: spike S8 nested block inside a false region`<br>`BS-COND-007: spike S9 directives inside a false region`<br>`BS-COND-007: spike S10 quotes and comments inside a false region`<br>`BS-COND-007: spike S11 #else if false`<br>`BS-COND-007: spike S12 REM-like prose inside a false region` | `BS-COND-007: spike R1 error before a false region` (recovery)<br>`BS-COND-007: spike R2 error after a false region` (recovery)<br>`BS-COND-007: spike R3 false region without #end if` (recovery) | none | KL-001 (only if the spike fails) | CC-07, AMB-20 |
+| BS-COND-008 | A directive occupies its own line: it may be indented (CC §Uses shows an indented `#error`); `#const`, `#if`, `#else if`, `#else` and `#end if` may be followed by a comment; `#` is immediately followed by the directive word; the two words of `#else if`/`#end if` may be separated by spaces or tabs. Code after a directive on the same line (after `:`) has no contractual behaviour. | CC §Uses (indentation); otherwise L1 silent | unknown | provisional | planned: directive tokens | `BS-COND-008: indented directives with comments` | n/a | none | — | CC-08, AMB-21 |
+| BS-COND-009 | Compact `#elseif`/`#endif`, whitespace between `#` and the word, operators or parentheses in conditions (`#if not DEBUG`), expressions in `#const`, constant names that begin with a digit or carry a designator. | none; `#if not` was observed only in a Level 4 test description | unknown | unresolved | none | n/a — unresolved | n/a | none | — | CC-02, CC-04, AMB-21; candidate "`#if not NAME`" |
 | BS-COND-010 | Directives inside expressions or literals, and statements split across branch boundaries. | ADR-0004 consequences | unknown | unresolved | none | n/a — unresolved | n/a | none | — | AMB-20 |
-| BS-COND-011 | Condition evaluation, manifest `bs_const`, undefined constants evaluating to `false` (16.0; earlier a compile error), redefinition, `#error` failing compilation. | CC §Criteria, §Undefined constants, §Manifest constant; RN §Roku OS 16.0 | 16.0 | out-of-scope | none | n/a | n/a | none | — | CC-05, CC-06, VER-24 |
+| BS-COND-011 | Condition evaluation, manifest `bs_const`, undefined constants evaluating to `false` (since 16.0; earlier a compile error), redefinition, `#error` failing compilation. | CC §Criteria, §Undefined constants, §Manifest constant; RN §Roku OS 16.0 | baseline | out-of-scope | none | n/a | n/a | none | — | CC-05, CC-06, VER-24 |
+| BS-COND-012 | Directives inside function and block bodies, and conditional blocks nested in conditional blocks. | L1 silent (CC examples are at file level) | unknown | provisional | planned: `if_directive` in `statement` | `BS-COND-012: #if inside a function body`<br>`BS-COND-012: nested #if blocks` | n/a | none | — | CC-08, AMB-21 |
 
 ## Registry summary
 
 | Area | Rows | documented | provisional | tolerated | unresolved | invalid | out-of-scope |
 |---|---|---|---|---|---|---|---|
-| LEX | 34 | 18 | 9 | 0 | 4 | 1 | 2 |
+| LEX | 35 | 18 | 9 | 1 | 4 | 1 | 2 |
 | LIT | 20 | 15 | 3 | 0 | 2 | 0 | 0 |
 | TYPE | 3 | 1 | 0 | 0 | 1 | 0 | 1 |
-| EXP | 26 | 18 | 3 | 0 | 2 | 2 | 1 |
-| STMT | 38 | 20 | 10 | 0 | 5 | 1 | 2 |
-| FUNC | 14 | 7 | 3 | 0 | 2 | 0 | 2 |
-| ARRAY | 8 | 4 | 2 | 0 | 1 | 0 | 1 |
-| AA | 5 | 3 | 1 | 0 | 0 | 0 | 1 |
+| EXP | 27 | 18 | 2 | 0 | 4 | 2 | 1 |
+| STMT | 39 | 20 | 7 | 4 | 5 | 1 | 2 |
+| FUNC | 14 | 7 | 1 | 1 | 3 | 0 | 2 |
+| ARRAY | 8 | 5 | 0 | 1 | 1 | 0 | 1 |
+| AA | 5 | 3 | 0 | 1 | 0 | 0 | 1 |
 | ERR | 7 | 3 | 1 | 0 | 1 | 1 | 1 |
-| COND | 11 | 7 | 1 | 0 | 2 | 0 | 1 |
-| **Total** | **166** | **96** | **33** | **0** | **20** | **5** | **12** |
+| COND | 12 | 7 | 2 | 0 | 2 | 0 | 1 |
+| **Total** | **170** | **97** | **25** | **8** | **23** | **5** | **12** |
 
-No requirement is `tolerated`: no undocumented variant has Level 2 evidence or
-Level 4 evidence of acceptance as plain BrightScript that was needed.
+The `tolerated` rows cite Level 4 evidence only (grammar-contract §3.3); none
+changes a documented tree, and each is non-normative.
 
 ## Known incompatibilities
 
 The grammar follows the current documentation (ADR-0003). Older meanings of
 the same text:
 
-| Text | Older meaning | Current parse | Requirement |
-|---|---|---|---|
-| `IF x?("Hello")` ending its line | single-line IF printing `Hello` | block IF with an optional call | BS-LEX-032 |
-| statement-initial `try`, `catch`, `throw` used as names | identifiers (before Roku OS 9.4) | statement keywords; ERROR for assignment or call forms | BS-ERR-005 |
-| statement-initial `continue` used as a name | identifier (before Roku OS 11.5) | statement keyword | BS-LEX-025 |
+| Text | Older or alternative reading | Current parse | Basis | Requirement |
+|---|---|---|---|---|
+| `IF x?("Hello")` ending its line | single-line IF printing `Hello` (older firmware) | block IF with an optional call | L1 states the change | BS-LEX-032 |
+| statement-initial `try`, `throw` used as names (`try = 1`, `throw = 1`) | identifiers (before Roku OS 9.4; L1 asks such code to be rewritten) | statement keywords, so the line is an error | provisional choice | BS-ERR-005, BS-LEX-025 |
+| statement-initial `continue`, `library` used as names | identifiers (L1 says nothing about these words as names) | statement keywords, so the line is an error | provisional choice | BS-LEX-025 |
 
 ## Reconciliation
 
@@ -365,15 +381,22 @@ the same text:
 | Page | Sections inspected | Requirements derived | Sections excluded (reason) |
 |---|---|---|---|
 | LR | whole page | none | overview and authority statement only |
-| SS | statement list; case note; colon note and examples | BS-LEX-001, 010; BS-STMT-007, 024 | — |
-| PS | DIM; variable = expression; END; STOP; GOTO label; RETURN; FOR; FOR EACH; WHILE; CONTINUE; TRY / CATCH; Nested TRY/CATCH; THROW; REM; IF (single line); Block IF; PRINT item list (TAB, POS); FUNCTION; Anonymous functions | BS-LEX-005, 013, 027; BS-STMT-001, 003, 005, 007, 010, 012, 013, 015–019, 023–025, 027, 029, 030, 036; BS-FUNC-001, 002, 005, 009, 013; BS-ARRAY-004, 005, 007; BS-ERR-001–005; BS-TYPE-001 | exception-object and backtrace tables, Maximum stack depth, `m` binding paragraphs, print zones and number formatting (runtime; BS-ERR-007, BS-FUNC-014, BS-STMT-038) |
-| EVT | Identifiers; Types; Comments › In BrightScript; Literals (string, numeric, source, function, array, associative array); Type declaration characters; Operators table; Function call, Dot, Array, Optional chaining (Notes, Support details), Exponentiation, Negation, Multiplicative, Additive, Increment and decrement, Mathematical and bitshift assignment, Integer bitshift, Comparison, Logical and bitwise, `=` operator | BS-LEX-001, 012, 015–018, 021, 026, 029–032; BS-LIT-001–012, 014–017, 019, 020; BS-EXP-001–021; BS-STMT-001–004; BS-ARRAY-001, 002, 007; BS-AA-001–003 | Comments › In XML (XML files); Dynamic vs. object types, Type conversion, Effects of type conversions (runtime; BS-TYPE-003); lookup case rules (BS-AA-005); short-circuit evaluation and operator results (BS-EXP-026) |
-| RW | reserved-word list | BS-LEX-021–023; BS-STMT-020, 034; BS-FUNC-003 | — |
-| CC | introduction; Criteria; Undefined constants; Defining a constant; Manifest constant; Uses; Block comments | BS-COND-001–009 | manifest syntax and evaluation rules (BS-COND-011) |
-| EH | Catching and handling; Throwing exceptions; Invalid throws; Re-throwing; Handling only some errors; Miscellaneous examples | BS-ERR-001, 004; BS-LEX-024 (`function` as a key); BS-LIT-008 (`1e1000000`); BS-STMT-031 (LIBRARY) | exception object, error number, backtrace, custom fields (runtime; BS-ERR-007); console and crash-dump transcripts (not source) |
-| RN | all 44 release sections | `since` values of BS-LEX-018, 029, 030; BS-LIT-011, 016; BS-TYPE-001; BS-EXP-007–010, 014, 016; BS-STMT-002, 003, 019; BS-AA-002; BS-ERR-001–005; BS-COND-011 | component, SceneGraph, media, DRM, tooling and platform entries (not language) |
-| CA | Use of wrapper functions on intrinsic types; Dot operator; Attribute operator; Scope; Creating and using intrinsic objects; Script libraries | BS-LIT-014; BS-EXP-004, 006, 012, 021, 022; BS-LEX-004, 027; BS-FUNC-006, 009, 010; BS-STMT-031, 033 | component model, statements working with interfaces, garbage collection, events, threading, XML namespaces, bslCore function list (runtime or API) |
-| RF | all function sections | BS-LEX-022; BS-LIT-019 | function behaviour, deprecations (API) |
+| SS | statement list; case note; colon note and examples | BS-LEX-001, 002, 005, 009, 010, 013, 031; BS-STMT-007, 018, 024, 027, 029, 030; BS-FUNC-001; BS-ARRAY-004; BS-COND-005 | — |
+| PS | DIM; variable = expression; END; STOP; GOTO label; RETURN; FOR; FOR EACH; WHILE; CONTINUE; TRY / CATCH; Nested TRY/CATCH; THROW; REM; IF (single line); Block IF; PRINT item list (TAB, POS); FUNCTION; Anonymous functions | BS-LEX-002, 004, 005, 009, 010, 012, 013, 017, 021, 022, 025, 027; BS-TYPE-001; BS-EXP-001; BS-STMT-001, 003, 005, 007, 010, 012, 013, 015–019, 023–025, 027–030, 036–038; BS-FUNC-001, 002, 005, 008, 009, 013, 014; BS-ARRAY-004, 005, 007, 008; BS-AA-001, 003; BS-ERR-001–007 | exception-object and backtrace tables, Maximum stack depth, `m` binding paragraphs, print zones and number formatting (runtime; BS-ERR-007, BS-FUNC-014, BS-STMT-038) |
+| EVT | Identifiers; Types; Comments › In BrightScript; Literals (string, numeric, source, function, array, associative array); Type declaration characters; Operators table; Function call, Dot, Array, Optional chaining (Notes, Support details), Exponentiation, Negation, Multiplicative, Additive, Increment and decrement, Mathematical and bitshift assignment, Integer bitshift, Comparison, Logical and bitwise, `=` operator | BS-LEX-001, 009, 012, 013, 015–019, 021, 024–026, 029–032, 035; BS-LIT-001–005, 007–009, 011–013, 015–017, 019, 020; BS-TYPE-002, 003; BS-EXP-001–005, 007–021, 026; BS-STMT-001–003, 005, 008; BS-FUNC-010, 014; BS-ARRAY-001, 002, 004, 007, 008; BS-AA-001–003, 005 | Comments › In XML (XML files); Dynamic vs. object types, Type conversion, Effects of type conversions (runtime; BS-TYPE-003); lookup case rules (BS-AA-005); short-circuit evaluation and operator results (BS-EXP-026) |
+| RW | reserved-word list | BS-LEX-021–023, 025; BS-LIT-019; BS-STMT-020, 021, 034; BS-FUNC-002, 003 | — |
+| CC | introduction; Criteria; Undefined constants; Defining a constant; Manifest constant; Uses; Block comments | BS-LEX-001, 009; BS-COND-001–008, 011, 012 | manifest syntax and evaluation rules (BS-COND-011) |
+| EH | Catching and handling; The backtrace; Throwing exceptions; Invalid throws; Re-throwing; Reacting to an error without handling it; Handling only some errors; Miscellaneous examples | BS-LEX-024; BS-LIT-005, 008; BS-STMT-007, 031; BS-ERR-004, 007 | exception object, error number, backtrace fields, custom fields (runtime; BS-ERR-007); console and crash-dump transcripts (not source) |
+| RN | all 44 release sections | `since` values of BS-LEX-018, 029, 030; BS-LIT-011, 016; BS-EXP-007–010, 014, 016; BS-STMT-002, 003, 019; BS-AA-002; BS-ERR-001–005; version notes of BS-TYPE-001, BS-COND-011, BS-FUNC-014 and BS-AA-005 | component, SceneGraph, media, DRM, tooling and platform entries (not language) |
+| CA | Use of wrapper functions on intrinsic types; Dot operator; Attribute operator; Scope; "m" the BrightScript "this pointer"; Creating and using intrinsic objects; Script libraries | BS-LEX-004, 025, 027, 033; BS-LIT-012, 014; BS-TYPE-003; BS-EXP-004, 006, 012, 022, 026, 027; BS-STMT-005, 007, 031, 033, 037; BS-FUNC-006, 010, 012–014 | component model, intrinsic types and object types, statements working with interfaces, garbage collection, events, threading, XML namespaces, bslCore function list (runtime or API) |
+| RF | all function sections | BS-LEX-022; BS-LIT-005, 019 | function behaviour, deprecations (API) |
+
+Official code that is not valid source as printed and is never used as a
+fixture: PS §WHILE `print "loop once".` (trailing period); RF §Run
+`BreakIfRunError(LINE_NUM)     stop` (two statements without a separator); CA
+§Attribute operator adjacent operands (BS-EXP-022); EVT §Identifiers bare
+identifier list (`a`, `boy5`, `super_man$`); program output and console
+transcripts in PS §PRINT item list, CA and EH.
 
 ### Research inventory → requirements
 
@@ -390,7 +413,7 @@ is a requirement with that status.
 | LEX-02 | promoted | BS-LEX-002, 003, 004 |
 | LEX-03 | promoted | BS-LEX-005, 006, 007 |
 | LEX-04 | promoted | BS-LEX-010, 011 |
-| LEX-05 | combined | BS-LEX-005, BS-EXP-023, 024, BS-FUNC-006, BS-ARRAY-002, BS-AA-003 |
+| LEX-05 | combined | BS-LEX-005, BS-EXP-023, 024, BS-FUNC-006, 007, BS-ARRAY-002, BS-AA-003 |
 | LEX-06 | promoted | BS-LEX-012, 013 |
 | LEX-07 | promoted | BS-LEX-015, 016, 026 |
 | LEX-08 | promoted | BS-LEX-017, 018, 019, 020 |
@@ -398,7 +421,7 @@ is a requirement with that status.
 | LEX-10 | promoted | BS-LEX-025 |
 | LEX-11 | promoted | BS-LEX-027, 028 |
 | LEX-12 | combined | BS-LEX-029, BS-EXP-006, 011–019, BS-STMT-002 |
-| LEX-13 | promoted | BS-LEX-031, 032 |
+| LEX-13 | promoted | BS-LEX-031, 032, 035 |
 | LEX-14 | promoted | BS-LIT-019 |
 | LIT-01 | promoted | BS-LIT-001 |
 | LIT-02 | promoted | BS-LIT-002 |
@@ -424,7 +447,7 @@ is a requirement with that status.
 | EXP-05 | promoted | BS-EXP-006 |
 | EXP-06 | promoted | BS-EXP-007–010 |
 | EXP-07 | promoted | BS-EXP-011 |
-| EXP-08 | promoted | BS-EXP-012 |
+| EXP-08 | promoted | BS-EXP-012, 027 |
 | EXP-09 | promoted | BS-EXP-013, 014 |
 | EXP-10 | promoted | BS-EXP-015 |
 | EXP-11 | promoted | BS-EXP-016 |
@@ -445,7 +468,7 @@ is a requirement with that status.
 | STM-05 | promoted | BS-STMT-016, 017 |
 | STM-06 | promoted | BS-STMT-019 |
 | STM-07 | promoted | BS-STMT-023 |
-| STM-08 | promoted | BS-STMT-024, 025, 026 |
+| STM-08 | promoted | BS-STMT-024, 025, 026, 039 |
 | STM-09 | promoted | BS-ARRAY-004, 005 |
 | STM-10 | promoted | BS-STMT-027 |
 | STM-11 | promoted | BS-STMT-029 |
@@ -467,7 +490,7 @@ is a requirement with that status.
 | ARR-01 | duplicate | of STM-09, LIT-11, LIT-12 |
 | ARR-02 | duplicate | of EXP-03, EXP-04, EXP-06 |
 | ARR-03 | out-of-scope | BS-AA-005 (key syntax is LIT-12) |
-| ARR-04 | provisional | BS-ARRAY-003, BS-AA-004 |
+| ARR-04 | tolerated | BS-ARRAY-003, BS-AA-004 |
 | ERR-01 | promoted | BS-ERR-001, 003, 006 |
 | ERR-02 | promoted | BS-ERR-004 |
 | ERR-03 | provisional | BS-ERR-005 |
@@ -481,23 +504,23 @@ is a requirement with that status.
 | CC-05 | out-of-scope | BS-COND-011 |
 | CC-06 | out-of-scope | BS-COND-011 |
 | CC-07 | promoted | BS-COND-007 |
-| CC-08 | promoted | BS-COND-006, 008 |
+| CC-08 | promoted | BS-COND-006, 008, 012 |
 | LINE-01 | combined | BS-LEX-005, 006 |
 | LINE-02 | duplicate | of LEX-04 |
 | LINE-03 | promoted | BS-LEX-009 |
 | LINE-04 | provisional | BS-LEX-008 |
 | LINE-05 | combined | BS-ARRAY-002, BS-AA-003, BS-FUNC-006, BS-EXP-024 |
-| LINE-06 | provisional | BS-LEX-033, 034 |
+| LINE-06 | promoted | BS-LEX-033, 034 |
 
 | Disposition | Items |
 |---|---|
-| promoted | 74 |
+| promoted | 75 |
 | combined | 8 |
 | duplicate | 7 |
 | out-of-scope | 6 |
-| provisional | 4 |
+| provisional | 2 |
 | unresolved | 3 |
-| tolerated | 0 |
+| tolerated | 1 |
 | rejected as an erroneous research interpretation | 0 |
 | **Total** | **102** |
 
@@ -511,27 +534,27 @@ MINOR change before 1.0 when a public shape changes (tree-schema versioning).
 | Entry | Requirements | Current evidence | Grammar impact | Disposition | Implementation behaviour | L2 may revise |
 |---|---|---|---|---|---|---|
 | AMB-01 | BS-LEX-021–024 | RW list; built-ins called in RF; `function` used as a key in EH | keyword recognition | PROVISIONAL-GRAMMAR-CHOICE | contextual keyword extraction; no `reserved` word sets; keywords allowed as member names and keys | yes |
-| AMB-02 | BS-LEX-025, BS-ERR-005 | PS keyword notes; RW omissions | keyword recognition | PROVISIONAL-GRAMMAR-CHOICE | non-reserved syntax words are contextual | yes |
+| AMB-02 | BS-LEX-025, BS-ERR-005 | PS keyword notes; RW omissions | keyword recognition | PROVISIONAL-GRAMMAR-CHOICE | non-reserved syntax words are contextual; the TRY body is a separate rule so `catch` is a keyword only there | yes |
 | AMB-03 | BS-STMT-010, 020, 021, 022; BS-FUNC-003; BS-ERR-001 | RW compact words; PS `ENDIF`, `ELSEIF`, `ENDTRY` | terminator tokens | PROVISIONAL-GRAMMAR-CHOICE | documented and reserved compact words accepted; `ENDFOR`/`EXITFOR`/`FOREACH` not; multi-word forms are separate tokens | yes |
 | AMB-04 | BS-STMT-007, 008, 011 | PS optional THEN; EVT comment case | IF form selection | PROVISIONAL-GRAMMAR-CHOICE | token after condition decides the form | yes |
 | AMB-05 | BS-STMT-009 | SS colon example | single-line IF shape | PROVISIONAL-GRAMMAR-CHOICE | nearest-IF ELSE; defined inline statement set | yes |
 | AMB-06 | BS-STMT-013, 014 | PS bare NEXT | terminator | RESOLVED-DOCUMENTED | bare NEXT accepted; `NEXT var` has no rule (unresolved) | yes (`NEXT var` only) |
-| AMB-07 | BS-LEX-005–008, BS-EXP-023, 024, BS-FUNC-006, 007, BS-ARRAY-002, 003, BS-AA-003, 004 | multi-line literals; one parameter-list example | line model | PROVISIONAL-GRAMMAR-CHOICE | newlines are tokens; allowed only where listed | yes |
-| AMB-08 | BS-LEX-010, 011, 027, 028; BS-STMT-035 | label definition; colon separator | label and separator shape | PROVISIONAL-GRAMMAR-CHOICE | labels end their line; runs of separators allowed | yes |
+| AMB-07 | BS-LEX-005–008, BS-EXP-023, 024, BS-FUNC-006, 007, BS-ARRAY-002, 003, BS-AA-003, 004 | multi-line literals; one parameter-list example | line model | PROVISIONAL-GRAMMAR-CHOICE | newlines are tokens, allowed inside literals and after a parameter-list comma; breaks in argument lists and after operators have no rule; trailing commas tolerated | yes |
+| AMB-08 | BS-LEX-010, 011, 027, 028; BS-STMT-035 | label definition; colon separator | label and separator shape | PROVISIONAL-GRAMMAR-CHOICE | labels end their line; separator runs tolerated | yes |
 | AMB-09 | BS-LEX-015–020 | identifier rules; designator table | identifier token | PROVISIONAL-GRAMMAR-CHOICE | designator is part of the identifier token everywhere | yes |
 | AMB-10 | BS-LIT-004–014 | numeric examples | number token | PROVISIONAL-GRAMMAR-CHOICE | planned `number` token shape | yes |
 | AMB-11 | BS-LIT-015–018, BS-LEX-033, 034 | only `""` documented | string token, encoding | PROVISIONAL-GRAMMAR-CHOICE | no escapes other than `""`; UTF-8 | yes |
 | AMB-12 | BS-LEX-013, 014 | REM prose | comment token | PROVISIONAL-GRAMMAR-CHOICE | whole-word REM followed by space, tab or line end | yes |
-| AMB-13 | BS-EXP-011–021 | precedence table and prose | precedence | PROVISIONAL-GRAMMAR-CHOICE | official order; postfix level includes `@` | yes (`@`, postfix only) |
+| AMB-13 | BS-EXP-011–021, 027 | precedence table and prose | precedence | PROVISIONAL-GRAMMAR-CHOICE | official order; postfix level includes `@`; prefix operators as right operands | yes (`@`, postfix, prefix-right only) |
 | AMB-14 | BS-STMT-002 | RN 7.1 list, EVT examples | compound operators | RESOLVED-DOCUMENTED | exactly seven operators | no |
-| AMB-15 | BS-STMT-003, 004 | postfix statement examples | update statement | PROVISIONAL-GRAMMAR-CHOICE | postfix statement on assignment targets | yes |
-| AMB-16 | BS-LEX-029–032, BS-EXP-007–010 | EVT notes and support details | `?` tokenization | RESOLVED-DOCUMENTED | indivisible tokens + context-aware lexing | yes (edge spellings) |
-| AMB-17 | BS-STMT-024–026 | PRINT prose and examples | PRINT list | PROVISIONAL-GRAMMAR-CHOICE | maximal-munch items, empty PRINT | yes |
+| AMB-15 | BS-STMT-003, 004 | postfix statement examples | update statement | TOLERATED | postfix statement on variables (documented) and on member and index targets (Level 4) | yes |
+| AMB-16 | BS-LEX-029–032, 035, BS-EXP-007–010 | EVT notes and support details | `?` tokenization | RESOLVED-DOCUMENTED | indivisible tokens + context-aware lexing; `?[` at statement start is provisional | yes (edge spellings) |
+| AMB-17 | BS-STMT-024–026, 039 | PRINT prose and examples | PRINT list | PROVISIONAL-GRAMMAR-CHOICE | maximal-munch items; empty PRINT tolerated | yes |
 | AMB-18 | BS-ARRAY-004–006 | heading vs examples | DIM | PROVISIONAL-GRAMMAR-CHOICE | brackets and parentheses; one declarator | yes |
 | AMB-19 | BS-STMT-031, 032 | one top-of-file example | top-level shape | PROVISIONAL-GRAMMAR-CHOICE | LIBRARY is an ordinary statement | yes |
 | AMB-20 | BS-COND-007 | block-comment idiom | CC body shape | PROVISIONAL-GRAMMAR-CHOICE (spike-gated) | ADR-0004 spike decides; FAIL ⇒ KNOWN-LIMITATION KL-001 | no (design decision) |
-| AMB-21 | BS-COND-001–005, 008, 009 | documented spellings only | directive tokens | PROVISIONAL-GRAMMAR-CHOICE | documented spellings; conditions are names or booleans | yes |
-| AMB-22 | BS-FUNC-011 | Sub shortcut prose | anonymous sub | PROVISIONAL-GRAMMAR-CHOICE | accepted, same node as anonymous function | yes |
+| AMB-21 | BS-COND-001–005, 008, 009, 012 | documented spellings only | directive tokens | PROVISIONAL-GRAMMAR-CHOICE | documented spellings; conditions are names or booleans; directives placed like statements | yes |
+| AMB-22 | BS-FUNC-011 | Sub shortcut prose | anonymous sub | TOLERATED | accepted on Level 4 evidence, same node as anonymous function | yes |
 | AMB-23 | BS-STMT-034 | RW only | none | FUTURE-L2 | no rule | yes |
 | AMB-24 | BS-LEX-022, 023 | RW only | none | OUT-OF-SCOPE | `ObjFun` is an ordinary identifier | yes (reservation only) |
 | AMB-25 | BS-STMT-029 | PS END | END vs END X | RESOLVED-DOCUMENTED | one-token lookahead after `end` | no |
@@ -551,12 +574,16 @@ MINOR change before 1.0 when a public shape changes (tree-schema versioning).
 | Disposition | AMB entries | Session 01 candidates |
 |---|---|---|
 | RESOLVED-DOCUMENTED | 4 | 0 |
-| PROVISIONAL-GRAMMAR-CHOICE | 22 | 1 |
-| TOLERATED | 0 | 0 |
+| PROVISIONAL-GRAMMAR-CHOICE | 20 | 1 |
+| TOLERATED | 2 | 0 |
 | OUT-OF-SCOPE | 5 | 0 |
 | KNOWN-LIMITATION | 0 (KL-001 contingent under AMB-20) | 0 |
 | FUTURE-L2 | 4 | 1 |
 | **Total** | **35** | **2** |
+
+Where the requirements of one entry have different statuses, the disposition
+names the governing choice and the behaviour column names the `tolerated` or
+`unresolved` parts.
 
 ### Versioned changes → `since`
 
@@ -565,7 +592,7 @@ version below was re-checked against the release-notes snapshot.
 
 | Research label | Roku OS | Change | Kind | Requirements / disposition |
 |---|---|---|---|---|
-| VER-01 | 3.0 | typed parameters and returns | syntax | BS-TYPE-001 `since` 3.0 |
+| VER-01 | 3.0 | typed values in parameters and returns | runtime semantic (the syntax predates it) | BS-TYPE-001 `since` baseline |
 | VER-02 | 3.0 | stricter runtime checks | runtime | BS-FUNC-014 |
 | VER-03 | 3.0 | `GetGlobalAA()` | API | none; name covered by BS-LEX-022 |
 | VER-04 | 3.0 | `Type(x, version)` | API | none |
@@ -591,12 +618,16 @@ version below was re-checked against the release-notes snapshot.
 | VER-24 | 16.0 | undefined CC constants are `false` | compile-time semantic | BS-COND-011 |
 | VER-25 | 16.0 | stack depth 8192 | resource | BS-FUNC-014 |
 | VER-26 | not stated | `NEXT` legacy terminator | syntax (spelling) | BS-STMT-013 `since` baseline |
-| VER-27 | not stated | conditional compilation introduced | syntax | BS-COND-001–008 `since` unknown |
+| VER-27 | not stated | conditional compilation introduced | syntax | BS-COND-001–008, 012 `since` unknown |
 | VER-28 | not stated | `Eval` deprecated | API | none |
 | VER-29 | not stated | `Run` deprecated | API | none; name covered by BS-LEX-022 |
 
-Syntax-relevant entries: 14 (VER-01, 06–12, 18–20, 22, 26, 27), all mapped. No
+Syntax-relevant entries: 13 (VER-06–12, 18–20, 22, 26, 27), all mapped. No
 semantic change is implemented as a parser mode.
 
-The research summary and the snapshot agree for every entry; no correction was
-needed.
+Correction to the research note: VER-01 was classified there as a parser
+syntax change. The Roku OS 3.0 compatibility note says return statements that
+return "a different type than specified in the function declaration" may have
+run in v2.0, so declared types existed before 3.0; the `AS` syntax therefore has
+no established boundary (`baseline`) and VER-01 is a semantic change. All other
+entries agree with the snapshot.

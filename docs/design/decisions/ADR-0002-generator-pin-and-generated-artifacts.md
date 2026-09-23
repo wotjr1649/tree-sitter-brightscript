@@ -55,11 +55,16 @@ fallback order; it does not change decisions 1–7. The session that first runs
 
 1. **Eligible releases.** Tags `vX.Y.Z` of `tree-sitter/tree-sitter` that are
    GitHub releases, not drafts or pre-releases, with `X.Y.Z` ≥ 0.26.0 and a
-   `tree-sitter-cli` npm package of the same version. 0.26.0 is the first
-   stable line whose test runner supports the `:cst` attribute used by the
-   fixture catalogue; `reserved()` and `--abi` exist from 0.25.0 (Level 3,
-   the tree-sitter clone at those tags). Order: descending semantic version.
-   The first is the candidate.
+   `tree-sitter-cli` npm package of the same version. 0.26.0 is the oldest
+   stable line whose DSL, test runner and CLI behaviour were checked while the
+   grammar design was frozen (Level 3, the tree-sitter clone at tags
+   `v0.26.0`, `v0.26.13`, `v0.27.0`; the one difference found, trailing-CR
+   handling in the corpus runner, is neutralised by how byte fixtures are
+   written, grammar-design §2); 0.25.x lacks the `:cst` test attribute and was
+   not checked further, so it is not eligible. Order: descending semantic
+   version. The first is the candidate. If the release list cannot be read
+   (no network), the procedure is `BLOCKED` and the user is told what is
+   missing; no version is guessed.
 2. **Issue review.** For every issue listed in this ADR (#5910, #5925) and
    every open issue that names the candidate version in its title and is
    labelled as a bug, record number, state and whether it concerns the
@@ -67,13 +72,20 @@ fallback order; it does not change decisions 1–7. The session that first runs
    [upstream-sources.md](../../provenance/upstream-sources.md). The review
    does not reject a candidate by itself; step 6 decides materiality.
 3. **Identity.** Install `tree-sitter-cli@X.Y.Z` exactly (no range) as a
-   devDependency with a lockfile. The SHA-256 of the installed binary must
-   equal the digest of the matching platform asset of GitHub release
-   `vX.Y.Z` (the API `digest` field, or the SHA-256 of that asset downloaded
-   from the release). A mismatch fails the candidate.
-4. **Capability smoke.** With `--abi 15`, generate the bootstrap grammar and
-   run a smoke corpus containing one `:cst` fixture and one CRLF byte fixture
-   (under `test/corpus/bytes/`). Both must pass.
+   devDependency with a lockfile. The npm installer downloads the gzip-compressed
+   platform asset `tree-sitter-<platform>-<arch>.gz` of GitHub release
+   `vX.Y.Z` and decompresses it (`crates/cli/npm/install.js` @ `v0.27.0`), so
+   the check has two parts: (a) the SHA-256 of that `.gz` asset, downloaded
+   from the release, equals the release's published digest (the API `digest`
+   field); (b) the SHA-256 of the decompressed asset equals the SHA-256 of the
+   binary npm installed. Both are recorded for the platform the session runs
+   on; other platforms are recorded when a CI or another machine first uses
+   the pin. A mismatch fails the candidate.
+4. **Capability smoke.** With `--abi 15`, generate the bootstrap grammar
+   (comments and line terminators only) and run the registry fixtures that use
+   nothing else: `BS-LEX-006: CRLF between comment lines` (under
+   `test/corpus/bytes/`), `BS-LEX-008: empty file` and
+   `BS-LEX-008: only comments and blank lines`. They must pass.
 5. **Determinism.** Generate twice from a clean tree; every generated file
    (`src/parser.c`, `src/grammar.json`, `src/node-types.json`,
    `src/tree_sitter/*`) must be byte-identical between the runs.

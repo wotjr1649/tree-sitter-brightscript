@@ -67,14 +67,17 @@ Designed in Session 02 from the requirement registry
 ([language-conformance.md](language-conformance.md)); planned rule families are
 in [grammar-design.md](grammar-design.md). **A planned node is not a released
 public node.** A difference found at reconciliation is resolved by changing the
-grammar to match this schema, or by changing this section with a recorded
-reason in the same commit.
+grammar until it produces this schema; this section changes only where the
+generator cannot produce the planned shape, with the reason recorded in the
+same commit.
 
 Names follow Tree-sitter's standard rule names (`source_file`, `block`,
 `identifier`, `string`, `comment`, `type`; Level 3, "Standard Rule Names") and
 the `*_statement`, `*_expression`, `*_clause` and `*_list` conventions of
-official grammars; the remaining names are the construct names used by the
-Roku documentation. No name is taken from the legacy grammar or BrighterScript.
+official grammars; the remaining names describe the construct, using the Roku
+documentation's term where it has one (`update_statement` covers Roku's
+"increment and decrement operators" with one name). No name is taken from the
+legacy grammar or BrighterScript.
 
 ### Supertypes
 
@@ -104,13 +107,13 @@ or more. Unnamed children are named nodes without a field.
 | `associative_array_literal` | — | `associative_array_entry`* | BS-AA-001–004 | — |
 | `associative_array_entry` | `key: identifier or string`, `value: expression` | — | BS-AA-001, 002, BS-LEX-024 | highlight (key) |
 | `parenthesized_expression` | — | `expression` | BS-EXP-002 | — |
-| `unary_expression` | `operator: - + not`, `operand: expression` | — | BS-LIT-004, BS-EXP-012, 018 | highlight (operator) |
-| `binary_expression` | `left: expression`, `operator: ^ * / \ mod + - << >> = <> < > <= >= and or`, `right: expression` | — | BS-EXP-011–020 | highlight (operator) |
+| `unary_expression` | `operator: - + not`, `operand: expression` | — | BS-LIT-004, BS-EXP-012, 018, 027 | highlight (operator) |
+| `binary_expression` | `left: expression`, `operator: ^ * / \ mod + - << >> = <> < > <= >= and or`, `right: expression` | — | BS-EXP-011–020, 027 | highlight (operator) |
 | `call_expression` | `function: identifier, member_expression, index_expression, call_expression, attribute_expression or parenthesized_expression`, `arguments: argument_list` | — | BS-EXP-003, 007, 010, BS-STMT-005, BS-LEX-022, 032 | highlight, tags (calls) |
-| `argument_list` | — | `expression`* | BS-EXP-003, 024 | — |
-| `member_expression` | `object: expression`, `property: identifier` | — | BS-EXP-004, 007, BS-LIT-014, BS-LEX-024 | highlight (property) |
-| `index_expression` | `object: expression`, `index: expression`+ | — | BS-EXP-005, 007, BS-ARRAY-007 | — |
-| `attribute_expression` | `object: expression`, `attribute: identifier` | — | BS-EXP-006, 007 | highlight (attribute) |
+| `argument_list` | — | `expression`* | BS-EXP-003 | — |
+| `member_expression` | `object: identifier, parenthesized_expression, call_expression, member_expression, index_expression, attribute_expression, number or string`, `property: identifier` | — | BS-EXP-004, 007, BS-LIT-014, BS-LEX-024 | highlight (property) |
+| `index_expression` | `object: identifier, parenthesized_expression, call_expression, member_expression, index_expression or attribute_expression`, `index: expression`+ | — | BS-EXP-005, 007, BS-ARRAY-007 | — |
+| `attribute_expression` | `object: identifier, parenthesized_expression, call_expression, member_expression, index_expression or attribute_expression`, `attribute: identifier` | — | BS-EXP-006, 007 | highlight (attribute) |
 | `anonymous_function` | `parameters: parameter_list`, `return_type: type`?, `body: block` | — | BS-FUNC-009–011 | highlight |
 | `assignment_statement` | `left: identifier, member_expression or index_expression`, `operator: = += -= *= /= \= <<= >>=`, `right: expression` | — | BS-STMT-001, 002, BS-EXP-010 | — |
 | `update_statement` | `operand: identifier, member_expression or index_expression`, `operator: ++ --` | — | BS-STMT-003, 004 | — |
@@ -124,7 +127,7 @@ or more. Unnamed children are named nodes without a field.
 | `exit_statement` | — | — | BS-STMT-018, 020 | highlight |
 | `continue_statement` | — | — | BS-STMT-019 | highlight |
 | `return_statement` | `value: expression`? | — | BS-STMT-023 | — |
-| `print_statement` | — | `expression`* | BS-STMT-024–026, BS-LEX-031 | — |
+| `print_statement` | — | `expression`* | BS-STMT-024–026, 039, BS-LEX-031, 035 | — |
 | `dim_statement` | `name: identifier`, `dimension: expression`+ | — | BS-ARRAY-004, 005 | — |
 | `goto_statement` | `label: identifier` | — | BS-STMT-027 | tags (label reference) |
 | `label_statement` | `name: identifier` | — | BS-LEX-027, 028 | highlight, tags |
@@ -135,11 +138,11 @@ or more. Unnamed children are named nodes without a field.
 | `try_statement` | `body: block`, `handler: catch_clause` | — | BS-ERR-001, 002 | — |
 | `catch_clause` | `variable: identifier`, `body: block` | — | BS-ERR-001 | — |
 | `function_declaration` | `name: identifier`, `parameters: parameter_list`, `return_type: type`?, `body: block` | — | BS-FUNC-001–003 | highlight, tags (definition) |
-| `parameter_list` | — | `parameter`* | BS-FUNC-005–007 | — |
+| `parameter_list` | — | `parameter`* | BS-FUNC-005, 006 | — |
 | `parameter` | `name: identifier`, `default: expression`?, `type: type`? | — | BS-FUNC-005 | highlight |
 | `type` | — | — | BS-TYPE-001 | highlight |
 | `const_directive` | `name: identifier`, `value: identifier, true or false` | — | BS-COND-001 | highlight |
-| `if_directive` | `condition: identifier, true or false`, `consequence: block or inactive_text`, `alternative: else_if_directive* else_directive?` | — | BS-COND-002, 006, 007 | highlight |
+| `if_directive` | `condition: identifier, true or false`, `consequence: block or inactive_text`, `alternative: else_if_directive* else_directive?` | — | BS-COND-002, 006, 007, 012 | highlight |
 | `else_if_directive` | `condition: identifier, true or false`, `consequence: block or inactive_text` | — | BS-COND-003, 007 | highlight |
 | `else_directive` | `body: block` | — | BS-COND-003 | highlight |
 | `error_directive` | `message: error_message`? | — | BS-COND-004 | highlight |
@@ -155,11 +158,36 @@ conditional, 2 supertypes, 33 field names.
 Rules applied: every node cites at least one requirement; `block`,
 `argument_list` and `parameter_list` are public because fields point to them
 and queries match them, not for parser convenience; hidden helpers
-(`_terminator`, `_newline`, `_inline_block`, the statement-level chains, the
-optional-chaining variants, `_sep`, `_cc_condition`, `_inactive_line`) stay
-internal; punctuation and keywords stay anonymous. Every planned node and
-field is intended to survive to 1.0; `inactive_text` is the only planned node
-whose existence depends on an experiment.
+(`_terminator`, `_newline`, `_inline_block`, `_inline_statement`,
+`_try_body`, `_try_line`, `_postfix_operand`, `_assignment_target`, the statement-level
+chains, the optional-chaining variants, `_sep`, `_cc_condition`,
+`_inactive_line`, `_inactive_if`) stay internal; punctuation, keywords and the
+single-token block terminators stay anonymous. `exit_statement` and
+`continue_statement` have no field for the loop kind: it is the anonymous
+keyword token (`for`, `while` or `exitwhile`), and a field would point at
+tokens of different shapes. Every planned node and field is intended to
+survive to 1.0; `inactive_text` is the only planned node whose existence
+depends on an experiment.
+
+### Placement rules
+
+These rules make every expected tree derivable from the input without running
+a parser:
+
+- A `block` starts at the terminator that ends its header (the newline or
+  `:`), so its range includes that terminator and ends after the last
+  terminator before the closing keyword. Exception: the `block` of a
+  single-line IF branch spans its first to its last statement.
+- A `comment` is a child of the smallest node that has a non-comment token
+  both before and after it. A comment before the first token or after the last
+  token of a node is a child of the enclosing node, next to it. Examples:
+  `if x then ' c` + newline + body → the comment is a child of `if_statement`,
+  between `condition` and `consequence`; a comment on its own line inside a
+  body → a child of that `block`; `x = 1 ' c` at file level → a child of
+  `source_file` after the `assignment_statement`.
+- Hidden rules contribute their children to the enclosing node; aliased hidden
+  rules (`_inline_block`, `_try_body` → `block`; statement chains → their
+  expression nodes) appear under the alias name with the planned fields.
 
 ### Fields
 
@@ -208,13 +236,13 @@ recoverable as shown.
 |---|---|---|---|
 | keywords | any letter case | anonymous token named by the lower-case word | source bytes of the token |
 | PRINT | `PRINT`, `?` | `print_statement` | anonymous child `print` or `?` |
-| block IF end | `END IF`, `ENDIF` | `if_statement` | anonymous children `end` `if`, or `endif` |
+| block IF end | `END IF` (any spacing), `ENDIF` | `if_statement` | anonymous token `end if` or `endif`; spacing from source bytes |
 | ELSE IF | `ELSE IF`, `ELSEIF` | `else_if_clause` | anonymous children |
 | single-line and block IF | one line, or a block closed by END IF | `if_statement` | presence of the closing keyword tokens |
-| FOR terminator | `END FOR`, `NEXT` | `for_statement`, `for_each_statement` | anonymous children |
-| WHILE end, EXIT WHILE | `END WHILE`, `ENDWHILE`; `EXIT WHILE`, `EXITWHILE` | `while_statement`, `exit_statement` | anonymous children |
-| TRY end | `END TRY`, `ENDTRY` | `try_statement` | anonymous children |
-| FUNCTION and SUB | `FUNCTION … END FUNCTION`/`ENDFUNCTION`, `SUB … END SUB`/`ENDSUB` | `function_declaration`, `anonymous_function` | anonymous keyword children |
+| FOR terminator | `END FOR`, `NEXT` | `for_statement`, `for_each_statement` | anonymous token `end for` or `next` |
+| WHILE end, EXIT WHILE | `END WHILE`, `ENDWHILE`; `EXIT WHILE`, `EXITWHILE` | `while_statement`, `exit_statement` | anonymous tokens `end while` or `endwhile`; `exit` `while` or `exitwhile` |
+| TRY end | `END TRY`, `ENDTRY` | `try_statement` | anonymous token `end try` or `endtry` |
+| FUNCTION and SUB | `FUNCTION … END FUNCTION`/`ENDFUNCTION`, `SUB … END SUB`/`ENDSUB` | `function_declaration`, `anonymous_function` | anonymous `function`/`sub` and terminator tokens |
 | comments | `'…`, `REM …` | `comment` | node text |
 | optional access | `.` `?.`, `[` `?[`, `(` `?(`, `@` `?@` | `member_expression`, `index_expression`, `call_expression`, `attribute_expression` | anonymous operator token (for calls, the first token of `argument_list`) |
 | DIM brackets | `[…]`, `(…)` | `dim_statement` | anonymous children |
@@ -222,11 +250,11 @@ recoverable as shown.
 | designators | `a`, `a$`, `a%`, … | `identifier` | node text |
 | multidimensional index | `a[1,2]`, `a[1][2]` | **not normalized**: one `index_expression` with two `index` fields, or two nested nodes | tree shape |
 | line endings | LF, CRLF | identical trees | source bytes only |
-| multi-word keyword spacing | `END IF`, `END   IF` | identical trees | source bytes only |
+| multi-word keyword spacing | `END IF`, `END   IF`, `ELSE  IF` | identical trees | source bytes only |
 
 ### Requirement ↔ schema mapping
 
-Every `documented` and `provisional` requirement, by category: **S**
+Every `documented`, `provisional` and `tolerated` requirement, by category: **S**
 structural (the listed planned node carries it), **N** normalized into the
 listed node, **L** lexical-only (no public node by design; realised by tokens,
 hidden rules or anonymous children).
@@ -260,6 +288,7 @@ hidden rules or anonymous children).
 | BS-LEX-031 | N | `print_statement` |
 | BS-LEX-032 | S | `if_statement` with a `call_expression` condition |
 | BS-LEX-033 | L | runtime BOM skip; `string` and `comment` text |
+| BS-LEX-035 | N | `print_statement` |
 | BS-LIT-001 | S | `true`, `false` |
 | BS-LIT-002 | S | `invalid` |
 | BS-LIT-003 | S | `number` |
@@ -298,8 +327,7 @@ hidden rules or anonymous children).
 | BS-EXP-019 | S | `binary_expression` |
 | BS-EXP-020 | S | `binary_expression`, `assignment_statement` |
 | BS-EXP-021 | S | nesting of postfix nodes |
-| BS-EXP-024 | L | `_newline` in `argument_list` |
-| BS-EXP-025 | S | allowed `object` and `function` types |
+| BS-EXP-027 | S | `unary_expression` inside `binary_expression` |
 | BS-STMT-001 | S | `assignment_statement` |
 | BS-STMT-002 | N | `assignment_statement` (`operator`) |
 | BS-STMT-003 | S | `update_statement` |
@@ -330,12 +358,12 @@ hidden rules or anonymous children).
 | BS-STMT-033 | S | `source_file` |
 | BS-STMT-035 | S | `block` |
 | BS-STMT-036 | S | block-structured statement nodes |
+| BS-STMT-039 | N | `print_statement` |
 | BS-FUNC-001 | S | `function_declaration`, `parameter_list` |
 | BS-FUNC-002 | N | `function_declaration` |
 | BS-FUNC-003 | N | `function_declaration` |
 | BS-FUNC-005 | S | `parameter_list`, `parameter` |
 | BS-FUNC-006 | L | `_newline` in `parameter_list` |
-| BS-FUNC-007 | L | `_newline` in `parameter_list` |
 | BS-FUNC-009 | S | `anonymous_function` |
 | BS-FUNC-010 | S | `block` |
 | BS-FUNC-011 | N | `anonymous_function` |
@@ -362,9 +390,10 @@ hidden rules or anonymous children).
 | BS-COND-006 | S | `if_directive` as a `statement` |
 | BS-COND-007 | S | `if_directive` with `inactive_text` (PASS) or KL-001 (FAIL) |
 | BS-COND-008 | L | directive tokens and line terminators |
+| BS-COND-012 | S | `if_directive` inside `block` |
 
-`invalid`, `unresolved` and `out-of-scope` rows need no shape. Requirements
+`invalid`, `unresolved` and `out-of-scope` rows need no shape; `tolerated` rows are listed because they are implemented. Requirements
 without a planned shape: 0 (counts in the next line are checked
 mechanically).
 
-Mapped: 129 (S 78, N 24, L 27).
+Mapped: 130 (S 79, N 26, L 25).
