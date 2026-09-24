@@ -30,6 +30,11 @@ A timeout stops only the CLI process started here. A compiler the CLI started
 for its first grammar build may outlive it and leave a partial library in the
 private parser directory; later calls then fail with "Failed to load
 language" (fail-closed). The check scripts compile first with a long timeout.
+Cleanup is `atexit` only: a killed process leaves its private directories in
+the temporary directory. The working tree's record (upstream-sources.md,
+package.json) and these scripts are trusted, and the programs the CLI starts
+itself (node for `generate`, the C compiler for the first build) are not
+identity-bound; V1 drift detects a divergent `generate`.
 """
 import atexit
 import hashlib

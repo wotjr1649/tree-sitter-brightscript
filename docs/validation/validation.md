@@ -129,8 +129,9 @@ SHA-256 of the generated files, runtime version (V5, V6, V9), Level 1 snapshot
 ID (V3), and date. A result for one identity is never reused for another.
 
 Every check script runs the CLI only through `scripts/tscli.py` (so the check
-does not depend on the order of CI steps), and every CI step runs only
-`npm ci`, a check script or git (`scripts/test_tscli.py` enforces both).
+does not depend on the order of CI steps) and starts no other program but git,
+and every `run` command of a CI step is `npm ci`, a check script or git, with
+no shell metacharacters (`scripts/test_tscli.py` enforces all three).
 Once per process `tscli.py` copies the installed binary into a private
 directory, compares the copy's SHA-256 with its record in
 [upstream-sources.md](../provenance/upstream-sources.md) and its version with
@@ -138,7 +139,9 @@ the pin, and from then on runs only that copy: a binary that differs is never
 run, a binary replaced or retargeted after the check is not run by that
 process, and no DLL beside the installed binary is loaded. Out of scope:
 another process of the same user writing into the private directory during
-the run. `python scripts/tscli.py test` is the verified form of
+the run. The working tree's record and scripts are trusted, and the programs
+the CLI starts itself (node for `generate`, the C compiler for the first
+build) are not identity-bound; V1 drift detects a divergent `generate`. `python scripts/tscli.py test` is the verified form of
 `tree-sitter test`. The `generate` and `test` scripts in `package.json` call
 the npm-installed binary directly and are conveniences, not evidence.
 

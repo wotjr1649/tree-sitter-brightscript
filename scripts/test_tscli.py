@@ -6,18 +6,23 @@ Usage: python scripts/test_tscli.py
 2. A binary whose SHA-256 differs from the record is never executed, by any
    entry point (subprocess is not called), including the command line
    `python scripts/tscli.py` run in a copied tree.
-3. A binary replaced in place after verification is not run: every run
-   executes the verified private copy (validation.md "Identity binding").
+3. Every run executes the verified private copy (validation.md "Identity
+   binding"): a binary replaced in place after verification is not run, the
+   copy's directory holds only the copy, a copy that differs from what was
+   installed is refused, and the command line runs the copy.
 4. A binary reporting another version than the pin is refused.
 5. The check scripts still work through the shared path.
-6. No other script builds the binary path, and every command of a CI run
-   step is on an allowlist, so the check does not depend on CI running
-   check_generated.py first.
+6. No other script names a CLI launcher or starts a program other than git
+   (AST check), every `run` key of ci.yml is readable by the test, and every
+   command it runs is on an allowlist without shell metacharacters, so the
+   check does not depend on CI running check_generated.py first.
 7. has_error() agrees with the full --cst root line, hidden MISSING
    included, and stays fast on a deep tree (S04-H5).
 """
+import ast
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -33,25 +38,34 @@ from corpus import read_corpus
 SCRIPTS = Path(__file__).resolve().parent
 # Commands a CI run step may execute: the installer, the check scripts (which reach the CLI only through tscli)
 # and git. Anything else, for example `npm test` or `npx tree-sitter`, fails the structural test.
-CI_ALLOWED = (r'npm ci|python scripts/[a-z0-9_]+\.py( \S+)*|git [a-z-]+( --?[a-z-]+)*'
+# Arguments are limited to characters without shell meaning, so nothing can be chained after an allowed command.
+CI_ALLOWED = (r'npm ci|python scripts/[a-z0-9_]+\.py( [A-Za-z0-9_./=-]+)*|git [a-z-]+( --?[a-z-]+)*'
               r'|test -z "\$\(git status --porcelain\)"')
+# Any `run` key in any YAML spelling (flow mapping, quoted key, extra spaces); each must be one the parser read.
+ANY_RUN_KEY = re.compile(r"""(?:^|[\s{,])["']?run["']?\s*:""", re.M)
 
 
 def ci_commands(text):
-    """Every command line of every `run:` step of a workflow (single-line and `|` block forms)."""
-    lines, out = text.splitlines(), []
+    """Every command of every `run:` step (single-line with continuation lines, `|` and `>` blocks).
+    Raises ValueError for a `run` key the block-style parser cannot read, so no spelling goes unchecked."""
+    lines, out, keys = text.splitlines(), [], 0
     for i, line in enumerate(lines):
-        m = re.match(r"^(\s*)(?:- )?run:\s*(.*)$", line)
+        m = re.match(r"^(\s*)(- )?run: ?(.*)$", line)
         if not m:
             continue
-        if m.group(2) not in ("|", ">"):
-            out.append(m.group(2).strip())
-            continue
-        for body in lines[i + 1:]:
-            if body.strip() and len(body) - len(body.lstrip()) <= len(m.group(1)):
+        keys += 1
+        indent = len(m.group(1)) + len(m.group(2) or "")
+        body = []
+        for nxt in lines[i + 1:]:
+            if nxt.strip() and len(nxt) - len(nxt.lstrip()) <= indent:
                 break
-            if body.strip():
-                out.append(body.strip())
+            body.append(nxt.strip())
+        if m.group(3).strip() in ("|", ">"):
+            out += [b for b in body if b]
+        else:  # a plain scalar continues on more-indented lines
+            out.append(" ".join([m.group(3).strip(), *[b for b in body if b]]))
+    if len(ANY_RUN_KEY.findall(text)) != keys:
+        raise ValueError("ci.yml has a run key in a form this test cannot check")
     return out
 
 
@@ -135,11 +149,54 @@ class VerifiedCli(unittest.TestCase):
                 code, out, _ = tscli.cli("--version")
                 self.assertEqual((code, out.strip()), (0, version))
                 ran = tscli.executable()
-                self.assertNotEqual(ran.parent, installed.parent)
+                self.assertEqual(os.listdir(ran.parent), [real.name])  # nothing else is loaded from there
+                self.assertEqual(ran.parent.parent, Path(tscli.BINDIR))
                 self.assertEqual(hashlib.sha256(ran.read_bytes()).hexdigest(), digest)
             finally:
                 tscli._verified.pop(installed, None)
                 tscli.EXE = real
+
+    def test_copy_changed_before_hashing_is_refused(self):
+        real, copyfile = tscli.EXE, tscli.shutil.copyfile
+
+        def corrupting(src, dst):  # the copy differs from what was installed: the hash must be of the copy
+            copyfile(src, dst)
+            with open(dst, "ab") as f:
+                f.write(b"\0")
+
+        with tempfile.TemporaryDirectory() as d:
+            installed = Path(d) / real.name
+            copyfile(real, installed)
+            tscli.EXE, tscli.shutil.copyfile = installed, corrupting
+            try:
+                with self.assertRaisesRegex(RuntimeError, "was not run"):
+                    tscli.verify()
+            finally:
+                tscli.shutil.copyfile = copyfile
+                tscli._verified.pop(installed, None)
+                tscli.EXE = real
+
+    def test_command_line_runs_only_the_private_copy(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = copied_tree(Path(d) / "repo")
+            hook, log = Path(d) / "hook", Path(d) / "argv0.txt"
+            hook.mkdir()
+            (hook / "sitecustomize.py").write_text(
+                "import subprocess\n_init = subprocess.Popen.__init__\n"
+                "def init(self, args, *a, **k):\n"
+                f"    with open({str(log)!r}, 'a', encoding='utf-8') as f:\n"
+                "        f.write(str(args[0]) + '\\n')\n"
+                "    _init(self, args, *a, **k)\n"
+                "subprocess.Popen.__init__ = init\n", encoding="utf-8")
+            r = subprocess.run([sys.executable, str(root / "scripts/tscli.py"), "--version"], capture_output=True,
+                               text=True, encoding="utf-8", env={**os.environ, "PYTHONPATH": str(hook)})
+            ran = log.read_text(encoding="utf-8").splitlines()
+            installed = root / tscli.EXE.relative_to(tscli.ROOT)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertGreaterEqual(len(ran), 2)  # the version check and the command itself
+        for argv0 in ran:
+            self.assertNotEqual(Path(argv0), installed)
+            self.assertIn("tree-sitter-bin-", argv0)
 
     def test_popen_rejects_another_program(self):
         for kwargs in ({"executable": sys.executable}, {"shell": True}):
@@ -171,24 +228,55 @@ class VerifiedCli(unittest.TestCase):
             self.assertLess(time.monotonic() - start, 10)
 
     def test_no_direct_cli_run(self):
-        # The binary path or a CLI launcher built outside tscli, in any quoting: tscli.EXE, a path into the
-        # package directory, the binary's file name, a bare `tree-sitter` argument, npx, npm.
-        direct = re.compile(r"\bEXE\b|tree-sitter-cli['\"]?\s*/|tree-sitter\.exe|['\"]tree-sitter['\"]"
-                            r"|\.bin/tree-sitter|\bnpx\b|['\"]npm['\"]")
         for path in sorted(SCRIPTS.glob("*.py")):
             if path.name not in ("tscli.py", "test_tscli.py"):
-                self.assertIsNone(direct.search(path.read_text(encoding="utf-8")), path.name)
-        for mutant in ('["npx", "tree-sitter", "test"]', "['node_modules/tree-sitter-cli/tree-sitter.exe']",
-                       "subprocess.run(['npm', 'test'])", 'f"{ROOT}/node_modules/.bin/tree-sitter"'):
-            self.assertIsNotNone(direct.search(mutant), mutant)
+                self.assertEqual(launches(path.read_text(encoding="utf-8")), [], path.name)
+        for mutant in ('subprocess.run(["npx", "tree-sitter", "test"])', "BIN = 'node_modules/tree-sitter-cli/tree-sitter.exe'",
+                       "subprocess.run(['npm', 'test'])", 'p = f"{ROOT}/node_modules/.bin/tree-sitter"',
+                       'subprocess.run("npm test", shell=True)', 'os.system("npm test")', 'subprocess.run(["npm.cmd", "test"])',
+                       'shutil.which("tree-sitter.cmd")', 'subprocess.run([sys.executable, "-c", "x"])', "x = EXE"):
+            self.assertNotEqual(launches(mutant), [], mutant)
+        self.assertEqual(launches('subprocess.run(["git", "status"], capture_output=True)'), [])
         commands = ci_commands((SCRIPTS.parent / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
         self.assertIn("python scripts/tscli.py test", commands)
         for command in commands:
             self.assertTrue(allowed(command), f"ci.yml runs a command outside the allowlist: {command}")
         for mutant in ("npm test", "npx tree-sitter test", "node_modules/.bin/tree-sitter test", "npm run generate",
-                       "tree-sitter test", 'python -c "import os"'):
+                       "tree-sitter test", 'python -c "import os"', "python scripts/check_v0.py && npx tree-sitter test",
+                       "python scripts/check_v0.py; npm test", "python scripts/check_v0.py | sh",
+                       "python scripts/check_v0.py $(npx tree-sitter test)"):
             self.assertFalse(allowed(mutant), mutant)
         self.assertEqual(ci_commands("    steps:\n      - run: npx tree-sitter test\n"), ["npx tree-sitter test"])
+        self.assertEqual(ci_commands("      - run: python scripts/check_v0.py\n          && npx tree-sitter test\n"),
+                         ["python scripts/check_v0.py && npx tree-sitter test"])
+        for unread in ("      - {name: x, run: npx tree-sitter test}\n", "      -   run: npx tree-sitter test\n",
+                       '      - "run": npx tree-sitter test\n', "      - run : npx tree-sitter test\n"):
+            with self.assertRaises(ValueError, msg=unread):
+                ci_commands(unread)
+
+
+LAUNCHERS = re.compile(r"\bEXE\b|tree-sitter-cli['\"]?\s*/|tree-sitter\.(exe|cmd)\b|['\"]tree-sitter['\"]|\.bin[/\\]"
+                       r"|\bnpx\b|\bpnpm\b|\byarn\b|\bnpm(\.cmd)?\b|shutil\.which")
+
+
+def launches(source):
+    """Ways a script could start a program other than git: launcher names and paths anywhere in the text, and
+    subprocess/os calls whose argv[0] is not the literal "git" or that use a shell."""
+    found = [m.group(0) for m in LAUNCHERS.finditer(source)]
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Call):
+            continue
+        name = ast.unparse(node.func)
+        if name in ("os.system", "os.popen") or name.startswith(("os.spawn", "os.exec")):
+            found.append(name)
+        elif name.startswith("subprocess.") and name.split(".")[1] in ("run", "Popen", "call", "check_call",
+                                                                           "check_output"):
+            argv = node.args[0] if node.args else None
+            first = argv.elts[0] if isinstance(argv, (ast.List, ast.Tuple)) and argv.elts else None
+            if not (isinstance(first, ast.Constant) and first.value == "git") or any(
+                    k.arg == "shell" for k in node.keywords):
+                found.append(ast.unparse(node))
+    return found
 
 
 if __name__ == "__main__":
