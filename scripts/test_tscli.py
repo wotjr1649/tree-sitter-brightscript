@@ -42,7 +42,7 @@ SCRIPTS = Path(__file__).resolve().parent
 CI_ALLOWED = (r'npm ci|python scripts/[a-z0-9_]+\.py( [A-Za-z0-9_./=-]+)*|git [a-z-]+( --?[a-z-]+)*'
               r'|test -z "\$\(git status --porcelain\)"')
 # Any `run` key in any YAML spelling (flow mapping, quoted key, extra spaces); each must be one the parser read.
-ANY_RUN_KEY = re.compile(r"""(?:^|[\s{,])["']?run["']?\s*:""", re.M)
+ANY_RUN_KEY = re.compile(r"""(?:^|[\s{,])["']?(?:run|\\x72un|\\u0072un)["']?\s*:""", re.M)
 
 
 def ci_commands(text):
@@ -151,6 +151,7 @@ class VerifiedCli(unittest.TestCase):
                 ran = tscli.executable()
                 self.assertEqual(os.listdir(ran.parent), [real.name])  # nothing else is loaded from there
                 self.assertEqual(ran.parent.parent, Path(tscli.BINDIR))
+                self.assertEqual(ran.resolve().parent.parent, Path(tscli.BINDIR).resolve())  # no junction or link
                 self.assertEqual(hashlib.sha256(ran.read_bytes()).hexdigest(), digest)
             finally:
                 tscli._verified.pop(installed, None)
@@ -185,7 +186,7 @@ class VerifiedCli(unittest.TestCase):
                 "import subprocess\n_init = subprocess.Popen.__init__\n"
                 "def init(self, args, *a, **k):\n"
                 f"    with open({str(log)!r}, 'a', encoding='utf-8') as f:\n"
-                "        f.write(str(args[0]) + '\\n')\n"
+                "        f.write(str(k.get('executable') or args[0]) + '\\n')\n"
                 "    _init(self, args, *a, **k)\n"
                 "subprocess.Popen.__init__ = init\n", encoding="utf-8")
             r = subprocess.run([sys.executable, str(root / "scripts/tscli.py"), "--version"], capture_output=True,
@@ -228,16 +229,26 @@ class VerifiedCli(unittest.TestCase):
             self.assertLess(time.monotonic() - start, 10)
 
     def test_no_direct_cli_run(self):
-        for path in sorted(SCRIPTS.glob("*.py")):
+        for path in sorted(SCRIPTS.rglob("*.py")):
             if path.name not in ("tscli.py", "test_tscli.py"):
                 self.assertEqual(launches(path.read_text(encoding="utf-8")), [], path.name)
         for mutant in ('subprocess.run(["npx", "tree-sitter", "test"])', "BIN = 'node_modules/tree-sitter-cli/tree-sitter.exe'",
                        "subprocess.run(['npm', 'test'])", 'p = f"{ROOT}/node_modules/.bin/tree-sitter"',
                        'subprocess.run("npm test", shell=True)', 'os.system("npm test")', 'subprocess.run(["npm.cmd", "test"])',
-                       'shutil.which("tree-sitter.cmd")', 'subprocess.run([sys.executable, "-c", "x"])', "x = EXE"):
+                       'shutil.which("tree-sitter.cmd")', 'subprocess.run([sys.executable, "-c", "x"])', "x = EXE",
+                       "from subprocess import run", "import subprocess as sp", "subprocess.getoutput('x')",
+                       "os.startfile('x')", "os.posix_spawnp('x', ['x'], {})", "import asyncio",
+                       "getattr(subprocess, 'run')", "importlib.import_module('subprocess')",
+                       'subprocess.run(["git", "status"], executable=sys.executable)', "subprocess.Popen(['git'])"):
             self.assertNotEqual(launches(mutant), [], mutant)
         self.assertEqual(launches('subprocess.run(["git", "status"], capture_output=True)'), [])
-        commands = ci_commands((SCRIPTS.parent / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+        # npm ci runs the root package's lifecycle scripts; none may exist.
+        scripts = json.loads((SCRIPTS.parent / "package.json").read_text(encoding="utf-8")).get("scripts", {})
+        lifecycle = {"preinstall", "install", "postinstall", "prepublish", "preprepare", "prepare", "postprepare",
+                     "dependencies"}
+        self.assertEqual(sorted(lifecycle & scripts.keys()), [], "package.json has an npm lifecycle script")
+        commands = [c for wf in sorted((SCRIPTS.parent / ".github/workflows").glob("*.y*ml"))
+                    for c in ci_commands(wf.read_text(encoding="utf-8"))]
         self.assertIn("python scripts/tscli.py test", commands)
         for command in commands:
             self.assertTrue(allowed(command), f"ci.yml runs a command outside the allowlist: {command}")
@@ -259,22 +270,37 @@ LAUNCHERS = re.compile(r"\bEXE\b|tree-sitter-cli['\"]?\s*/|tree-sitter\.(exe|cmd
                        r"|\bnpx\b|\bpnpm\b|\byarn\b|\bnpm(\.cmd)?\b|shutil\.which")
 
 
+SUBPROCESS_DATA = {"PIPE", "DEVNULL", "STDOUT", "TimeoutExpired", "CalledProcessError", "CompletedProcess"}
+OS_LAUNCH = ("system", "popen", "startfile", "spawn", "exec", "posix_spawn", "fork")
+
+
 def launches(source):
-    """Ways a script could start a program other than git: launcher names and paths anywhere in the text, and
-    subprocess/os calls whose argv[0] is not the literal "git" or that use a shell."""
+    """Ways a script could start a program other than git. Lexical: launcher names and paths anywhere in the text.
+    Semantic: `subprocess` only as `import subprocess`, used for its data names or for `subprocess.run([
+    "git", ...])` without `shell` or `executable`; no other process API of os, asyncio, importlib or
+    getattr. A structural guard against accidental regressions, not a sandbox: the scripts are trusted."""
     found = [m.group(0) for m in LAUNCHERS.finditer(source)]
     for node in ast.walk(ast.parse(source)):
-        if not isinstance(node, ast.Call):
-            continue
-        name = ast.unparse(node.func)
-        if name in ("os.system", "os.popen") or name.startswith(("os.spawn", "os.exec")):
-            found.append(name)
-        elif name.startswith("subprocess.") and name.split(".")[1] in ("run", "Popen", "call", "check_call",
-                                                                           "check_output"):
+        if isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] in ("subprocess", "asyncio",
+                                                                                       "importlib"):
+            found.append(ast.unparse(node))
+        elif isinstance(node, ast.Import) and any(
+                a.name.split(".")[0] in ("asyncio", "importlib") or (a.name == "subprocess" and a.asname)
+                for a in node.names):
+            found.append(ast.unparse(node))
+        elif isinstance(node, ast.Name) and (node.id in ("__import__", "importlib") or (
+                node.id == "getattr" and "subprocess" in source)):
+            found.append(node.id)
+        elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+            if node.value.id == "os" and node.attr.startswith(OS_LAUNCH):
+                found.append(ast.unparse(node))
+            elif node.value.id == "subprocess" and node.attr not in SUBPROCESS_DATA | {"run"}:
+                found.append(ast.unparse(node))
+        elif isinstance(node, ast.Call) and ast.unparse(node.func) == "subprocess.run":
             argv = node.args[0] if node.args else None
             first = argv.elts[0] if isinstance(argv, (ast.List, ast.Tuple)) and argv.elts else None
             if not (isinstance(first, ast.Constant) and first.value == "git") or any(
-                    k.arg == "shell" for k in node.keywords):
+                    k.arg in ("shell", "executable") for k in node.keywords):
                 found.append(ast.unparse(node))
     return found
 

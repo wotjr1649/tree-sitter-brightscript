@@ -130,8 +130,11 @@ ID (V3), and date. A result for one identity is never reused for another.
 
 Every check script runs the CLI only through `scripts/tscli.py` (so the check
 does not depend on the order of CI steps) and starts no other program but git,
-and every `run` command of a CI step is `npm ci`, a check script or git, with
-no shell metacharacters (`scripts/test_tscli.py` enforces all three).
+and every `run` command of a CI step, in every workflow file, is `npm ci`, a
+check script or git, with no shell metacharacters, and `package.json` has no
+npm lifecycle script. `scripts/test_tscli.py` checks all of this structurally,
+in the forms it recognises: a guard against accidental regressions, not a
+sandbox (the scripts are trusted, below).
 Once per process `tscli.py` copies the installed binary into a private
 directory, compares the copy's SHA-256 with its record in
 [upstream-sources.md](../provenance/upstream-sources.md) and its version with
@@ -141,7 +144,9 @@ process, and no DLL beside the installed binary is loaded. Out of scope:
 another process of the same user writing into the private directory during
 the run. The working tree's record and scripts are trusted, and the programs
 the CLI starts itself (node for `generate`, the C compiler for the first
-build) are not identity-bound; V1 drift detects a divergent `generate`. `python scripts/tscli.py test` is the verified form of
+build) are not identity-bound, nor are environment settings the CLI honours
+(`TREE_SITTER_JS_RUNTIME`, `TREE_SITTER_ABI_VERSION`; the check scripts pass
+`--abi 15`); V1 drift detects a divergent `generate`. `python scripts/tscli.py test` is the verified form of
 `tree-sitter test`. The `generate` and `test` scripts in `package.json` call
 the npm-installed binary directly and are conveniences, not evidence.
 
@@ -176,7 +181,7 @@ compared).
 | ID | State | Requirement | Behaviour | Demonstrating fixture |
 |---|---|---|---|---|
 | KL-001 | retired (unused): the ADR-0004 spike passed with design V1 on 2026-09-23 | BS-COND-007 | A literal-`false` conditional branch whose text is not BrightScript (the documented block-comment idiom) produces `ERROR` nodes | `BS-COND-007: block comment with prose` and the spike fixtures S3, S5–S8, S10–S12, asserted with `:error` |
-| KL-002 | active; accepted for 0.1.0 by the owner on 2026-09-24 | none is violated (robustness only); the constructs involved are the prefix operators of BS-EXP-012, 018, 027 and their nesting (BS-EXP-028) | Error recovery time grows with the square of the number of consecutive malformed prefix-operator pairs in one expression: a prefix operator (`+`, `-`, `not`) followed by a token that cannot start an operand and forces the pending prefix operators to reduce (`*`, `/`, `,`, `)`, `<`, …), repeated, as in `x = ` + `+*`×k or `x = (` + `not)`×k, also inside closed `(…)`, `[…]` or call arguments and after `print`, `return`, `if`. Memory stays small (≤ 20 MiB at 16 KB); the runtime's progress callback stops it. Runtimes 0.25.1, 0.26.13 and 0.27.0 behave alike and generators 0.26.13 and 0.27.0 emit identical files. Valid input, scattered errors and one malformed statement per line stay linear. Measurements, cause and mitigation: [0.1.0-performance.md](../reports/0.1.0-performance.md#known-limitation-kl-002) | W13 seed `KL-002 B-01 witness k=1000` and the KL-002 row of the recovery scaling guards |
+| KL-002 | active; accepted for 0.1.0 by the owner on 2026-09-24 | none is violated (robustness only); the constructs involved are the prefix operators of BS-EXP-012, 018, 027 and their nesting (BS-EXP-028) | Error recovery time grows with the square of the number of repeated malformed prefix-operator pairs in one expression: a prefix operator (`+`, `-`, `not`) followed by a token that cannot start an operand and forces the pending prefix operators to reduce (`*`, `/`, `,`, `)`, `<`, …), repeated, as in `x = ` + `+*`×k or `x = (` + `not)`×k, also inside closed `(…)`, `[…]` or call arguments and after `print`, `return`, `if`. Memory stays small (≤ 20 MiB at 16 KB); the runtime's progress callback stops it. Runtimes 0.25.1, 0.26.13 and 0.27.0 behave alike and generators 0.26.13 and 0.27.0 emit identical files. Valid input, scattered errors and one malformed statement per line stay linear. Measurements, cause and mitigation: [0.1.0-performance.md](../reports/0.1.0-performance.md#known-limitation-kl-002) | W13 seed `KL-002 B-01 witness k=1000` and the KL-002 row of the recovery scaling guards |
 | KL-003 | active; accepted for 0.1.0 by the owner on 2026-09-24 as an explicit exception to the bounded-memory condition for known limitations | none is violated (robustness only); the construct involved is the right-associative `^` of BS-EXP-011 | Error recovery on a run of `^` each followed by a token that cannot start an operand, in one expression (`x = ` + `2^*`×k, `2^)`, `2^,`), grows quadratically. With `*` and similar tokens memory grows quadratically too: the pinned CLI needs 86 MiB at 6 KB, 326 MiB at 12 KB and 1.13 GiB at 24 KB, and the cost lies in the runtime's end-of-input acceptance, which the progress callback does not interrupt (a 200 ms limit stopped a 24 KB input after 2.0 s). A minimal grammar with only a right-associative `^` behaves the same; no grammar change that keeps BS-EXP-011 and the tree was found. Measurements and mitigation: [0.1.0-performance.md](../reports/0.1.0-performance.md#known-limitation-kl-003) | W13 seed `KL-003 exponent witness k=2000` and the KL-003 row of the recovery scaling guards |
 
 KL-002, KL-003 and the V10 bound. W06's per-input bound (10 s, 1 GiB) still
@@ -201,7 +206,7 @@ memory exceeds the row's bound:
 |---|---|---|---|---|---|
 | KL-002 | `+*`, k = 250 and 1,000 | ≤ 2.5 | ≤ 3 s | ≤ 256 MiB | disclosed limitation: worse than quadratic, or a large constant-factor slowdown, fails |
 | R-A-01 | `f(*`, k = 500 and 2,000 | ≤ 1.5 | ≤ 1 s | ≤ 256 MiB | regression test of the Session 05-1 fix (before it: exponent 1.7–2.1, 3 s, 1.27 GiB) |
-| KL-003 | `2^*`, k = 500 and 2,000 | ≤ 2.5 | ≤ 3 s | ≤ 512 MiB | disclosed limitation, memory included (observed 86–89 MiB at k = 2,000) |
+| KL-003 | `2^*`, k = 500 and 2,000 | ≤ 2.5 | ≤ 3 s | ≤ 512 MiB | disclosed limitation, memory included (observed about 80–90 MiB at k = 2,000) |
 
 ## Fixture rules
 
