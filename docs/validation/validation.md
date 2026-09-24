@@ -131,16 +131,28 @@ ID (V3), and date. A result for one identity is never reused for another.
 Every check script runs the CLI only through `scripts/tscli.py` (so the check
 does not depend on the order of CI steps) and starts no other program but git,
 and every `run` command of a CI step, in every workflow file, is `npm ci`, a
-check script or git, with no shell metacharacters, and `package.json` has no
-npm lifecycle script. `scripts/test_tscli.py` checks all of this structurally,
-in the forms it recognises: a guard against accidental regressions, not a
-sandbox (the scripts are trusted, below).
+check script or git, with no shell metacharacters except the fixed clean-tree
+check `test -z "$(git status --porcelain)"`, and `package.json` has no npm
+lifecycle script. `scripts/test_tscli.py` checks all of this structurally, in
+the forms it recognises: a guard against accidental regressions, not a
+sandbox (the scripts are trusted, below). Forms it does not recognise include
+`from os import …` and aliases of `os`, `subprocess` reached through another
+module or with `**` keywords, `sys.modules`, `ctypes`, `_winapi`,
+`multiprocessing`, `pty`, `webbrowser`, `eval` and `exec`, git aliases,
+modules outside `scripts/`, YAML keys escaped other than `\x72un`, a custom
+step `shell:`, local actions, `binding.gyp` and `.npmrc` settings (Session 05-1
+delta re-audit C4-01, C4-02).
 Once per process `tscli.py` copies the installed binary into a private
 directory, compares the copy's SHA-256 with its record in
 [upstream-sources.md](../provenance/upstream-sources.md) and its version with
 the pin, and from then on runs only that copy: a binary that differs is never
 run, a binary replaced or retargeted after the check is not run by that
-process, and no DLL beside the installed binary is loaded. Out of scope:
+process, and no DLL beside the installed binary is loaded. The self-test
+pins the copy's location, the hash before the first run and the version
+refusal; these properties otherwise rest on review of `tscli.py`, because it
+does not detect every change to it (for example a private directory that is a
+link, a copy rewritten after the check, `os.spawn*`, or the environment passed
+to the CLI; C4-03). Out of scope:
 another process of the same user writing into the private directory during
 the run. The working tree's record and scripts are trusted, and the programs
 the CLI starts itself (node for `generate`, the C compiler for the first

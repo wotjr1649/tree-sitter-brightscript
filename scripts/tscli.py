@@ -1,7 +1,8 @@
 """Run the pinned tree-sitter CLI for the check scripts. Stdlib only.
 
 Every run of the CLI goes through `cli()` or `popen()`, which call `verify()`
-first. Once per process `verify()` copies the installed binary into a private
+first; `verify()` itself (the version check) and the command line run the
+verified copy directly. Once per process `verify()` copies the installed binary into a private
 directory and hashes the copy: its SHA-256 must equal the decompressed release
 asset recorded for this platform in docs/provenance/upstream-sources.md
 (ADR-0002). Only then is the copy run, once, to confirm that it reports the

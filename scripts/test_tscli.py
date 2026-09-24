@@ -13,9 +13,11 @@ Usage: python scripts/test_tscli.py
 4. A binary reporting another version than the pin is refused.
 5. The check scripts still work through the shared path.
 6. No other script names a CLI launcher or starts a program other than git
-   (AST check), every `run` key of ci.yml is readable by the test, and every
-   command it runs is on an allowlist without shell metacharacters, so the
-   check does not depend on CI running check_generated.py first.
+   in the spellings the AST check recognises, every `run` key of every workflow
+   file is readable by the test, and every command it runs is on an allowlist
+   (no shell metacharacters except the fixed clean-tree check), so the check
+   does not depend on CI running check_generated.py first. A regression guard,
+   not a sandbox: validation.md "Identity binding" lists what it does not see.
 7. has_error() agrees with the full --cst root line, hidden MISSING
    included, and stays fast on a deep tree (S04-H5).
 """
@@ -65,7 +67,7 @@ def ci_commands(text):
         else:  # a plain scalar continues on more-indented lines
             out.append(" ".join([m.group(3).strip(), *[b for b in body if b]]))
     if len(ANY_RUN_KEY.findall(text)) != keys:
-        raise ValueError("ci.yml has a run key in a form this test cannot check")
+        raise ValueError("a workflow file has a run key in a form this test cannot check")
     return out
 
 
@@ -251,7 +253,7 @@ class VerifiedCli(unittest.TestCase):
                     for c in ci_commands(wf.read_text(encoding="utf-8"))]
         self.assertIn("python scripts/tscli.py test", commands)
         for command in commands:
-            self.assertTrue(allowed(command), f"ci.yml runs a command outside the allowlist: {command}")
+            self.assertTrue(allowed(command), f"a workflow runs a command outside the allowlist: {command}")
         for mutant in ("npm test", "npx tree-sitter test", "node_modules/.bin/tree-sitter test", "npm run generate",
                        "tree-sitter test", 'python -c "import os"', "python scripts/check_v0.py && npx tree-sitter test",
                        "python scripts/check_v0.py; npm test", "python scripts/check_v0.py | sh",
