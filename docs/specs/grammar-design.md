@@ -290,8 +290,14 @@ inlined rule did; `src/node-types.json` and every valid tree are unchanged.
 For the same reason the left operand of `^` is a hidden rule
 `_pow_left` = `expression` with `POSTFIX` precedence: recovery on a run of
 malformed `^` (`x = 2^*2^*…`) otherwise needed quadratic memory at end of
-input (1.1 GiB at 24 KB) and now needs little memory; the time stays
-quadratic (KL-002). `2^3^2` is still `2^(3^2)` and `-2^2` still `-(2^2)`.
+input (1.1 GiB at 24 KB) and now needs little memory, but its time is
+quadratic (KL-002; 6 KB: 1.4 s native, 0.16 s before). This precedence now
+carries the right associativity of `^` (`2^3^2` = `2^(3^2)`, BS-EXP-011) and
+its binding above the prefix operators (`-2^2` = `-(2^2)`, BS-EXP-012): the
+generator emits the same parser with `prec.left` as with `prec.right` on the
+`^` rule, and without the `POSTFIX` precedence the trees change. `EXPONENT`
+still orders `^` against the binary levels (`a ^ b * c` = `(a ^ b) * c`), which
+the BS-EXP-011 fixture checks.
 
 | Postfix form | Accepted left operand |
 |---|---|
@@ -669,6 +675,7 @@ Policy: `conflicts` starts empty. A declared conflict needs (1) the generator's
 conflict report, (2) a minimised input, (3) evidence that factoring,
 precedence or associativity cannot resolve it without changing a documented
 tree, and (4) a row added to this section naming the conflict, the rules and
+| associativity of `^`, `^` vs prefix operators | `POSTFIX` precedence on `_pow_left` (§5) |
 the fixture proving the dynamic choice.
 
 ## 15. Implementation order

@@ -292,7 +292,7 @@ The last input line, just before the divider, ends with LF alone
 | Fixture | Input | Expected grouping |
 |---|---|---|
 | `BS-EXP-002: parentheses override precedence` | `x = (a + b) * c` | `(a + b) * c` |
-| `BS-EXP-011: exponentiation is right associative` | `x = 2^3^2↵y = a.b ^ 2` | `2^(3^2)`; `(a.b) ^ 2` |
+| `BS-EXP-011: exponentiation is right associative` | `x = 2^3^2↵y = a.b ^ 2↵z = a ^ b * c↵w = a * b ^ c↵v = not a ^ b↵u = a ^ b or c` | `2^(3^2)`; `(a.b) ^ 2`; `(a ^ b) * c`; `a * (b ^ c)`; `not (a ^ b)`; `(a ^ b) or c` |
 | `BS-EXP-012: unary minus against postfix and exponent` | `a = -5.tostr()↵b = -2^2` | `-(5.tostr())`; `-(2^2)` |
 | `BS-EXP-012: unary operators against multiplication` | `a = -x * y↵c = +x` | `(-x) * y`; `+x` |
 | `BS-EXP-013: multiplicative operators are left associative` | `x = a / b mod c \ d * e` | `(((a / b) mod c) \ d) * e` |
