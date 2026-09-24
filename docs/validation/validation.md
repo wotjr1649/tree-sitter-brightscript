@@ -181,32 +181,34 @@ compared).
 | ID | State | Requirement | Behaviour | Demonstrating fixture |
 |---|---|---|---|---|
 | KL-001 | retired (unused): the ADR-0004 spike passed with design V1 on 2026-09-23 | BS-COND-007 | A literal-`false` conditional branch whose text is not BrightScript (the documented block-comment idiom) produces `ERROR` nodes | `BS-COND-007: block comment with prose` and the spike fixtures S3, S5–S8, S10–S12, asserted with `:error` |
-| KL-002 | active; accepted for 0.1.0 by the owner on 2026-09-24 | none is violated (robustness only); the constructs involved are the prefix operators of BS-EXP-012, 018, 027 and their nesting (BS-EXP-028) | Error recovery time grows with the square of the number of repeated malformed prefix-operator pairs in one expression: a prefix operator (`+`, `-`, `not`) followed by a token that cannot start an operand and forces the pending prefix operators to reduce (`*`, `/`, `,`, `)`, `<`, …), repeated, as in `x = ` + `+*`×k or `x = (` + `not)`×k, also inside closed `(…)`, `[…]` or call arguments and after `print`, `return`, `if`. Memory stays small (≤ 20 MiB at 16 KB); the runtime's progress callback stops it. Runtimes 0.25.1, 0.26.13 and 0.27.0 behave alike and generators 0.26.13 and 0.27.0 emit identical files. Valid input, scattered errors and one malformed statement per line stay linear. Measurements, cause and mitigation: [0.1.0-performance.md](../reports/0.1.0-performance.md#known-limitation-kl-002) | W13 seed `KL-002 B-01 witness k=1000` and the KL-002 row of the recovery scaling guards |
-| KL-003 | active; accepted for 0.1.0 by the owner on 2026-09-24 as an explicit exception to the bounded-memory condition for known limitations | none is violated (robustness only); the construct involved is the right-associative `^` of BS-EXP-011 | Error recovery on a run of `^` each followed by a token that cannot start an operand, in one expression (`x = ` + `2^*`×k, `2^)`, `2^,`), grows quadratically. With `*` and similar tokens memory grows quadratically too: the pinned CLI needs 86 MiB at 6 KB, 326 MiB at 12 KB and 1.13 GiB at 24 KB, and the cost lies in the runtime's end-of-input acceptance, which the progress callback does not interrupt (a 200 ms limit stopped a 24 KB input after 2.0 s). A minimal grammar with only a right-associative `^` behaves the same; no grammar change that keeps BS-EXP-011 and the tree was found. Measurements and mitigation: [0.1.0-performance.md](../reports/0.1.0-performance.md#known-limitation-kl-003) | W13 seed `KL-003 exponent witness k=2000` and the KL-003 row of the recovery scaling guards |
+| KL-002 | active; accepted for 0.1.0 by the owner on 2026-09-24 as a class of behaviour | none is violated (robustness only); the constructs involved are right-recursive nestings the language allows: prefix operators (BS-EXP-012, 018, 027, 028), the right-associative `^` (BS-EXP-011) and single-line IFs nested in a single-line branch (BS-STMT-009) | Error recovery time can grow with the square of the number of repeated malformed pieces that keep such a nesting pending in one statement or its continuation. Known families (measured): a prefix operator (`+`, `-`, `not`) followed by a token that cannot start an operand and forces a reduction (`x = +*+*…`, `x = (not)not)…`, also inside closed groups, call arguments and after `print`, `return`, `if`, `while`, `for`, `dim`); `^` followed by a non-operand (`x = 2^*2^*…`, `2^)`, `2^,`); a condition broken across a line inside nested single-line IFs (`if a⏎*2if a⏎*2…`, `x = if a then⏎*2…`); a directive inside an expression (`x = #if a⏎*2…`, also after `print`, in `(` and `f(`); and each of these continued across line breaks or `:` while every piece starts with a prefix operator or `^` (`x = -` followed by `-` lines). The list is not exhaustive: other right-recursive nestings may behave the same. Memory stays small (≤ 20 MiB through the CLI at 28 KB), and the runtime's progress callback stops the parse. Runtimes 0.25.1, 0.26.13 and 0.27.0 behave alike and generators 0.26.13 and 0.27.0 emit identical files. Valid input, scattered errors and statements separated by valid lines stay linear. Measurements, cause and mitigation: [0.1.0-performance.md](../reports/0.1.0-performance.md#known-limitation-kl-002) | W13 seeds `KL-002 B-01 witness k=1000`, `KL-002 nested single-line IF witness k=1000`, `KL-002 prefix operators across lines k=1000`, `KL-002 exponent witness k=2000`, and the KL-002 rows of the recovery scaling guards |
+| KL-003 | retired 2026-09-24: the `_pow_left` change of Session 05-1 (grammar-design §5) removed its quadratic memory; its quadratic time is part of KL-002, and the owner's exception to the bounded-memory condition is withdrawn | — | Error recovery on a run of `^` each followed by a token that cannot start an operand needed quadratic memory at end of input (1.1 GiB at 24 KB) that the progress callback could not interrupt | — |
 
-KL-002, KL-003 and the V10 bound. W06's per-input bound (10 s, 1 GiB) still
-applies to every W06 input and W13 seed, the KL-002 and KL-003 witnesses
-included. An input of either family large enough to exceed it is a `FAIL` of
-that bound, not a pass: KL-002 inputs exceed the time bound from about 9 KB
-through the pinned CLI; KL-003 inputs exceed the time bound from about 13 KB
-(`2^)`) and the memory bound from about 23 KB (`2^*`). They are accepted for
-0.1.0 as KL-002 and KL-003, they are not W06 inputs, and V10 supports no time
-or memory claim for them beyond the recorded measurements. A fix is recorded
-by re-measuring, retiring the limitation and turning its guard into a scaling
-regression test.
+KL-002 and the V10 bound. W06's per-input bound (10 s, 1 GiB) still applies
+to every W06 input and W13 seed, the KL-002 witnesses included. An input of
+the KL-002 class large enough to exceed it is a `FAIL` of that bound, not a
+pass: through the pinned CLI the measured families pass 10 s from about 9 KB
+(prefix operators, also across lines), 14 KB (`^`) and 28 KB (nested
+single-line IFs); none approaches the memory bound. Such inputs are accepted
+for 0.1.0 as KL-002, they are not W06 inputs, and V10 supports no time claim
+for them beyond the recorded measurements, and no claim that the known
+families are the only ones. A fix is recorded by re-measuring, narrowing or
+retiring the limitation and turning its guard into a scaling regression test.
 
 Recovery scaling guards. `scripts/check_robustness.py` runs, with W13 locally
 and in hosted CI, one guard per row of its `RECOVERY_GUARDS` table: the
-witness `x = ` + unit×k at two sizes, the minimum of three CLI parse times for
-each, and the peak memory of the CLI process for the larger one. A guard
-fails if the local exponent of the two times, the larger time or that peak
-memory exceeds the row's bound:
+witness (a prefix followed by the unit k times) at two sizes, the minimum of
+three CLI parse times for each, and the peak memory of the CLI process for
+each. A guard fails if the local exponent of the two times, the larger time
+or the growth of peak memory from the smaller to the larger size exceeds the
+row's bound (a growth, so that each OS's base memory cancels out):
 
-| Row | Unit, sizes | Exponent | Larger parse | Peak memory | Kind |
+| Row | Witness, sizes | Exponent | Larger parse | Memory growth | Kind |
 |---|---|---|---|---|---|
-| KL-002 | `+*`, k = 250 and 1,000 | ≤ 2.5 | ≤ 3 s | ≤ 256 MiB | disclosed limitation: worse than quadratic, or a large constant-factor slowdown, fails |
-| R-A-01 | `f(*`, k = 500 and 2,000 | ≤ 1.5 | ≤ 1 s | ≤ 256 MiB | regression test of the Session 05-1 fix (before it: exponent 1.7–2.1, 3 s, 1.27 GiB) |
-| KL-003 | `2^*`, k = 500 and 2,000 | ≤ 2.5 | ≤ 3 s | ≤ 512 MiB | disclosed limitation, memory included (observed about 80–90 MiB at k = 2,000) |
+| KL-002 prefix | `x = ` + `+*`, k = 250 and 1,000 | ≤ 2.5 | ≤ 3 s | ≤ 32 MiB | disclosed limitation: worse than quadratic, a large slowdown or a memory regression fails |
+| KL-002 nested IF | `if a⏎*2`, k = 250 and 1,000 | ≤ 2.5 | ≤ 3 s | ≤ 32 MiB | as above |
+| KL-002 exponent | `x = ` + `2^*`, k = 500 and 2,000 | ≤ 2.5 | ≤ 5 s | ≤ 24 MiB | as above, and a regression test of the `_pow_left` memory fix (before it: 69 MiB growth) |
+| R-A-01 | `x = ` + `f(*`, k = 500 and 2,000 | ≤ 1.5 | ≤ 300 ms | ≤ 24 MiB | regression test of the Session 05-1 fix (before it: exponent 1.7–2.1, 3 s, 1.24 GiB) |
 
 ## Fixture rules
 

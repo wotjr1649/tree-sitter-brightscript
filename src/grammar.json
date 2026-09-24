@@ -1967,6 +1967,14 @@
         }
       ]
     },
+    "_pow_left": {
+      "type": "PREC",
+      "value": 10,
+      "content": {
+        "type": "SYMBOL",
+        "name": "expression"
+      }
+    },
     "binary_expression": {
       "type": "CHOICE",
       "members": [
@@ -1981,7 +1989,7 @@
                 "name": "left",
                 "content": {
                   "type": "SYMBOL",
-                  "name": "expression"
+                  "name": "_pow_left"
                 }
               },
               {

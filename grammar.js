@@ -355,10 +355,16 @@ module.exports = grammar({
       prec(PREC.NOT, seq(field('operator', kw('not')), field('operand', $.expression))),
     ),
 
+    // The left operand of `^` as its own rule with POSTFIX precedence: the
+    // tree and associativity are unchanged, but error recovery on runs of
+    // malformed `^` no longer keeps a deep merged stack whose end-of-input
+    // acceptance needs quadratic memory (grammar-design §5).
+    _pow_left: $ => prec(PREC.POSTFIX, $.expression),
+
     // BS-EXP-011, 013-017, 019, 020.
     binary_expression: $ => choice(
       prec.right(PREC.EXPONENT, seq(
-        field('left', $.expression), field('operator', '^'), field('right', $.expression),
+        field('left', $._pow_left), field('operator', '^'), field('right', $.expression),
       )),
       ...[
         [PREC.MULTIPLICATIVE, choice('*', '/', kw('mod'), '\\')],

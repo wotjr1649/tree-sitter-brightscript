@@ -17,9 +17,10 @@ Usage: python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N] 
 - Recovery scaling guards (validation.md "Recovery scaling guards"): each
   witness of RECOVERY_GUARDS is parsed at two sizes. The local exponent of the
   CLI parse times (minimum of three `--time` runs each) must not exceed the
-  row's bound, the larger parse must stay within the row's time and its CLI
-  process within the row's peak memory. The exponent is printed so that a fix,
-  or a worse regression, is visible.
+  row's bound, the larger parse must stay within the row's time, and the peak
+  memory of the CLI process may grow from the smaller to the larger size by at
+  most the row's bound (a growth, so that each OS's base memory cancels out).
+  The exponent is printed so that a fix, or a worse regression, is visible.
 Crash = a timeout, an exit status other than 0 or 1, or status 1 without the
 CLI's parse-error summary line (status 1 also reports failures to run). Error
 state is the root line of `--cst` output, read by scripts/tscli.py `has_error`
@@ -39,18 +40,20 @@ from corpus import read_corpus
 from tscli import cli, cst, has_error, popen
 TIME_LIMIT = 10.0
 MEMORY_LIMIT = 1 << 30
-# (name, repeated unit, small k, large k, max exponent, max ms and max MiB of the large parse).
-# KL-002 and KL-003 are disclosed quadratic families; R-A-01 was fixed in Session 05-1 and must stay linear.
+# (name, prefix, repeated unit, small k, large k, max exponent, max ms of the large parse, max MiB of memory
+# growth). The KL-002 rows are disclosed quadratic-time families; the other two were fixed in Session 05-1
+# (R-A-01: time and memory; exponent: memory) and must stay so.
 RECOVERY_GUARDS = [
-    ("KL-002 prefix +/- (B-01)", b"+*", 250, 1000, 2.5, 3000, 256),
-    ("R-A-01 unclosed calls (fixed)", b"f(*", 500, 2000, 1.5, 1000, 256),
-    ("KL-003 exponent", b"2^*", 500, 2000, 2.5, 3000, 512),
+    ("KL-002 prefix +/- (B-01)", b"x = ", b"+*", 250, 1000, 2.5, 3000, 32),
+    ("KL-002 nested single-line IF", b"", b"if a\n*2", 250, 1000, 2.5, 3000, 32),
+    ("KL-002 exponent, memory fixed", b"x = ", b"2^*", 500, 2000, 2.5, 5000, 24),
+    ("R-A-01 unclosed calls (fixed)", b"x = ", b"f(*", 500, 2000, 1.5, 300, 24),
 ]
 
 
-def witness(unit, k):
-    """`x = ` followed by `unit` k times: one unclosed expression."""
-    return b"x = " + unit * k + b"\n"
+def witness(unit, k, prefix=b"x = "):
+    """`prefix` followed by `unit` k times and a line end."""
+    return prefix + unit * k + b"\n"
 
 
 def w06():
@@ -122,8 +125,10 @@ def w07_w13_seeds():
         ("W13 #if without #end if", b"#if false\nprose\n#if A\n"),
         ("W13 directive-like region lines at line end", b"#if false\n#elsei\n#endi\n#if-then-else notes\n#else:\nx = 1\n#end if\ny = 2\n"),
         ("KL-002 B-01 witness k=1000", witness(b"+*", 1000)),
+        ("KL-002 nested single-line IF witness k=1000", witness(b"if a\n*2", 1000, b"")),
+        ("KL-002 prefix operators across lines k=1000", witness(b"-\n", 1000, b"x = -\n")),
+        ("KL-002 exponent witness k=2000", witness(b"2^*", 2000)),
         ("R-A-01 unclosed-call witness k=2000", witness(b"f(*", 2000)),
-        ("KL-003 exponent witness k=2000", witness(b"2^*", 2000)),
     ]
 
 
@@ -136,7 +141,7 @@ def parse_ms(path):
     return float(m.group(1))
 
 
-def scaling_verdict(small_bytes, small_ms, large_bytes, large_ms, large_mib, max_exponent, max_ms, max_mib):
+def scaling_verdict(small_bytes, small_ms, large_bytes, large_ms, growth_mib, max_exponent, max_ms, max_growth):
     """(local exponent, problems) of one recovery scaling guard."""
     exponent = math.log(max(large_ms, 0.001) / max(small_ms, 0.001)) / math.log(large_bytes / small_bytes)
     problems = []
@@ -144,25 +149,27 @@ def scaling_verdict(small_bytes, small_ms, large_bytes, large_ms, large_mib, max
         problems.append(f"exponent {exponent:.2f} > {max_exponent}")
     if large_ms > max_ms:
         problems.append(f"{large_ms:.0f} ms > {max_ms} ms")
-    if large_mib > max_mib:
-        problems.append(f"{large_mib:.0f} MiB > {max_mib} MiB")
+    if growth_mib > max_growth:
+        problems.append(f"memory grew {growth_mib:.0f} MiB > {max_growth} MiB")
     return exponent, problems
 
 
 def recovery_guards(tmp, fail):
-    for name, unit, small, large, max_exponent, max_ms, max_mib in RECOVERY_GUARDS:
-        sizes = []
+    for name, prefix, unit, small, large, max_exponent, max_ms, max_growth in RECOVERY_GUARDS:
+        sizes, problems = [], []
         for k in (small, large):
             path = tmp / f"guard-{k}.brs"
-            path.write_bytes(witness(unit, k))
-            sizes.append((path.stat().st_size, min(parse_ms(path) for _ in range(3))))
-        code, _, peak, _ = (run if sys.platform == "win32" else run_posix)(path)
-        (sb, sm), (lb, lm) = sizes
-        exponent, problems = scaling_verdict(sb, sm, lb, lm, peak / 2**20, max_exponent, max_ms, max_mib)
-        if code is None or peak < 0:
-            problems.append("hang or memory not measured")
-        print(f"  {name}: k={small} {sb:,} bytes {sm:.1f} ms; k={large} {lb:,} bytes {lm:.1f} ms, "
-              f"{peak / 2**20:.0f} MiB; exponent {exponent:.2f} (limit {max_exponent})"
+            path.write_bytes(witness(unit, k, prefix))
+            ms = min(parse_ms(path) for _ in range(3))
+            code, _, peak, _ = (run if sys.platform == "win32" else run_posix)(path)
+            if code is None or peak < 0:
+                problems.append(f"k={k}: hang or memory not measured")
+            sizes.append((path.stat().st_size, ms, peak / 2**20))
+        (sb, sm, speak), (lb, lm, lpeak) = sizes
+        exponent, more = scaling_verdict(sb, sm, lb, lm, lpeak - speak, max_exponent, max_ms, max_growth)
+        problems += more
+        print(f"  {name}: k={small} {sb:,} bytes {sm:.1f} ms {speak:.0f} MiB; k={large} {lb:,} bytes {lm:.1f} ms "
+              f"{lpeak:.0f} MiB; exponent {exponent:.2f} (limit {max_exponent})"
               f"{' FAIL ' + ', '.join(problems) if problems else ''}")
         fail += [f"{name} guard: {p}" for p in problems]
 
@@ -257,7 +264,7 @@ def main():
         for name, t in corpus.items():
             if ":error" in t["attrs"]:
                 check(name, t["input"], False, True, tmp, fail)
-        print("Recovery scaling guards (minimum of 3 CLI parse times; peak memory of the larger parse)")
+        print("Recovery scaling guards (minimum of 3 CLI parse times; peak memory of each parse, growth checked)")
         recovery_guards(tmp, fail)
     if "--skip-fuzz" not in sys.argv:
         iterations = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--fuzz-iterations=")), "1000")

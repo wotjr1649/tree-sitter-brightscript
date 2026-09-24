@@ -148,8 +148,9 @@ bytes and invalid UTF-8 (BS-LEX-034); line breaks in argument lists, after
 BS-FUNC-007); lone `"`, `#`, `?`, `&h`; 10,000 `(`; 10,000 `:`; `#if` without
 `#end if`; directive-like region lines that end at a word boundary
 (grammar-design §11); every other unresolved form listed in the registry; the
-KL-002 witness `x = ` + `+*`×1,000, the R-A-01 witness `x = ` +
-`f(*`×2,000 and the KL-003 witness `x = ` + `2^*`×2,000 (validation.md). Only the robustness criterion applies to them.
+KL-002 witnesses `x = ` + `+*`×1,000, `if a↵*2`×1,000, `x = -↵` +
+`-↵`×1,000 and `x = ` + `2^*`×2,000, and the R-A-01 witness `x = ` +
+`f(*`×2,000 (validation.md). Only the robustness criterion applies to them.
 The recovery scaling guards also parse each witness at two sizes and bound
 the exponent, time and memory (validation.md "Recovery scaling guards").
 

@@ -287,6 +287,11 @@ left a deep stack whose end-of-input acceptance took quadratic time and memory
 input is linear. The precedence settles the reduce/reduce conflict between an
 operand of a postfix form and a PRINT item (`print a [1]`, §14) the way the
 inlined rule did; `src/node-types.json` and every valid tree are unchanged.
+For the same reason the left operand of `^` is a hidden rule
+`_pow_left` = `expression` with `POSTFIX` precedence: recovery on a run of
+malformed `^` (`x = 2^*2^*…`) otherwise needed quadratic memory at end of
+input (1.1 GiB at 24 KB) and now needs little memory; the time stays
+quadratic (KL-002). `2^3^2` is still `2^(3^2)` and `-2^2` still `-(2^2)`.
 
 | Postfix form | Accepted left operand |
 |---|---|

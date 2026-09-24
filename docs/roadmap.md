@@ -5,8 +5,9 @@
 Grammar version 0.1.0: release candidate (Session 03), independently
 audited in Session 04 ([reports/0.1.0-release-audit.md](reports/0.1.0-release-audit.md)),
 release-frozen in Session 05 ([reports/0.1.0-release.md](reports/0.1.0-release.md));
-Session 05-1 isolated the final-review finding B-01 (KL-002), fixed the
-unclosed-call recovery found by its re-audit and disclosed KL-003. The 0.1.0 release is the commit identified by the `v0.1.0` tag and
+Session 05-1 isolated the final-review finding B-01, fixed two
+recovery families found by its re-audits and disclosed the remaining
+quadratic-time recovery behaviour as the class KL-002. The 0.1.0 release is the commit identified by the `v0.1.0` tag and
 its GitHub Release once they are published; no package is published.
 Phases 1–5 have their exit evidence in
 [reports/0.1.0-release-candidate.md](reports/0.1.0-release-candidate.md) and
