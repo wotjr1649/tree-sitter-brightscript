@@ -279,7 +279,14 @@ level. A prefix operator binds its operand at its own level: `-2^2` is
 Postfix operand kinds. `_postfix_operand` is `identifier`,
 `parenthesized_expression`, `call_expression`, `member_expression`,
 `index_expression` or `attribute_expression` (including their optional
-variants).
+variants). It is a hidden rule that is not inlined and carries `POSTFIX`
+precedence. When it was inlined, error recovery on a run of unclosed calls or
+indexes opened with a token that cannot start their content (`x = f(*f(*…`)
+left a deep stack whose end-of-input acceptance took quadratic time and memory
+(1.27 GiB at 6 KB; Session 05-1 re-audit finding R-A-01); not inlined, the same
+input is linear. The precedence settles the reduce/reduce conflict between an
+operand of a postfix form and a PRINT item (`print a [1]`, §14) the way the
+inlined rule did; `src/node-types.json` and every valid tree are unchanged.
 
 | Postfix form | Accepted left operand |
 |---|---|
@@ -646,6 +653,7 @@ Expected ambiguity points and the planned mechanism:
 | label vs colon separator | factoring: a bare identifier is never a statement |
 | `?` alias vs optional chaining | lexical distinction (§3) |
 | PRINT item juxtaposition | `LIST` precedence below every operator |
+| operand of a postfix form vs PRINT item (`print a [1]`) | `POSTFIX` precedence on `_postfix_operand` (§5) |
 | anonymous function vs declaration | LR(1): identifier vs `(` after `function`/`sub` |
 | END vs END X | single tokens for the two-word terminators (§3) |
 | ELSE vs ELSE IF, FOR vs FOR EACH, `#else` vs `#else if` | LR(1) one-token lookahead |

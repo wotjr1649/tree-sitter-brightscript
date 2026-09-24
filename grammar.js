@@ -64,7 +64,7 @@ module.exports = grammar({
 
   supertypes: $ => [$.statement, $.expression],
 
-  inline: $ => [$._postfix_operand, $._assignment_target, $._stmt_chain, $._cc_condition],
+  inline: $ => [$._assignment_target, $._stmt_chain, $._cc_condition],
 
   rules: {
     // ---------------------------------------------------------------- lines
@@ -305,14 +305,17 @@ module.exports = grammar({
       $.attribute_expression,
     ),
 
-    _postfix_operand: $ => choice(
+    // Not inlined: inlined, error recovery on runs of unclosed calls or indexes
+    // grew quadratically in time and memory (grammar-design §5). POSTFIX
+    // precedence keeps `print a [1]` an index expression (§14).
+    _postfix_operand: $ => prec(PREC.POSTFIX, choice(
       $.identifier,
       $.parenthesized_expression,
       $.call_expression,
       $.member_expression,
       $.index_expression,
       $.attribute_expression,
-    ),
+    )),
 
     // BS-EXP-002.
     parenthesized_expression: $ => seq('(', $.expression, ')'),

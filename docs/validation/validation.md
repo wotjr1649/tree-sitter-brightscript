@@ -178,11 +178,20 @@ every W06 input and W13 seed, the KL-002 witness included. A KL-002-family
 input large enough to exceed it (about 7 KB through the pinned CLI) is a
 `FAIL` of that bound, not a pass: it is accepted for 0.1.0 as KL-002, it is not
 a W06 input, and V10 supports no time claim for it beyond the recorded
-measurements. The KL-002 guard, run with W13 locally and in hosted CI, parses
-the witness at k = 250 and k = 1,000 and fails if the local exponent of the
-parse times exceeds 2.5 (worse than the disclosed quadratic) or the larger
-parse exceeds 10 s. A fix is recorded by re-measuring, retiring KL-002 and
-turning the guard into a scaling regression test.
+measurements. A fix is recorded by re-measuring, retiring KL-002 and turning
+its guard into a scaling regression test.
+
+Recovery scaling guards. `scripts/check_robustness.py` runs, with W13 locally
+and in hosted CI, one guard per row of its `RECOVERY_GUARDS` table: the
+witness `x = ` + unit×k at two sizes, the minimum of three CLI parse times for
+each, and the peak memory of the CLI process for the larger one. A guard
+fails if the local exponent of the two times, the larger time or that peak
+memory exceeds the row's bound:
+
+| Row | Unit, sizes | Exponent | Larger parse | Peak memory | Kind |
+|---|---|---|---|---|---|
+| KL-002 | `+*`, k = 250 and 1,000 | ≤ 2.5 | ≤ 3 s | ≤ 256 MiB | disclosed limitation: worse than quadratic, or a large constant-factor slowdown, fails |
+| R-A-01 | `f(*`, k = 500 and 2,000 | ≤ 1.5 | ≤ 1 s | ≤ 256 MiB | regression test of the Session 05-1 fix (before it: exponent 1.7–2.1, 3 s, 1.27 GiB) |
 
 ## Fixture rules
 

@@ -14,11 +14,12 @@ Usage: python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N] 
   N iterations (default 1000) of up to 10 edits and seed N (default 1,
   TREE_SITTER_SEED) reports no failure. The fuzzer signals failures only in
   its output, so its output is scanned.
-- KL-002 guard (validation.md): the B-01 witness `x = ` + `+*`×k is parsed at
-  two sizes; the local exponent of the CLI parse times (minimum of three
-  `--time` runs each) must not exceed 2.5 and the larger parse must finish
-  within 10 s. The disclosed behaviour is quadratic; the exponent is printed
-  so that a fix, or a worse regression, is visible.
+- Recovery scaling guards (validation.md "Recovery scaling guards"): each
+  witness of RECOVERY_GUARDS is parsed at two sizes. The local exponent of the
+  CLI parse times (minimum of three `--time` runs each) must not exceed the
+  row's bound, the larger parse must stay within the row's time and its CLI
+  process within the row's peak memory. The exponent is printed so that a fix,
+  or a worse regression, is visible.
 Crash = a timeout, an exit status other than 0 or 1, or status 1 without the
 CLI's parse-error summary line (status 1 also reports failures to run). Error
 state is the root line of `--cst` output, read by scripts/tscli.py `has_error`
@@ -38,13 +39,17 @@ from corpus import read_corpus
 from tscli import cli, cst, has_error, popen
 TIME_LIMIT = 10.0
 MEMORY_LIMIT = 1 << 30
-KL002_SIZES = (250, 1000)
-KL002_MAX_EXPONENT = 2.5
+# (name, repeated unit, small k, large k, max exponent, max ms and max MiB of the large parse).
+# KL-002 is a disclosed quadratic family; R-A-01 was fixed in Session 05-1 and must stay linear.
+RECOVERY_GUARDS = [
+    ("KL-002 prefix +/- (B-01)", b"+*", 250, 1000, 2.5, 3000, 256),
+    ("R-A-01 unclosed calls (fixed)", b"f(*", 500, 2000, 1.5, 1000, 256),
+]
 
 
-def kl002_witness(k):
-    """B-01: a prefix `+` followed by `*`, repeated k times inside one unclosed expression."""
-    return b"x = " + b"+*" * k + b"\n"
+def witness(unit, k):
+    """`x = ` followed by `unit` k times: one unclosed expression."""
+    return b"x = " + unit * k + b"\n"
 
 
 def w06():
@@ -115,7 +120,8 @@ def w07_w13_seeds():
         ("W13 10000 colons", b":" * 10000),
         ("W13 #if without #end if", b"#if false\nprose\n#if A\n"),
         ("W13 directive-like region lines at line end", b"#if false\n#elsei\n#endi\n#if-then-else notes\n#else:\nx = 1\n#end if\ny = 2\n"),
-        ("KL-002 B-01 witness k=1000", kl002_witness(1000)),
+        ("KL-002 B-01 witness k=1000", witness(b"+*", 1000)),
+        ("R-A-01 unclosed-call witness k=2000", witness(b"f(*", 2000)),
     ]
 
 
@@ -128,29 +134,35 @@ def parse_ms(path):
     return float(m.group(1))
 
 
-def kl002_verdict(small_bytes, small_ms, large_bytes, large_ms):
-    """(local exponent, problems) of the KL-002 guard."""
-    exponent = math.log(large_ms / max(small_ms, 0.001)) / math.log(large_bytes / small_bytes)
+def scaling_verdict(small_bytes, small_ms, large_bytes, large_ms, large_mib, max_exponent, max_ms, max_mib):
+    """(local exponent, problems) of one recovery scaling guard."""
+    exponent = math.log(max(large_ms, 0.001) / max(small_ms, 0.001)) / math.log(large_bytes / small_bytes)
     problems = []
-    if exponent > KL002_MAX_EXPONENT:
-        problems.append(f"exponent {exponent:.2f} > {KL002_MAX_EXPONENT} (worse than the disclosed quadratic)")
-    if large_ms > TIME_LIMIT * 1000:
-        problems.append(f"{large_ms / 1000:.1f} s > {TIME_LIMIT:.0f} s")
+    if exponent > max_exponent:
+        problems.append(f"exponent {exponent:.2f} > {max_exponent}")
+    if large_ms > max_ms:
+        problems.append(f"{large_ms:.0f} ms > {max_ms} ms")
+    if large_mib > max_mib:
+        problems.append(f"{large_mib:.0f} MiB > {max_mib} MiB")
     return exponent, problems
 
 
-def kl002_guard(tmp, fail):
-    times = []
-    for k in KL002_SIZES:
-        path = tmp / f"kl002-{k}.brs"
-        path.write_bytes(kl002_witness(k))
-        times.append((path.stat().st_size, min(parse_ms(path) for _ in range(3))))
-    (sb, sm), (lb, lm) = times
-    exponent, problems = kl002_verdict(sb, sm, lb, lm)
-    note = " (below 1.5: KL-002 may no longer hold; re-measure and update it)" if exponent < 1.5 else ""
-    print(f"  k={KL002_SIZES[0]}: {sb:,} bytes, {sm:.1f} ms; k={KL002_SIZES[1]}: {lb:,} bytes, {lm:.1f} ms; "
-          f"exponent {exponent:.2f}{note}{' FAIL ' + ', '.join(problems) if problems else ''}")
-    fail += [f"KL-002 guard: {p}" for p in problems]
+def recovery_guards(tmp, fail):
+    for name, unit, small, large, max_exponent, max_ms, max_mib in RECOVERY_GUARDS:
+        sizes = []
+        for k in (small, large):
+            path = tmp / f"guard-{k}.brs"
+            path.write_bytes(witness(unit, k))
+            sizes.append((path.stat().st_size, min(parse_ms(path) for _ in range(3))))
+        code, _, peak, _ = (run if sys.platform == "win32" else run_posix)(path)
+        (sb, sm), (lb, lm) = sizes
+        exponent, problems = scaling_verdict(sb, sm, lb, lm, peak / 2**20, max_exponent, max_ms, max_mib)
+        if code is None or peak < 0:
+            problems.append("hang or memory not measured")
+        print(f"  {name}: k={small} {sb:,} bytes {sm:.1f} ms; k={large} {lb:,} bytes {lm:.1f} ms, "
+              f"{peak / 2**20:.0f} MiB; exponent {exponent:.2f} (limit {max_exponent})"
+              f"{' FAIL ' + ', '.join(problems) if problems else ''}")
+        fail += [f"{name} guard: {p}" for p in problems]
 
 
 def run(path):
@@ -243,8 +255,8 @@ def main():
         for name, t in corpus.items():
             if ":error" in t["attrs"]:
                 check(name, t["input"], False, True, tmp, fail)
-        print("KL-002 scaling guard (B-01 witness, minimum of 3 CLI parse times)")
-        kl002_guard(tmp, fail)
+        print("Recovery scaling guards (minimum of 3 CLI parse times; peak memory of the larger parse)")
+        recovery_guards(tmp, fail)
     if "--skip-fuzz" not in sys.argv:
         iterations = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--fuzz-iterations=")), "1000")
         seed = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--fuzz-seed=")), "1")

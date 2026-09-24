@@ -148,10 +148,10 @@ bytes and invalid UTF-8 (BS-LEX-034); line breaks in argument lists, after
 BS-FUNC-007); lone `"`, `#`, `?`, `&h`; 10,000 `(`; 10,000 `:`; `#if` without
 `#end if`; directive-like region lines that end at a word boundary
 (grammar-design §11); every other unresolved form listed in the registry; the
-KL-002 witness `x = ` + `+*`×1,000 (validation.md). Only the robustness
-criterion applies to them. The KL-002 scaling guard also parses the witness at
-k = 250 and k = 1,000 and bounds the local exponent of the parse times
-(validation.md "KL-002 and the V10 bound").
+KL-002 witness `x = ` + `+*`×1,000 and the R-A-01 witness `x = ` +
+`f(*`×2,000 (validation.md). Only the robustness criterion applies to them.
+The recovery scaling guards also parse each witness at two sizes and bound
+the exponent, time and memory (validation.md "Recovery scaling guards").
 
 ## Automation
 
@@ -163,7 +163,7 @@ runs all of them except W12 and W14 on Windows and Ubuntu.
 | W01, W02, W04, W07 (valid), W09 (fixtures), W11 | `python scripts/tscli.py test` (verified binary, private parser library, validation.md "Identity binding") and `python scripts/check_registry.py --complete` |
 | W03 | `python scripts/check_samples.py` |
 | W05 | `python scripts/check_spellings.py` |
-| W06, W07 (invalid bytes), W08, W13 (KL-002 guard included) | `python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N]` |
+| W06, W07 (invalid bytes), W08, W13 (recovery scaling guards included) | `python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N]` |
 | W09 (C4), W10 (C5 included) | `python scripts/check_spike.py`, `python scripts/check_incremental.py` |
 | W12 | `python scripts/record_oracle.py` (clean tree; output under `artifacts/oracle/`) |
 | W14 | in `go-treesitter`, from the W12 inputs and W10 edits of the same identity |
