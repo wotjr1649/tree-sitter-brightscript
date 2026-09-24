@@ -314,6 +314,8 @@ Precedence cases (each is a fixture expectation, see the workload matrix):
 | `-5.tostr()` | `-(5.tostr())` |
 | `a.b ^ 2` | `(a.b) ^ 2` |
 | `2^3^2` | `2^(3^2)` |
+| `a ^ b * c`, `a * b ^ c` | `(a ^ b) * c`, `a * (b ^ c)` |
+| `not a ^ b`, `a ^ b or c` | `not (a ^ b)`, `(a ^ b) or c` |
 | `-2^2`, `2^-2` | `-(2^2)`, `2^(-2)` |
 | `-a * b`, `a * -b` | `(-a) * b`, `a * (-b)` |
 | `a / b mod c \ d * e` | `(((a / b) mod c) \ d) * e` |
@@ -391,9 +393,10 @@ items (`print f([)f([)…`, `print ,+*,+*…`) left a deep merged stack whose
 end-of-input acceptance needed quadratic memory that the progress callback
 could not interrupt (1.4 GiB at 32 KB; Session 05-1 delta re-audit findings
 B4-01, B4-02). The right-recursive hidden list `_print_items` needs little
-memory on the same input; a PRINT continued by lines that start with a
-separator and a prefix operator (`print ,+⏎,+⏎…`) takes quadratic time instead
-(KL-002). `src/node-types.json` and every valid tree are unchanged: a hidden
+memory on the same input; a PRINT continued by malformed lines (for example
+`print ,+⏎,+⏎…`) takes quadratic time instead (KL-002), and a highlight query
+within one PRINT takes time quadratic in its item count (open finding A5-01,
+0.1.0-release.md "Status: hold"). `src/node-types.json` and every valid tree are unchanged: a hidden
 list's items are children of `print_statement` either way.
 
 ## 7. Top level

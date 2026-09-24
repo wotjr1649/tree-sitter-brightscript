@@ -8,8 +8,11 @@ release-frozen in Session 05 ([reports/0.1.0-release.md](reports/0.1.0-release.m
 Session 05-1 isolated the final-review finding B-01, fixed the
 unclosed-call recovery family and the recovery memory of two others (`^` and
 PRINT items) found by its re-audits, and disclosed the remaining
-quadratic-time recovery behaviour as the class KL-002. The 0.1.0 release is the commit identified by the `v0.1.0` tag and
-its GitHub Release once they are published; no package is published.
+quadratic-time recovery behaviour as the class KL-002. Its round-5 re-audit
+found three release-blocking findings, and Session 05-1 ended on hold: 0.1.0
+is not released ([reports/0.1.0-release.md](reports/0.1.0-release.md#status-hold)).
+The 0.1.0 release will be the commit identified by the `v0.1.0` tag and its
+GitHub Release once they are published; no package is published.
 Phases 1–5 have their exit evidence in
 [reports/0.1.0-release-candidate.md](reports/0.1.0-release-candidate.md) and
 the release record. Phase 6 was tried on a local `go-treesitter` branch that
