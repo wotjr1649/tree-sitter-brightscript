@@ -14,7 +14,8 @@ Usage: python scripts/test_tscli.py
 5. The check scripts still work through the shared path.
 6. No other script names a CLI launcher or starts a program other than git
    in the spellings the AST check recognises, every `run` key of every workflow
-   file is readable by the test, and every command it runs is on an allowlist
+   file that the test recognises (`run`, also with a hex or unicode escape of
+   its first letter) is readable by it, and every command it runs is on an allowlist
    (no shell metacharacters except the fixed clean-tree check), so the check
    does not depend on CI running check_generated.py first. A regression guard,
    not a sandbox: validation.md "Identity binding" lists what it does not see.
@@ -43,13 +44,15 @@ SCRIPTS = Path(__file__).resolve().parent
 # Arguments are limited to characters without shell meaning, so nothing can be chained after an allowed command.
 CI_ALLOWED = (r'npm ci|python scripts/[a-z0-9_]+\.py( [A-Za-z0-9_./=-]+)*|git [a-z-]+( --?[a-z-]+)*'
               r'|test -z "\$\(git status --porcelain\)"')
-# Any `run` key in any YAML spelling (flow mapping, quoted key, extra spaces); each must be one the parser read.
+# `run` keys in the spellings recognised here (flow mapping, quoted key, extra spaces, `\x72un`, `\u0072un`);
+# each must be one the parser read. Other escapes are not recognised (validation.md "Identity binding").
 ANY_RUN_KEY = re.compile(r"""(?:^|[\s{,])["']?(?:run|\\x72un|\\u0072un)["']?\s*:""", re.M)
 
 
 def ci_commands(text):
     """Every command of every `run:` step (single-line with continuation lines, `|` and `>` blocks).
-    Raises ValueError for a `run` key the block-style parser cannot read, so no spelling goes unchecked."""
+    Raises ValueError for a `run` key, in a spelling ANY_RUN_KEY recognises, that the block-style parser cannot
+    read."""
     lines, out, keys = text.splitlines(), [], 0
     for i, line in enumerate(lines):
         m = re.match(r"^(\s*)(- )?run: ?(.*)$", line)
@@ -278,9 +281,11 @@ OS_LAUNCH = ("system", "popen", "startfile", "spawn", "exec", "posix_spawn", "fo
 
 def launches(source):
     """Ways a script could start a program other than git. Lexical: launcher names and paths anywhere in the text.
-    Semantic: `subprocess` only as `import subprocess`, used for its data names or for `subprocess.run([
-    "git", ...])` without `shell` or `executable`; no other process API of os, asyncio, importlib or
-    getattr. A structural guard against accidental regressions, not a sandbox: the scripts are trusted."""
+    Semantic, for the spellings checked below: `subprocess` imported as `import subprocess`, used for its data
+    names or for `subprocess.run(["git", ...])` without `shell` or `executable`; `from subprocess/asyncio/
+    importlib import`, aliases of `subprocess`, `__import__`, `importlib` and `getattr` beside `subprocess` are
+    reported. Other forms are not seen (validation.md "Identity binding" lists them). A structural guard
+    against accidental regressions, not a sandbox: the scripts are trusted."""
     found = [m.group(0) for m in LAUNCHERS.finditer(source)]
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] in ("subprocess", "asyncio",

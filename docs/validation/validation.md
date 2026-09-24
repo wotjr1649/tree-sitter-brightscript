@@ -139,7 +139,7 @@ sandbox (the scripts are trusted, below). Forms it does not recognise include
 `from os import …` and aliases of `os`, `subprocess` reached through another
 module or with `**` keywords, `sys.modules`, `ctypes`, `_winapi`,
 `multiprocessing`, `pty`, `webbrowser`, `eval` and `exec`, git aliases,
-modules outside `scripts/`, YAML keys escaped other than `\x72un`, a custom
+modules outside `scripts/`, YAML keys escaped other than `\x72un` and `\u0072un`, a custom
 step `shell:`, local actions, `binding.gyp` and `.npmrc` settings (Session 05-1
 delta re-audit C4-01, C4-02).
 Once per process `tscli.py` copies the installed binary into a private
