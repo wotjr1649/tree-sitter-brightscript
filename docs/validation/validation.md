@@ -166,20 +166,26 @@ compared).
 - A known defect becomes a named known limitation with an ID (`KL-NNN`), the
   affected `BS-*` requirement, the observed behaviour and the fixture that
   demonstrates it. Tree-sitter's `:skip` attribute is allowed only on a fixture
-  that cites its `KL-NNN`.
+  that cites its `KL-NNN`. A robustness-only limitation, which no `BS-*`
+  requirement bounds, names the constructs involved instead and is
+  demonstrated by a W13 seed and its recovery scaling guard.
 
 | ID | State | Requirement | Behaviour | Demonstrating fixture |
 |---|---|---|---|---|
 | KL-001 | retired (unused): the ADR-0004 spike passed with design V1 on 2026-09-23 | BS-COND-007 | A literal-`false` conditional branch whose text is not BrightScript (the documented block-comment idiom) produces `ERROR` nodes | `BS-COND-007: block comment with prose` and the spike fixtures S3, S5–S8, S10–S12, asserted with `:error` |
-| KL-002 | active; accepted for 0.1.0 by the owner on 2026-09-24 | none is violated (robustness only); the construct involved is the prefix `+`/`-` of BS-EXP-012 and BS-EXP-027 | Error recovery time grows with the square of the number of consecutive malformed prefix-operator pairs inside one unclosed expression: `+` or `-` followed by a token that cannot start an operand (`*`, `/`, `,`, `)`, `<`, …), repeated, as in `x = ` + `+*`×k. Tree-sitter runtimes 0.25.1, 0.26.13 and 0.27.0 behave alike, and generators 0.26.13 and 0.27.0 emit identical files, so neither the pin nor a runtime choice removes it. Valid input, scattered errors and one malformed statement per line stay linear. Measurements, cause and mitigation: [0.1.0-performance.md](../reports/0.1.0-performance.md#known-limitation-kl-002) | W13 seed `KL-002 B-01 witness k=1000` and the KL-002 scaling guard (`scripts/check_robustness.py`) |
+| KL-002 | active; accepted for 0.1.0 by the owner on 2026-09-24 | none is violated (robustness only); the constructs involved are the prefix operators of BS-EXP-012, 018, 027 and their nesting (BS-EXP-028) | Error recovery time grows with the square of the number of consecutive malformed prefix-operator pairs in one expression: a prefix operator (`+`, `-`, `not`) followed by a token that cannot start an operand and forces the pending prefix operators to reduce (`*`, `/`, `,`, `)`, `<`, …), repeated, as in `x = ` + `+*`×k or `x = (` + `not)`×k, also inside closed `(…)`, `[…]` or call arguments and after `print`, `return`, `if`. Memory stays small (≤ 20 MiB at 16 KB); the runtime's progress callback stops it. Runtimes 0.25.1, 0.26.13 and 0.27.0 behave alike and generators 0.26.13 and 0.27.0 emit identical files. Valid input, scattered errors and one malformed statement per line stay linear. Measurements, cause and mitigation: [0.1.0-performance.md](../reports/0.1.0-performance.md#known-limitation-kl-002) | W13 seed `KL-002 B-01 witness k=1000` and the KL-002 row of the recovery scaling guards |
+| KL-003 | active; accepted for 0.1.0 by the owner on 2026-09-24 as an explicit exception to the bounded-memory condition for known limitations | none is violated (robustness only); the construct involved is the right-associative `^` of BS-EXP-011 | Error recovery on a run of `^` each followed by a token that cannot start an operand, in one expression (`x = ` + `2^*`×k, `2^)`, `2^,`), grows quadratically. With `*` and similar tokens memory grows quadratically too: the pinned CLI needs 86 MiB at 6 KB, 326 MiB at 12 KB and 1.13 GiB at 24 KB, and the cost lies in the runtime's end-of-input acceptance, which the progress callback does not interrupt (a 200 ms limit stopped a 24 KB input after 2.0 s). A minimal grammar with only a right-associative `^` behaves the same; no grammar change that keeps BS-EXP-011 and the tree was found. Measurements and mitigation: [0.1.0-performance.md](../reports/0.1.0-performance.md#known-limitation-kl-003) | W13 seed `KL-003 exponent witness k=2000` and the KL-003 row of the recovery scaling guards |
 
-KL-002 and the V10 bound. W06's per-input bound (10 s, 1 GiB) still applies to
-every W06 input and W13 seed, the KL-002 witness included. A KL-002-family
-input large enough to exceed it (about 7 KB through the pinned CLI) is a
-`FAIL` of that bound, not a pass: it is accepted for 0.1.0 as KL-002, it is not
-a W06 input, and V10 supports no time claim for it beyond the recorded
-measurements. A fix is recorded by re-measuring, retiring KL-002 and turning
-its guard into a scaling regression test.
+KL-002, KL-003 and the V10 bound. W06's per-input bound (10 s, 1 GiB) still
+applies to every W06 input and W13 seed, the KL-002 and KL-003 witnesses
+included. An input of either family large enough to exceed it is a `FAIL` of
+that bound, not a pass: KL-002 inputs exceed the time bound from about 9 KB
+through the pinned CLI; KL-003 inputs exceed the time bound from about 13 KB
+(`2^)`) and the memory bound from about 23 KB (`2^*`). They are accepted for
+0.1.0 as KL-002 and KL-003, they are not W06 inputs, and V10 supports no time
+or memory claim for them beyond the recorded measurements. A fix is recorded
+by re-measuring, retiring the limitation and turning its guard into a scaling
+regression test.
 
 Recovery scaling guards. `scripts/check_robustness.py` runs, with W13 locally
 and in hosted CI, one guard per row of its `RECOVERY_GUARDS` table: the
@@ -192,6 +198,7 @@ memory exceeds the row's bound:
 |---|---|---|---|---|---|
 | KL-002 | `+*`, k = 250 and 1,000 | ≤ 2.5 | ≤ 3 s | ≤ 256 MiB | disclosed limitation: worse than quadratic, or a large constant-factor slowdown, fails |
 | R-A-01 | `f(*`, k = 500 and 2,000 | ≤ 1.5 | ≤ 1 s | ≤ 256 MiB | regression test of the Session 05-1 fix (before it: exponent 1.7–2.1, 3 s, 1.27 GiB) |
+| KL-003 | `2^*`, k = 500 and 2,000 | ≤ 2.5 | ≤ 3 s | ≤ 512 MiB | disclosed limitation, memory included (observed 86–89 MiB at k = 2,000) |
 
 ## Fixture rules
 

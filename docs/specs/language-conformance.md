@@ -89,7 +89,7 @@ Implementation rules per status (frozen for the first implementation):
   tree. Whatever the grammar built for documented forms produces is
   non-contractual. Such inputs may appear only as robustness seeds (V10).
 - `out-of-scope`: no rule. Rows marked "(guard)" have a positive fixture that
-  shows the grammar does **not** enforce the semantic rule.
+  shows the grammar does **not** enforce the rule.
 
 How grammar-contract §3 is applied: `provisional` is used only for a choice
 about text the grammar must handle anyway — token boundaries and character
@@ -234,6 +234,7 @@ limitation.
 | BS-EXP-025 | Postfix operators on operand kinds that Level 1 does not show: a call or index applied directly to a literal (`"a"(1)`, `5[0]`), and member or index access on array or associative-array literals (`[1, 2].count()`, `[1][0]`). | L1 shows postfix operators on identifiers, on results of postfix operators, on parenthesized expressions and (member access only) on numeric and string literals | unknown | unresolved | none — the planned operand kinds (grammar-design §5) exclude them | n/a — unresolved | n/a | none | — | EXP-02, EXP-03, LIT-09 |
 | BS-EXP-026 | Operator semantics: numeric promotion, concatenation, short-circuit evaluation, runtime errors, `?.` on interface names, the `TYPE?(` compile error. | EVT §Operators subsections; CA | baseline | out-of-scope | none | n/a | n/a | none | — | EXP-14, AMB-35 |
 | BS-EXP-027 | A prefix operator may start the right operand of a tighter binary operator and applies to that operand at its own level: `2^-2` = `2^(-2)`, `x * -y` = `x * (-y)`, `a < not b` = `a < (not b)`. | L1 shows a prefix operator on the right only where it binds tighter than the operator (`<>-1.1`, CA §Use of wrapper functions on intrinsic types) | unknown | provisional | `unary_expression` inside `binary_expression` | `BS-EXP-027: prefix operators as right operands` | n/a | covered | — | AMB-13. Provisional, not tolerated: the form needs no extra rule (a prefix operator starts any operand); what is chosen is the tree shape. BrighterScript (Level 4) accepts these forms but is not evidence for their shape. |
+| BS-EXP-028 | Prefix operators nest: a prefix operator may start the operand of another prefix operator, and each applies to the operand that follows it (`- -x` = `-(-x)`, `+-1` = `+(-1)`, `- not x` = `-(not x)`). | L1 silent (no Level 1 example nests prefix operators); Level 4: BrighterScript @ `01a359c6` `src/parser/Parser.ts` `prefixUnary()` recurses for `-` and `+` without an error diagnostic | unknown | provisional | `unary_expression` (operand `unary_expression`) | `BS-EXP-028: nested prefix operators` | n/a | covered | — | Session 05-1 re-audit (R-A-03). Provisional like BS-EXP-027: no extra rule is needed; the nested shape is the choice. KL-002 rests on keeping it. `not not a` is BS-EXP-018. |
 
 ### STMT
 
@@ -363,14 +364,14 @@ limitation.
 | LEX | 35 | 18 | 9 | 1 | 4 | 1 | 2 |
 | LIT | 20 | 15 | 3 | 0 | 2 | 0 | 0 |
 | TYPE | 3 | 1 | 0 | 0 | 1 | 0 | 1 |
-| EXP | 27 | 18 | 2 | 0 | 4 | 2 | 1 |
+| EXP | 28 | 18 | 3 | 0 | 4 | 2 | 1 |
 | STMT | 40 | 20 | 7 | 5 | 5 | 1 | 2 |
 | FUNC | 14 | 7 | 1 | 1 | 3 | 0 | 2 |
 | ARRAY | 9 | 5 | 0 | 1 | 2 | 0 | 1 |
 | AA | 6 | 3 | 0 | 1 | 1 | 0 | 1 |
 | ERR | 7 | 3 | 1 | 0 | 1 | 1 | 1 |
 | COND | 15 | 7 | 2 | 1 | 2 | 1 | 2 |
-| **Total** | **176** | **97** | **25** | **10** | **25** | **6** | **13** |
+| **Total** | **177** | **97** | **26** | **10** | **25** | **6** | **13** |
 
 The `tolerated` rows cite Level 4 evidence only (grammar-contract §3.3); none
 changes a documented tree, and each is non-normative.

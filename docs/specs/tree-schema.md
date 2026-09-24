@@ -178,7 +178,7 @@ or more. Unnamed children are named nodes without a field.
 | `associative_array_literal` | — | `associative_array_entry`* | BS-AA-001–004 | — |
 | `associative_array_entry` | `key: identifier or string`, `value: expression` | — | BS-AA-001, 002, BS-LEX-024 | highlight (key) |
 | `parenthesized_expression` | — | `expression` | BS-EXP-002 | — |
-| `unary_expression` | `operator: - + not`, `operand: expression` | — | BS-LIT-004, BS-EXP-012, 018, 027 | highlight (operator) |
+| `unary_expression` | `operator: - + not`, `operand: expression` | — | BS-LIT-004, BS-EXP-012, 018, 027, 028 | highlight (operator) |
 | `binary_expression` | `left: expression`, `operator: ^ * / \ mod + - << >> = <> < > <= >= and or`, `right: expression` | — | BS-EXP-011–020, 027 | highlight (operator) |
 | `call_expression` | `function: identifier, member_expression, index_expression, call_expression, attribute_expression or parenthesized_expression`, `arguments: argument_list` | — | BS-EXP-003, 007, 010, BS-STMT-005, BS-LEX-022, 032 | highlight, tags (calls) |
 | `argument_list` | — | `expression`* | BS-EXP-003 | — |
@@ -405,6 +405,7 @@ hidden rules or anonymous children).
 | BS-EXP-020 | S | `binary_expression`, `assignment_statement` |
 | BS-EXP-021 | S | nesting of postfix nodes |
 | BS-EXP-027 | S | `unary_expression` inside `binary_expression` |
+| BS-EXP-028 | S | `unary_expression` inside `unary_expression` |
 | BS-STMT-001 | S | `assignment_statement` |
 | BS-STMT-002 | N | `assignment_statement` (`operator`) |
 | BS-STMT-003 | S | `update_statement` |
@@ -475,4 +476,4 @@ hidden rules or anonymous children).
 without a planned shape: 0 (counts in the next line are checked
 mechanically).
 
-Mapped: 132 (S 80, N 27, L 25).
+Mapped: 133 (S 81, N 27, L 25).

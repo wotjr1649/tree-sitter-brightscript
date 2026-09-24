@@ -40,10 +40,11 @@ from tscli import cli, cst, has_error, popen
 TIME_LIMIT = 10.0
 MEMORY_LIMIT = 1 << 30
 # (name, repeated unit, small k, large k, max exponent, max ms and max MiB of the large parse).
-# KL-002 is a disclosed quadratic family; R-A-01 was fixed in Session 05-1 and must stay linear.
+# KL-002 and KL-003 are disclosed quadratic families; R-A-01 was fixed in Session 05-1 and must stay linear.
 RECOVERY_GUARDS = [
     ("KL-002 prefix +/- (B-01)", b"+*", 250, 1000, 2.5, 3000, 256),
     ("R-A-01 unclosed calls (fixed)", b"f(*", 500, 2000, 1.5, 1000, 256),
+    ("KL-003 exponent", b"2^*", 500, 2000, 2.5, 3000, 512),
 ]
 
 
@@ -122,6 +123,7 @@ def w07_w13_seeds():
         ("W13 directive-like region lines at line end", b"#if false\n#elsei\n#endi\n#if-then-else notes\n#else:\nx = 1\n#end if\ny = 2\n"),
         ("KL-002 B-01 witness k=1000", witness(b"+*", 1000)),
         ("R-A-01 unclosed-call witness k=2000", witness(b"f(*", 2000)),
+        ("KL-003 exponent witness k=2000", witness(b"2^*", 2000)),
     ]
 
 
