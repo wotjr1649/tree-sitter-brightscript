@@ -665,6 +665,7 @@ Expected ambiguity points and the planned mechanism:
 | `?` alias vs optional chaining | lexical distinction (§3) |
 | PRINT item juxtaposition | `LIST` precedence below every operator |
 | operand of a postfix form vs PRINT item (`print a [1]`) | `POSTFIX` precedence on `_postfix_operand` (§5) |
+| associativity of `^`, `^` vs prefix operators | `POSTFIX` precedence on `_pow_left` (§5) |
 | anonymous function vs declaration | LR(1): identifier vs `(` after `function`/`sub` |
 | END vs END X | single tokens for the two-word terminators (§3) |
 | ELSE vs ELSE IF, FOR vs FOR EACH, `#else` vs `#else if` | LR(1) one-token lookahead |
@@ -675,7 +676,6 @@ Policy: `conflicts` starts empty. A declared conflict needs (1) the generator's
 conflict report, (2) a minimised input, (3) evidence that factoring,
 precedence or associativity cannot resolve it without changing a documented
 tree, and (4) a row added to this section naming the conflict, the rules and
-| associativity of `^`, `^` vs prefix operators | `POSTFIX` precedence on `_pow_left` (§5) |
 the fixture proving the dynamic choice.
 
 ## 15. Implementation order
