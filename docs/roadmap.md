@@ -4,9 +4,11 @@
 
 Grammar version 0.1.0: release candidate (Session 03), independently
 audited in Session 04 ([reports/0.1.0-release-audit.md](reports/0.1.0-release-audit.md)),
-release-frozen in Session 05 ([reports/0.1.0-release.md](reports/0.1.0-release.md)).
-The 0.1.0 release is the commit tagged `v0.1.0` and its GitHub Release; no
-package is published. Phases 1–5 have their exit evidence in
+release-frozen in Session 05 ([reports/0.1.0-release.md](reports/0.1.0-release.md));
+Session 05-1 isolated the final-review finding B-01 and disclosed it as
+KL-002. The 0.1.0 release is the commit identified by the `v0.1.0` tag and
+its GitHub Release once they are published; no package is published.
+Phases 1–5 have their exit evidence in
 [reports/0.1.0-release-candidate.md](reports/0.1.0-release-candidate.md) and
 the release record. Phase 6 was tried on a local `go-treesitter` branch that
 is neither merged nor pushed; it did not pass V9 (recovery-tree differences in
