@@ -231,8 +231,9 @@ Rules applied: every node cites at least one requirement; `block`,
 `argument_list` and `parameter_list` are public because fields point to them
 and queries match them, not for parser convenience; hidden helpers
 (`_line`, `_terminator`, `_newline`, `_block_if`, `_single_line_if`,
-`_inline_else`, `_inline_block`, `_inline_statement`, `_print_item`,
-`_try_body`, `_try_line`, `_postfix_operand`, `_assignment_target`, the
+`_inline_else`, `_inline_block`, `_inline_statement`, `_print_items`,
+`_print_item`, `_try_body`, `_try_line`, `_postfix_operand`, `_pow_left`,
+`_assignment_target`, the
 statement-level chain `_stmt_chain` with `_stmt_member`, `_stmt_index`,
 `_stmt_call` and `_stmt_arguments`, `_sep`, `_cc_condition`,
 `_inactive_item`, `_inactive_line`, `_inactive_if`) stay internal; punctuation, keywords and the

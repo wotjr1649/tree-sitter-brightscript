@@ -381,10 +381,20 @@ Boundary rules:
 | Block IF clauses | `ELSE IF`/`ELSEIF` + condition + optional THEN + `block`; `ELSE` + `block` | BS-STMT-010, 011 |
 | Labels | `label_statement` only in `source_file`/`block` lists, never in single-line branches | BS-LEX-027, 028 |
 | Comments | extras; they never end a statement, the following `_newline` does; placement in the tree follows the tree-schema comment rule | BS-LEX-012 |
-| PRINT items | `print_statement` = (`print` or `?`) then any sequence of `expression`, `,`, `;`; the list has `LIST` precedence so every operator or postfix continuation extends the current item | BS-STMT-024–026, 040 |
+| PRINT items | `print_statement` = (`print` or `?`) then any sequence of `expression`, `,`, `;`, as the right-recursive hidden list `_print_items`; each item has `LIST` precedence so every operator or postfix continuation extends the current item | BS-STMT-024–026, 040 |
 | Directive lines | directives are statements, placed wherever statements are; their bodies are `block`s | BS-COND-002–008, 012 |
 | END vs END X | the two-word terminators are single tokens (§3); `end` alone is `end_statement` | BS-STMT-029, 036 |
 | NEXT | a terminator only of the innermost open FOR/FOR EACH; inside a WHILE body it closes nothing, so the WHILE is an error whether `next` lexes there as a keyword or an identifier | BS-STMT-013, 017 |
+
+PRINT item list. With `repeat()`, error recovery on a run of malformed PRINT
+items (`print f([)f([)…`, `print ,+*,+*…`) left a deep merged stack whose
+end-of-input acceptance needed quadratic memory that the progress callback
+could not interrupt (1.4 GiB at 32 KB; Session 05-1 delta re-audit findings
+B4-01, B4-02). The right-recursive hidden list `_print_items` needs little
+memory on the same input; a PRINT continued by lines that start with a
+separator and a prefix operator (`print ,+⏎,+⏎…`) takes quadratic time instead
+(KL-002). `src/node-types.json` and every valid tree are unchanged: a hidden
+list's items are children of `print_statement` either way.
 
 ## 7. Top level
 

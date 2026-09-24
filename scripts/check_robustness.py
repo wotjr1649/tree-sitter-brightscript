@@ -41,13 +41,15 @@ from tscli import cli, cst, has_error, popen
 TIME_LIMIT = 10.0
 MEMORY_LIMIT = 1 << 30
 # (name, prefix, repeated unit, small k, large k, max exponent, max ms of the large parse, max MiB of memory
-# growth). The KL-002 rows are disclosed quadratic-time families; the other two were fixed in Session 05-1
-# (R-A-01: time and memory; exponent: memory) and must stay so.
+# growth). The KL-002 rows are disclosed quadratic-time families; the others were fixed in Session 05-1
+# (R-A-01: time and memory; exponent and PRINT items: memory) and must stay so.
 RECOVERY_GUARDS = [
     ("KL-002 prefix +/- (B-01)", b"x = ", b"+*", 250, 1000, 2.5, 3000, 32),
     ("KL-002 nested single-line IF", b"", b"if a\n*2", 250, 1000, 2.5, 3000, 32),
     ("KL-002 exponent, memory fixed", b"x = ", b"2^*", 500, 2000, 2.5, 5000, 24),
+    ("KL-002 PRINT across lines", b"print ", b",+\n", 125, 500, 2.5, 5000, 32),
     ("R-A-01 unclosed calls (fixed)", b"x = ", b"f(*", 500, 2000, 1.5, 300, 24),
+    ("B4-01 PRINT items, memory fixed", b"print ", b"f([)", 1000, 4000, 1.5, 300, 24),
 ]
 
 
@@ -128,7 +130,10 @@ def w07_w13_seeds():
         ("KL-002 nested single-line IF witness k=1000", witness(b"if a\n*2", 1000, b"")),
         ("KL-002 prefix operators across lines k=1000", witness(b"-\n", 1000, b"x = -\n")),
         ("KL-002 exponent witness k=2000", witness(b"2^*", 2000)),
+        ("KL-002 PRINT across lines k=500", witness(b",+\n", 500, b"print ")),
         ("R-A-01 unclosed-call witness k=2000", witness(b"f(*", 2000)),
+        ("B4-01 PRINT unclosed-call witness k=4000", witness(b"f([)", 4000, b"print ")),
+        ("B4-02 PRINT separator witness k=4000", witness(b",+*", 4000, b"print ")),
     ]
 
 

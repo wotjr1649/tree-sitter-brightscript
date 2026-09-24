@@ -257,7 +257,12 @@ module.exports = grammar({
 
     // BS-STMT-024-026, 039, BS-LEX-031, 035: an item extends as far as the
     // expression grammar allows (LIST precedence is below every operator).
-    print_statement: $ => seq(choice(kw('print'), '?'), repeat($._print_item)),
+    print_statement: $ => seq(choice(kw('print'), '?'), optional($._print_items)),
+
+    // A right-recursive list rather than repeat(): with repeat(), error
+    // recovery on runs of malformed items kept a deep merged stack whose
+    // end-of-input acceptance needed quadratic memory (grammar-design §6).
+    _print_items: $ => seq($._print_item, optional($._print_items)),
 
     _print_item: $ => prec(PREC.LIST, choice($.expression, ',', ';')),
 
