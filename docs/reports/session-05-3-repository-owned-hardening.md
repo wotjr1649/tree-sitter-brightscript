@@ -165,14 +165,17 @@ pattern.
 
 ## Validation
 
-Local, Windows, on the tree of `620475a`: `check_v0`, `check_generated`, `test_tscli`,
-`check_registry --complete`, `check_schema`, `tscli test` (corpus 228/228;
-highlight 40 + 98 + 21), `check_samples`, `check_spellings`,
-`check_robustness` (fuzz 1,000 × 10, seed 1; recovery and query guards),
-`check_incremental`, `check_spike`: all pass. The comparators, the HTML
-alignment, the repair comparator and the query guard were each checked
-against deliberately wrong results. Two reviews in separate contexts of the
-same model (query semantics; scope, protocol and hold) found nothing that
-blocks the change; their minor findings are corrected here. Hosted CI runs
-only after the owner approves a push; its result is not part of this
-report.
+Local, Windows, on the tree of `b6cc6da` (later commits change documents
+only): `check_v0`, `check_generated`, `test_tscli`, `check_registry
+--complete`, `check_schema`, `tscli test` (corpus 228/228; highlight 40 + 98
++ 21), `check_samples`, `check_spellings`, `check_robustness` (fuzz 1,000 ×
+10, seed 1; recovery and query guards), `check_incremental`, `check_spike`:
+all pass. The comparators, the HTML alignment, the repair comparator and the
+query guard were each checked against deliberately wrong results. Two
+reviews in separate contexts of the same model (query semantics; scope,
+protocol and hold) found nothing that blocks the change; their minor
+findings are corrected here or in the local evidence, and two informational
+points stand (the query guard does not count captures, which W11 checks; two
+measured before-times differ slightly between runs). A confirmation review
+of the corrections found them acceptable. Hosted CI runs only after the
+owner approves a push; its result is not part of this report.
