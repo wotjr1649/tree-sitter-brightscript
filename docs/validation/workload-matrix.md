@@ -119,6 +119,8 @@ least one instance of every row. `test/highlight/tokens.brs` additionally
 repeats the inputs of the fixtures marked **(token)** in the catalogue and
 asserts the capture of every anonymous token that carries their requirement
 (`?.`, `?@`, `?[`, `?(` as `@operator`; `?` as `@keyword`).
+`test/highlight/chains.brs` asserts the rows below on chains that mix member,
+attribute, index and call expressions, with and without optional access.
 
 | Syntax | Capture |
 |---|---|
