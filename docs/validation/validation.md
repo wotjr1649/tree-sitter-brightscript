@@ -45,8 +45,9 @@ does not prove either tree is right.
 Hosted CI (`.github/workflows/ci.yml`, Windows and Ubuntu) runs on every push
 V0, generation drift (V1), the self-test of the verified CLI path
 (`scripts/test_tscli.py`), the registry, schema and corpus checks (V2, V3), V4,
-the W03 and W05 checks, V5 (W10) and V10 (W06–W08, W13 with fuzzing); the
-commands are in [workload-matrix.md](workload-matrix.md) "Automation". It never
+the W03 and W05 checks, V5 (W10) and V10 (W06–W08, W13 with fuzzing, and the
+query scaling guards); the commands are in
+[workload-matrix.md](workload-matrix.md) "Automation". It never
 fetches Roku documentation, so the registry's research-inventory and ambiguity
 reconciliations, which read the local `_ref/`, run only locally.
 
@@ -228,6 +229,41 @@ growth below it is invisible there; the Windows job sees it:
 | KL-002 PRINT across lines | `print ` + `,+⏎`, k = 125 and 500 | ≤ 2.5 | ≤ 5 s | ≤ 32 MiB | as the first row |
 | R-A-01 | `x = ` + `f(*`, k = 500 and 2,000 | ≤ 1.5 | ≤ 300 ms | ≤ 24 MiB | regression test of the Session 05-1 fix (before it: exponent 1.7–2.1, 3 s, 1.24 GiB) |
 | B4-01 PRINT items | `print ` + `f([)`, k = 1,000 and 4,000 | ≤ 1.5 | ≤ 300 ms | ≤ 24 MiB | regression test of the `_print_items` memory fix (before it: 386 MiB at 16 KB through the CLI) |
+
+Query scaling guards. The same script runs one guard per row of its
+`QUERY_GUARDS` table: the full highlight query over a valid chain at two
+sizes through `tree-sitter query -c --quiet --time` (every capture with its
+predicates; parsing excluded), the minimum of three runs for each. A guard
+fails if the local exponent of the two times or the larger time exceeds the
+row's bound. Chains with method calls stay quadratic (S07-M03, open), so no
+guard covers them.
+
+| Row | Chain, sizes | Exponent | Larger run | Kind |
+|---|---|---|---|---|
+| member chain | `x = a` + `.b`, k = 2,000 and 16,000 | ≤ 1.5 | ≤ 500 ms | regression test of the Session 05-3 member pattern (before it: exponent 2.06, 2.2 s at k = 16,000) |
+| member and attribute chain | `x = a` + `.b@c`, k = 1,000 and 8,000 | ≤ 1.5 | ≤ 500 ms | the same for the attribute pattern (before it: 2.03, 2.1 s) |
+
+## Highlight query changes
+
+A change to `queries/highlights.scm` that keeps roles is compared with the
+query it replaces on the same parser, runtime and inputs (valid inputs and
+inputs with `ERROR` or `MISSING` nodes), at equal work: every capture
+consumed, with no match limit, range, start depth or cancellation set.
+Three results are compared:
+
+- the native captures, in cursor order and as a multiset of capture name,
+  node kind, byte range and missing flag (no predicates);
+- `tree-sitter query -c`, which applies the text predicates;
+- the final roles of `tree-sitter highlight --html --layout fragment --style
+  minimal <input> --query-paths <dir>/highlights.scm`, aligned to the input
+  bytes. The default theme holds every capture name of the query.
+  `--query-paths` takes one or more values, so the input goes before it; it
+  reads only a file named `highlights.scm`.
+
+Valid inputs must give identical results in all three. A difference on an
+input with `ERROR` or `MISSING` nodes is a change of meaning: it is
+classified (inside an `ERROR` node, at a `MISSING` node, elsewhere) and the
+owner approves it before the query changes. W11 still passes.
 
 ## Fixture rules
 

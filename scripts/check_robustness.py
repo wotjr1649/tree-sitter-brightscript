@@ -21,6 +21,11 @@ Usage: python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N] 
   memory of the CLI process may grow from the smaller to the larger size by at
   most the row's bound (a growth, so that each OS's base memory cancels out).
   The exponent is printed so that a fix, or a worse regression, is visible.
+- Query scaling guards (validation.md "Query scaling guards"): each chain of
+  QUERY_GUARDS is queried at two sizes with the full highlight query
+  (`query -c --quiet --time`: every capture with its predicates, parsing
+  excluded; minimum of three runs). The local exponent must not exceed the
+  row's bound and the larger run must stay within the row's time.
 Crash = a timeout, an exit status other than 0 or 1, or status 1 without the
 CLI's parse-error summary line (status 1 also reports failures to run). Error
 state is the root line of `--cst` output, read by scripts/tscli.py `has_error`
@@ -36,7 +41,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from corpus import read_corpus
+from corpus import ROOT, read_corpus
 from tscli import cli, cst, has_error, popen
 TIME_LIMIT = 10.0
 MEMORY_LIMIT = 1 << 30
@@ -51,6 +56,14 @@ RECOVERY_GUARDS = [
     ("R-A-01 unclosed calls (fixed)", b"x = ", b"f(*", 500, 2000, 1.5, 300, 24),
     ("B4-01 PRINT items, memory fixed", b"print ", b"f([)", 1000, 4000, 1.5, 300, 24),
 ]
+# (name, prefix, repeated unit, small k, large k, max exponent, max ms of the larger run). The highlight query on
+# valid left-deep chains (S07-M03): the member and attribute patterns match the operator and the name as siblings,
+# so no query state waits in every ancestor; with the parent form a member chain of 16,000 took 2.1 s.
+QUERY_GUARDS = [
+    ("member chain (S07-M03)", b"x = a", b".b", 2000, 16000, 1.5, 500),
+    ("member and attribute chain (S07-M03)", b"x = a", b".b@c", 1000, 8000, 1.5, 500),
+]
+QUERY = ROOT / "queries/highlights.scm"
 
 
 def witness(unit, k, prefix=b"x = "):
@@ -179,6 +192,29 @@ def recovery_guards(tmp, fail):
         fail += [f"{name} guard: {p}" for p in problems]
 
 
+def query_ms(path, query=QUERY):
+    """CLI time in ms of the full highlight query over one file: every capture with its predicates, parsing excluded."""
+    code, out, err = cli("query", "-c", "--quiet", "--time", query, path, timeout=TIME_LIMIT * 3)
+    m = re.search("^([0-9.]+)(ns|\u00b5s|ms|s)$", out, re.M)
+    if code != 0 or not m or "in-progress captures" in err:
+        raise RuntimeError(f"query --time {path} failed (exit {code}): {err.strip()[-300:]}")
+    return float(m.group(1)) * {"ns": 1e-6, "\u00b5s": 1e-3, "ms": 1.0, "s": 1000.0}[m.group(2)]
+
+
+def query_guards(tmp, fail, query=QUERY):
+    for name, prefix, unit, small, large, max_exponent, max_ms in QUERY_GUARDS:
+        sizes = []
+        for k in (small, large):
+            path = tmp / f"query-guard-{k}.brs"
+            path.write_bytes(witness(unit, k, prefix))
+            sizes.append((path.stat().st_size, min(query_ms(path, query) for _ in range(3))))
+        (sb, sm), (lb, lm) = sizes
+        exponent, problems = scaling_verdict(sb, sm, lb, lm, 0, max_exponent, max_ms, 0)
+        print(f"  {name}: k={small} {sb:,} bytes {sm:.2f} ms; k={large} {lb:,} bytes {lm:.2f} ms; exponent {exponent:.2f} "
+              f"(limit {max_exponent}){' FAIL ' + ', '.join(problems) if problems else ''}")
+        fail += [f"{name} query guard: {p}" for p in problems]
+
+
 def run(path):
     """Parse one file; return (exit code, seconds, peak bytes, output)."""
     start = time.monotonic()
@@ -271,6 +307,8 @@ def main():
                 check(name, t["input"], False, True, tmp, fail)
         print("Recovery scaling guards (minimum of 3 CLI parse times; peak memory of each parse, growth checked)")
         recovery_guards(tmp, fail)
+        print("Query scaling guards (minimum of 3 CLI query times, captures with predicates)")
+        query_guards(tmp, fail)
     if "--skip-fuzz" not in sys.argv:
         iterations = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--fuzz-iterations=")), "1000")
         seed = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--fuzz-seed=")), "1")

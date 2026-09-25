@@ -29,14 +29,15 @@
   (#match? @variable.builtin "^[mM]$"))
 
 ; Members, keys and XML attributes
-(member_expression
-  property: (identifier) @property)
+; A member property is the identifier right after `.` or `?.`; matching the
+; sibling pair, not the parent, keeps left-deep chains linear (S07-M03).
+(["." "?."] . (identifier) @property)
 
 (associative_array_entry
   key: (identifier) @property)
 
-(attribute_expression
-  attribute: (identifier) @attribute)
+; Likewise the identifier right after `@` or `?@`.
+(["@" "?@"] . (identifier) @attribute)
 
 ; Functions
 (function_declaration
