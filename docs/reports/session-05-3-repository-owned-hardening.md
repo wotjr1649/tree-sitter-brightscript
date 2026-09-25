@@ -47,16 +47,22 @@ consumed and no match limit, range, start depth or cancellation set.
 
 | Comparison | Inputs | Valid inputs that differ | Inputs with errors that differ |
 |---|---|---|---|
-| Native captures, in order and as a multiset (no predicates) | 3,152 (1,634 valid) | 0 | 78 of 1,518 |
+| Native captures, in order and as a multiset (no predicates) | 3,153 run, 3,152 completed (1,634 valid) | 0 | 78 of 1,518 |
 | `tree-sitter query -c` (predicates applied) | 3,185 | 0 | 78 |
 | `tree-sitter highlight --html` final roles, aligned to the input bytes | 3,185 | 0 | 78 |
-| Repair: 34 edit scripts (W10 I01–I12 and E1–E6, earlier recovery edits, 6 new) | 34 | 0 (every repaired state) | 3 edited states |
+| Repair: 34 edit scripts (W10 I01–I12 and E1–E6, earlier recovery edits, 6 new) | 34 | 0 of 34 repaired states | 3 edited states |
 
 The inputs are the corpus, the highlight fixtures and samples, 2,811
 recovery-comparison inputs of Session 05-2, and new small cases of member,
 attribute, call, mixed and optional chains, comments, line ends, predicates,
 `ERROR` and `MISSING` nodes and UTF-8. Valid chains up to 16,000 links give
-identical ordered captures and identical HTML.
+identical ordered captures and identical HTML. One native run, a valid
+500-link mixed chain, hit the watchdog because the harness looks up each
+capture's parent, which costs time in the chain depth; its ordered captures
+and its HTML match the old query's in the timing and CLI runs. One repaired
+state keeps the errors of its base. In one edited state
+(`PRINT-middle-error`) the incremental tree differs from a fresh parse, as
+recorded before; the captures are the same.
 
 On the 78 inputs with errors the final roles change in four ways:
 
@@ -82,7 +88,7 @@ runs after a warmup; the old query at 16,000 links ran 3 times.
 
 | Chain (k links) | Before, k = 4,000 | After, k = 4,000 | Exponent over k = 250–4,000 |
 |---|---|---|---|
-| `x = a` + `.b` | 106.0 ms (k = 16,000: 2,134 ms) | 2.13 ms (k = 16,000: 8.9 ms) | 1.98 → 1.00 |
+| `x = a` + `.b` | 106.0 ms (k = 16,000: 2,134 ms) | 2.13 ms (k = 16,000: 8.9 ms) | 1.89 → 0.99 (to k = 16,000: 1.98 → 1.00) |
 | `x = a` + `@b` | 107.5 ms | 2.08 ms | 1.90 → 1.00 |
 | `x = a` + `.b@c` | 437.3 ms | 4.54 ms | 1.97 → 0.99 |
 | `a` + `.b` + ` = 1` | 105.8 ms | 2.04 ms | 1.90 → 1.00 |
@@ -120,7 +126,7 @@ pattern.
 - Query scaling guards in `scripts/check_robustness.py`
   ([validation.md](../validation/validation.md) "Query scaling guards"). The
   old query fails both rows (exponent 2.03–2.06, 2.1–2.2 s), the new one
-  passes (0.99, 9.4 ms).
+  passes (0.99, 9.4–9.5 ms).
 - The comparison method: [validation.md](../validation/validation.md)
   "Highlight query changes". `--query-paths` takes one or more values; an
   input path written after it becomes a query path and the CLI highlights
@@ -137,10 +143,13 @@ pattern.
   watchdog to be measured, so it fails the gap, cleanup and memory checks on
   every configuration by construction. Re-read from the Session 07 records,
   every cancelled run of that witness on the current parser returns within
-  0.07 ms of its budget, frees tree and parser within 0.8 ms and stays below
+  0.07 ms of its budget, frees tree and parser within 0.81 ms and stays below
   5 MiB. A revision that would judge the witness by cancellation instead was
   proposed; the owner deferred it. The check set and its results are
-  unchanged.
+  unchanged. The proposal would also drop the full-run callback-gap check
+  for that witness.
+- The message of commit `620475a` gives 1.98 → 1.00 for all five chains;
+  the table above has the values per chain and range.
 
 ## Findings
 
@@ -162,4 +171,8 @@ highlight 40 + 98 + 21), `check_samples`, `check_spellings`,
 `check_robustness` (fuzz 1,000 × 10, seed 1; recovery and query guards),
 `check_incremental`, `check_spike`: all pass. The comparators, the HTML
 alignment, the repair comparator and the query guard were each checked
-against deliberately wrong results.
+against deliberately wrong results. Two reviews in separate contexts of the
+same model (query semantics; scope, protocol and hold) found nothing that
+blocks the change; their minor findings are corrected here. Hosted CI runs
+only after the owner approves a push; its result is not part of this
+report.
