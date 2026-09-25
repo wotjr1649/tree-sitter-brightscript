@@ -11,6 +11,9 @@ PRINT items) found by its re-audits, and disclosed the remaining
 quadratic-time recovery behaviour as the class KL-002. Its round-5 re-audit
 found three release-blocking findings, and Session 05-1 ended on hold: 0.1.0
 is not released ([reports/0.1.0-release.md](reports/0.1.0-release.md#status-hold)).
+Sessions 05-2 and 07 found four more material findings and Session 05-3
+fixed part of one (member and attribute chains in the highlight query); all
+seven stay open ([reports/0.1.0-structural-recovery-safety.md](reports/0.1.0-structural-recovery-safety.md)).
 The 0.1.0 release will be the commit identified by the `v0.1.0` tag and its
 GitHub Release once they are published; no package is published.
 Phases 1–5 have their exit evidence in

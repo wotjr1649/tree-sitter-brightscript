@@ -263,7 +263,9 @@ Three results are compared:
 Valid inputs must give identical results in all three. A difference on an
 input with `ERROR` or `MISSING` nodes is a change of meaning: it is
 classified (inside an `ERROR` node, at a `MISSING` node, elsewhere) and the
-owner approves it before the query changes. W11 still passes.
+owner approves it before the query changes. W11 still passes. The Session
+05-3 comparison is in
+[session-05-3-repository-owned-hardening.md](../reports/session-05-3-repository-owned-hardening.md).
 
 ## Fixture rules
 

@@ -23,6 +23,7 @@ link to it rather than restate it.
 | [reports/0.1.0-comparative-conformance.md](reports/0.1.0-comparative-conformance.md) | 0.1.0 against the legacy grammar and BrighterScript, under official evidence | Claiming an improvement over earlier grammars |
 | [reports/0.1.0-release.md](reports/0.1.0-release.md) | Final 0.1.0 release record: identity, gates, dispositions, limitations, verdict | Consuming or auditing the 0.1.0 release |
 | [reports/0.1.0-structural-recovery-safety.md](reports/0.1.0-structural-recovery-safety.md) | Causes of the open 0.1.0 hold findings, candidates compared, stricter checks and the Gate A decision | Deciding how to remediate the 0.1.0 hold |
+| [reports/session-05-3-repository-owned-hardening.md](reports/session-05-3-repository-owned-hardening.md) | The Session 05-3 query change, its role and time comparison, what stays open | Changing the highlight query |
 
 Repository-wide operating rules for contributors and coding agents are in
 `AGENTS.md` at the repository root.
