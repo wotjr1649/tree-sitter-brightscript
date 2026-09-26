@@ -2,15 +2,16 @@
 
 ## Current maturity
 
-Grammar version 0.1.0: release candidate (Session 03), independently
+Grammar version 0.1.0: released 2026-09-26 (tag `v0.1.0`,
+[reports/0.1.0-release.md](reports/0.1.0-release.md#release-v010)). Release candidate (Session 03), independently
 audited in Session 04 ([reports/0.1.0-release-audit.md](reports/0.1.0-release-audit.md)),
 release-frozen in Session 05 ([reports/0.1.0-release.md](reports/0.1.0-release.md));
 Session 05-1 isolated the final-review finding B-01, fixed the
 unclosed-call recovery family and the recovery memory of two others (`^` and
 PRINT items) found by its re-audits, and disclosed the remaining
 quadratic-time recovery behaviour as the class KL-002. Its round-5 re-audit
-found three release-blocking findings, and Session 05-1 ended on hold: 0.1.0
-is not released ([reports/0.1.0-release.md](reports/0.1.0-release.md#status-hold)).
+found three release-blocking findings, and Session 05-1 ended on hold
+([reports/0.1.0-release.md](reports/0.1.0-release.md#status-hold)).
 Sessions 05-2 and 07 found four more material findings and Session 05-3
 fixed part of one (member and attribute chains in the highlight query); all
 seven stayed open ([reports/0.1.0-structural-recovery-safety.md](reports/0.1.0-structural-recovery-safety.md)).
@@ -23,9 +24,8 @@ Session 05-7-2 revised that check (P572-SEP) and confirmed all seven
 closures in three passing runs of the release qualification lane on the
 local Windows host
 ([reports/0.1.0-integrated-qualification.md](reports/0.1.0-integrated-qualification.md));
-its release awaits the owner's decision.
-The 0.1.0 release will be the commit identified by the `v0.1.0` tag and its
-GitHub Release once they are published; no package is published.
+the owner approved its release. The 0.1.0 release is the commit identified
+by the `v0.1.0` tag and its GitHub Release; no package is published.
 Phases 1–5 have their exit evidence in
 [reports/0.1.0-release-candidate.md](reports/0.1.0-release-candidate.md) and
 the release record. Phase 6 was tried on a local `go-treesitter` branch that
