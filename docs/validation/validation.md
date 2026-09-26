@@ -342,7 +342,7 @@ by the lane:
 | B5-01-MEMORY | `x = ` + `+f([)` and `-f(-)` k ≤ 800, `x = ` + `{a:@*}<` k ≤ 600 | allocator peak live and working-set growth < 64 MiB; live-memory exponent of every consecutive pair ≤ 1.5 |
 | B5-02-LIFECYCLE | `print ` + `f([)` and `,+*`, k 1,000–20,000; `x = ` + `-f(-)` k ≤ 20,000 | parse, tree and parser deletion complete; call exponent 1,000 → 4,000 ≤ 1.5 |
 | A5-01-COST | PRINT items `a;`, `1;` k ≤ 32,000 and `a ` k ≤ 8,000 | query and cursor, field and index navigation, paired with BEFORE_PRINT: same work (and the query match limit never exceeded), ratio ≤ 1.5; exponents ≤ 1.5 |
-| CANCEL | the v3 cases and seven 1 MiB inputs registered to run past the budget | 200 ms budget: return ≤ 300 ms, deletion ≤ 100 ms, live memory after the budget < 64 MiB, measured from the first allocation or progress callback after the budget (a reached budget without a recorded crossing is `NOT_RUN`, not a pass); the registered inputs are cancelled. Each run is judged by its own records: its budget is reached if it recorded a crossing, was cancelled or took at least the budget; the allocator run's status is not taken from another run, and uninstrumented runs that reached the budget while the allocator run did not leave the growth `NOT_RUN`; missing, non-finite or contradictory values fail the point (`scripts/qualify/test_gates.py`) |
+| CANCEL | 15 points (case, budget): the v3 cases and seven 1 MiB inputs at 200 ms, and the 1 MiB `for each` and anonymous-function inputs also at 100 ms | SAFETY on every point at its budget: return ≤ budget + 100 ms, deletion ≤ 100 ms, live memory after the budget < 64 MiB, measured from the first allocation or progress callback after the budget (a reached budget without a recorded crossing is `NOT_RUN`, not a pass), and a parse that ends on its own reports the registered error state and the input's length. ACTUAL cancellation for seven families: every measured run cancelled and the allocator run's growth measured, at 200 ms for five and at 100 ms for the two that finish before 200 ms (Session 05-7-2, P572-SEP); an input that finishes first is `NOT_TRIGGERED`, never a pass. Each run is judged by its own records, the warmup included: its budget is reached if it recorded a crossing, was cancelled or took at least the budget; the allocator run's status is not taken from another run, and uninstrumented runs that reached the budget while the allocator run did not leave the growth `NOT_RUN`; missing, non-finite or contradictory values fail the point (`scripts/qualify/test_gates.py`) |
 | CANCEL-OVERSHOOT | cancellation and 1 MiB malformed inputs, budgets 25 ms–4 s | overshoot ≤ 100 ms on every point that reaches its budget; the number of such points is reported |
 | MAX-CALLBACK-GAP, CLEANUP-ALL | the same and six 1 MiB valid inputs | progress-callback gap ≤ 100 ms; tree and parser deletion ≤ 100 ms |
 | LARGE-INPUT | 1 MiB malformed and valid inputs | completes, peak commit ≤ 256 MiB, parse ≤ 10 s (the PRINT-separator input time-exempt as in v3) |
@@ -365,7 +365,11 @@ sweep point and floor clamp, every B5-01 pair, the match-limit checks, the
 callback crossing of CANCEL and two RESUME-RESET inputs that are long enough
 to trigger; after the delta review it also gained a sweep unit with a block
 keyword after each malformed piece (B2-01). Each change makes a gate stricter
-or measures what it could not. RECOVERY-LOCALITY and the regeneration of
+or measures what it could not. Session 05-7-2 (P572-SEP) separated CANCEL's
+time bounds from its actual-cancellation coverage after S571 q1 found two
+inputs registered as parsing past 200 ms finishing before it: their 200 ms
+points stay as SAFETY points and their cancellation moved to 100 ms points
+chosen after that result; this is a policy revision, not the earlier check. RECOVERY-LOCALITY and the regeneration of
 the references run the pinned CLI outside the supervisor, with the `--cc`
 compiler and a private parser-library directory per checkout.
 

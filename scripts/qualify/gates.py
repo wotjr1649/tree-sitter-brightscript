@@ -25,10 +25,16 @@ A501J = [f"A501J-k{k:05d}" for k in (1000, 2000, 4000, 8000)]
 CANCEL_V3 = ["B5-01-prefix-k00800", "B5-01-minus-k00800", "B5-01-aa-k00600", "B5-02-call-k20000", "B5-02-sep-k20000",
              "KL2-plusstar-k08000"]
 CANCEL_SET = CANCEL_V3 + ["SW-z203d207bk3a20-7ba3a402a7d3c-colon-k20000", "REVB-aaz-colon-k40000", "B5-01-prefix-k16000"]
-# Registered before the lane first ran on the candidate: inputs whose natural parse is longer than 200 ms, so that
-# a 200 ms budget cancels for real (the v3 CANCEL cases finish before the budget on a fast candidate).
+# The families whose actual cancellation CANCEL requires; registered in ec14a17 as parsing longer than 200 ms, which
+# S571 q1 found false for L-FOREACH and L-ANON (the v3 CANCEL cases finish before the budget on a fast candidate).
 CANCEL_ACTUAL = ["V-FLAT-1MiB", "V-ARRAY-1MiB", "V-CALLS-1MiB", "V-PRINT-1MiB", "L-WHILE-1MiB", "L-FOREACH-1MiB",
                  "L-ANON-1MiB"]
+# P572-SEP (Session 05-7-2, DEV-572): every case keeps its 200 ms point, judged for SAFETY; ACTUAL cancellation is
+# required at 200 ms for five families and at a fixed 100 ms point for the two that finished before 200 ms in S571
+# q1 (a value chosen after that result). A point is one (case, budget) with its own runs.
+ACTUAL_AT_100 = ["L-FOREACH-1MiB", "L-ANON-1MiB"]
+CANCEL_POINTS = [(c, 200, ("SAFETY", "ACTUAL") if c in CANCEL_ACTUAL and c not in ACTUAL_AT_100 else ("SAFETY",))
+                 for c in CANCEL_V3 + CANCEL_ACTUAL] + [(c, 100, ("ACTUAL",)) for c in ACTUAL_AT_100]
 LARGE_SET = [f"{c}-1MiB" for c in cases.LARGE_MALFORMED]
 VALID_1MIB = [f"{c}-1MiB" for c in cases.LARGE_VALID]
 BUDGETS = [25, 50, 100, 200, 300, 500, 1000, 2000, 4000]
@@ -228,47 +234,96 @@ def budget_run(rec, budget):
         parse_ms, cleanup
 
 
-def cancel(r):
-    points, ok = [], True
-    for case in CANCEL_V3 + CANCEL_ACTUAL:
-        vals, recs = timed(r, "cand", "PARSE", case, 5, lambda x: x, budget=200)
-        a = r.run("cand-alloc", "PARSE", case, 200, tag="alloc")
-        p = {"case": case, "registered": "v3" if case in CANCEL_V3 else "actual-cancel (pre-registered)"}
-        if vals is None or not completed(a):
-            p.update(censored=True, post_budget_live_status="CENSORED", pass_=False)
+def run_id(rec):
+    """One native execution: the supervisor's process id and creation time."""
+    return f"{rec['report'].get('pid')}@{rec['report'].get('creation_filetime')}"
+
+
+def result_check(rec, case, length):
+    """A run's final record against its parse event and the registered input (Session 05-7-2 A-03): the byte count,
+    the cancellation, and the error state: -1 for a cancelled parse (no tree), else 0 for the valid 1 MiB inputs and
+    1 for the malformed cases. A parse that is not cancelled returns the whole input's tree; the frozen probe reports
+    no root span. Returns OK, MEASUREMENT_INCONSISTENT or WRONG_RESULT."""
+    f, pe = rec["final"] or {}, rec["events"].get("parse") or {}
+    if f.get("bytes") != length or type(f.get("cancelled")) is not bool or f.get("cancelled") != pe.get("cancelled"):
+        return "MEASUREMENT_INCONSISTENT"
+    want = -1 if f["cancelled"] else 0 if case in VALID_1MIB else 1
+    return "OK" if type(f.get("has_error")) is int and f["has_error"] == want else "WRONG_RESULT"
+
+
+def cancel_point(r, case, budget, roles):
+    """One registered point: 1 warmup + 5 uninstrumented runs, then one allocator run, all at `budget`.
+
+    SAFETY: no censored, inconsistent or wrong run (warmup and allocator included); the 5 measured runs return within
+    budget + 100 ms and clean up within 100 ms; growth after the budget below 64 MiB where measured, and never
+    unobserved where a run reached the budget. ACTUAL also: all 5 measured runs cancelled (the warmup is no
+    substitute) and the allocator run's growth measured at its own crossing (Session 05-7-2 P572-SEP)."""
+    vals, recs = timed(r, "cand", "PARSE", case, 5, lambda x: x, budget=budget)
+    a = r.run("cand-alloc", "PARSE", case, budget, tag="alloc")
+    actual = "ACTUAL" in roles
+    p = {"case": case, "budget": budget, "roles": list(roles), "source_sha": cases.RECORDED["cases"][case],
+         "required_count": 5, "run_ids": {"uninstrumented": [run_id(x) for x in recs], "allocator": run_id(a)}}
+    if vals is None or not completed(a):
+        p.update(censored_count=sum(not completed(x) for x in recs + [a]), safety="CENSORED",
+                 coverage="CENSORED" if actual else "NOT_REQUIRED", memory="CENSORED", pass_=False)
+    else:
+        # Return, cleanup and cancellation from the uninstrumented runs; growth after the budget from the
+        # allocator run; each run's budget, time and crossing from its own records, never from another run's.
+        length = len(cases.generate(case))
+        judged = [budget_run(x, budget) for x in recs + [a]]          # warmup, 5 measured, allocator
+        checks = [result_check(x, case, length) for x in recs + [a]]
+        inconsistent = sum(j[1] == "MEASUREMENT_INCONSISTENT" or c == "MEASUREMENT_INCONSISTENT"
+                           for j, c in zip(judged, checks))
+        wrong = checks.count("WRONG_RESULT")
+        plain = judged[1:6]
+        reached, status, post, alloc_ms, _ = judged[6]
+        cancelled = [(v["events"].get("parse") or {}).get("cancelled") is True for v in vals]
+        ret, cleanup = [x[3] for x in plain], [x[4] for x in plain]
+        plain_reached = sum(x[0] for x in plain)
+        if inconsistent:
+            point_status, live_ok = "MEASUREMENT_INCONSISTENT", False
+        elif status.startswith("MEASURED"):
+            point_status, live_ok = status, post < 64 * MIB
+        elif status == "NOT_APPLICABLE_BEFORE_BUDGET" and plain_reached:
+            # The allocator run finished before the budget but uninstrumented runs reached it: their growth
+            # after the budget is unmeasured, and the allocator run's N/A is not borrowed for them.
+            point_status, live_ok = "NOT_RUN_BUDGET_REACHED_UNOBSERVED", False
         else:
-            # Return, cleanup and cancellation from the uninstrumented runs; growth after the budget from the
-            # allocator run; each run's budget, time and crossing from its own records, never from another run's.
-            plain = [budget_run(v, 200) for v in vals]
-            reached, status, post, alloc_ms, _ = budget_run(a, 200)
-            cancelled = [(v["events"].get("parse") or {}).get("cancelled") is True for v in vals]
-            inconsistent = sum(s == "MEASUREMENT_INCONSISTENT" for _, s, *_ in plain) + (status == "MEASUREMENT_INCONSISTENT")
-            ret, cleanup = [x[3] for x in plain], [x[4] for x in plain]
-            plain_reached = sum(x[0] for x in plain)
-            if inconsistent:
-                point_status, live_ok = "MEASUREMENT_INCONSISTENT", False
-            elif status.startswith("MEASURED"):
-                point_status, live_ok = status, post < 64 * MIB
-            elif status == "NOT_APPLICABLE_BEFORE_BUDGET" and plain_reached:
-                # The allocator run finished before the budget but uninstrumented runs reached it: their growth
-                # after the budget is unmeasured, and the allocator run's N/A is not borrowed for them.
-                point_status, live_ok = "NOT_RUN_BUDGET_REACHED_UNOBSERVED", False
-            else:
-                point_status, live_ok = status, status == "NOT_APPLICABLE_BEFORE_BUDGET"
-            p.update(return_median_ms=None if inconsistent else med(ret), return_max_ms=None if inconsistent else max(ret),
-                     cleanup_max_ms=None if inconsistent else max(cleanup), cancelled_runs=sum(cancelled),
-                     runs=len(vals), runs_reached_budget=plain_reached, inconsistent_runs=inconsistent,
-                     alloc_parse_ms=alloc_ms, alloc_memory_status=status, post_budget_live=post,
-                     cross_at_callback=(a["events"].get("parse") or {}).get("cross_at_callback"),
-                     budget_reached=reached or plain_reached > 0, post_budget_live_status=point_status)
-            must_cancel = case in CANCEL_ACTUAL
-            p["pass_"] = (not inconsistent and max(ret) <= 300 and max(cleanup) <= 100 and live_ok
-                          and (not must_cancel or all(cancelled)))
-        p["pass"] = p.pop("pass_")
-        ok &= p["pass"]
-        points.append(p)
-    return result("CANCEL", ok, points, ["return and cleanup over 1 warmup + 5 runs; post-budget live from the allocator build",
-                                         "each run judged by its own budget, time and crossing (Session 05-7-1 C1)"])
+            point_status, live_ok = status, status == "NOT_APPLICABLE_BEFORE_BUDGET"
+        safety = not inconsistent and not wrong and max(ret) <= budget + 100 and max(cleanup) <= 100 and live_ok
+        natural_before = sum(not x[0] for x in plain)
+        if not actual:
+            coverage = "NOT_REQUIRED"
+        elif inconsistent:
+            coverage = "MEASUREMENT_INCONSISTENT"
+        elif all(cancelled):
+            coverage = "TRIGGERED" if point_status.startswith("MEASURED") else "ALLOCATOR_GROWTH_UNOBSERVED"
+        else:
+            coverage = "NOT_TRIGGERED" if natural_before == 5 else "NOT_ALL_CANCELLED"
+        p.update(observed_count=len(vals), triggered_count=sum(cancelled), natural_before_count=natural_before,
+                 late_natural_count=sum(x[0] and not c for x, c in zip(plain, cancelled)), censored_count=0,
+                 inconsistent_count=inconsistent, wrong_result_count=wrong,
+                 warmup_cancelled=(recs[0]["events"].get("parse") or {}).get("cancelled"),
+                 return_median_ms=None if inconsistent else med(ret), return_max_ms=None if inconsistent else max(ret),
+                 cleanup_max_ms=None if inconsistent else max(cleanup), runs_reached_budget=plain_reached,
+                 alloc_parse_ms=alloc_ms, alloc_memory_status=status, post_budget_live=post,
+                 cross_at_callback=(a["events"].get("parse") or {}).get("cross_at_callback"),
+                 budget_reached=reached or plain_reached > 0, safety="PASS" if safety else "FAIL", coverage=coverage,
+                 memory=point_status, pass_=safety and coverage in ("TRIGGERED", "NOT_REQUIRED"))
+    p["pass"] = p.pop("pass_")
+    return p
+
+
+def cancel(r):
+    points = [cancel_point(r, case, budget, roles) for case, budget, roles in CANCEL_POINTS]
+    safety = [(c, b) for c, b, roles in CANCEL_POINTS if "SAFETY" in roles]
+    actual = sorted(c for c, _, roles in CANCEL_POINTS if "ACTUAL" in roles)
+    registered = safety == [(c, 200) for c in CANCEL_V3 + CANCEL_ACTUAL] and actual == sorted(CANCEL_ACTUAL)
+    return result("CANCEL", registered and all(p["pass"] for p in points), points,
+                  ["return and cleanup over 5 runs after 1 warmup; growth after the budget from the allocator build",
+                   "each run judged by its own budget, time and crossing (Session 05-7-1 C1)",
+                   f"P572-SEP: {len(safety)} SAFETY points at 200 ms; ACTUAL 5/5 cancellation for {len(actual)} "
+                   f"families (L-FOREACH, L-ANON at 100 ms, chosen after S571 q1); point set as registered: {registered}"])
 
 
 def overshoot(r):
