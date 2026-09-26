@@ -200,20 +200,14 @@ compared).
 | ID | State | Requirement | Behaviour | Demonstrating fixture |
 |---|---|---|---|---|
 | KL-001 | retired (unused): the ADR-0004 spike passed with design V1 on 2026-09-23 | BS-COND-007 | A literal-`false` conditional branch whose text is not BrightScript (the documented block-comment idiom) produces `ERROR` nodes | `BS-COND-007: block comment with prose` and the spike fixtures S3, S5–S8, S10–S12, asserted with `:error` |
-| KL-002 | active; accepted for 0.1.0 by the owner on 2026-09-24 as a class of behaviour | none is violated (robustness only); the constructs involved are right-recursive nestings the grammar accepts: prefix operators (BS-EXP-012, 018; their nesting BS-EXP-027, 028 is provisional), the right-associative `^` (BS-EXP-011), single-line IFs nested in a single-line branch (BS-STMT-009, provisional) and the PRINT item list (BS-STMT-024–026, 040; 026 provisional, 040 tolerated) | Error recovery time can grow with the square of the number of repeated malformed pieces that keep such a nesting pending in one statement or its continuation. Known families (measured): a prefix operator (`+`, `-`, `not`) followed by a token that cannot start an operand and forces a reduction (`x = +*+*…`, `x = (not)not)…`, also inside closed groups, call arguments and after `print`, `return`, `if`, `while`, `for`, `dim`); `^` followed by a non-operand (`x = 2^*2^*…`, `2^)`, `2^,`, `2^-*`, also inside closed groups); a condition broken across a line inside nested single-line IFs (`if a⏎*2if a⏎*2…`, `x = if a then⏎*2…`); a directive inside an expression (`x = #if a⏎*2…`, also after `print`, in `(` and `f(`); a PRINT continued by malformed lines (`print ,+⏎,+⏎…`, `print ;-⏎…`); and each of these continued across line breaks or `:` while every piece starts with a prefix operator or `^` (`x = -` followed by `-` lines). The list is not exhaustive: other right-recursive nestings may behave the same. Memory stays small (about 24 MiB at most for the CLI process in every measured family, 13.5 MiB native for the prefix witness at 16 KB), and the runtime's progress callback stops the parse. The open release-blocking findings B5-01 and B5-02 ([0.1.0-release.md](../reports/0.1.0-release.md#status-hold)) are not covered: there memory grows quadratically, or the parse overflows the stack. On the release parser runtimes 0.25.1, 0.26.13 and 0.27.0 give the same trees and quadratic curves, and generators 0.26.13 and 0.27.0 emit identical files. Valid input, scattered errors and statements separated by valid lines stay linear. Measurements, cause and mitigation: [0.1.0-performance.md](../reports/0.1.0-performance.md#known-limitation-kl-002) | W13 seeds `KL-002 B-01 witness k=1000`, `KL-002 nested single-line IF witness k=1000`, `KL-002 prefix operators across lines k=1000`, `KL-002 exponent witness k=2000`, `KL-002 PRINT across lines k=500`, and the KL-002 rows of the recovery scaling guards |
+| KL-002 | retired 2026-09-26: the Session 05-7 error-recovery scanner ([ADR-0008](../design/decisions/ADR-0008-error-recovery-scanner.md)) makes every measured family linear; accepted for 0.1.0 by the owner on 2026-09-24 as a class of behaviour until then | none is violated (robustness only); the constructs involved are right-recursive nestings the grammar accepts: prefix operators (BS-EXP-012, 018; their nesting BS-EXP-027, 028 is provisional), the right-associative `^` (BS-EXP-011), single-line IFs nested in a single-line branch (BS-STMT-009, provisional) and the PRINT item list (BS-STMT-024–026, 040; 026 provisional, 040 tolerated) | Error recovery time grew with the square of the number of repeated malformed pieces that kept such a nesting pending in one statement or its continuation (the measured families and their history: [0.1.0-performance.md](../reports/0.1.0-performance.md#known-limitation-kl-002)). With the scanner the rest of a malformed line is one token. Through the pinned CLI all 18 known families (prefix operators, also in closed groups, call arguments, after `return`, across lines and `:`; `^` before `*`, `)`, `,`, `-*`; nested single-line IFs and the IF expression across lines; directives in expressions, after `print` and in `f(`; PRINT continued by `,+` and `;-` lines) have local exponents 0.07–1.06 from k = 1,000 to 16,000, at most 128 ms and 20 MiB at k = 16,000, and the 74 families of the lane's regression sweep built from the KL-002 units at most 1.45 ([0.1.0-integrated-qualification.md](../reports/0.1.0-integrated-qualification.md)). Nestings that were never measured are not claimed | W13 seeds `KL-002 B-01 witness k=1000`, `KL-002 nested single-line IF witness k=1000`, `KL-002 prefix operators across lines k=1000`, `KL-002 exponent witness k=2000`, `KL-002 PRINT across lines k=500`, kept as regression seeds, and the KL-002 rows of the recovery scaling guards, now scaling regression tests |
 | KL-003 | retired 2026-09-24: the `_pow_left` change of Session 05-1 (grammar-design §5) removed its quadratic memory; its quadratic time is part of KL-002, and the owner's exception to the bounded-memory condition is withdrawn | — | Error recovery on a run of `^` each followed by a token that cannot start an operand needed quadratic memory at end of input (1.1 GiB at 24 KB) that the progress callback could not interrupt | — |
 
-KL-002 and the V10 bound. W06's per-input bound (10 s, 1 GiB) still applies
-to every W06 input and W13 seed, the KL-002 witnesses included. An input of
-the KL-002 class large enough to exceed it is a `FAIL` of that bound, not a
-pass: through the pinned CLI the measured families pass 10 s from about 5 KB
-(PRINT continued by malformed lines), 10 KB (prefix operators, also across
-lines), 14 KB (`^`) and 29 KB (nested single-line IFs); none of them
-approaches the memory bound (the open finding B5-01 does, [0.1.0-release.md](../reports/0.1.0-release.md#status-hold)). Such inputs are accepted
-for 0.1.0 as KL-002, they are not W06 inputs, and V10 supports no time claim
-for them beyond the recorded measurements, and no claim that the known
-families are the only ones. A fix is recorded by re-measuring, narrowing or
-retiring the limitation and turning its guard into a scaling regression test.
+KL-002 and the V10 bound. Until its retirement an input of the KL-002 class
+large enough to exceed W06's per-input bound (10 s, 1 GiB) was a `FAIL` of
+that bound, accepted for 0.1.0 as KL-002. Since Session 05-7 its witnesses
+are ordinary W13 seeds under that bound, and its guard rows are scaling
+regression tests with the bounds of the other fixed rows.
 
 Recovery scaling guards. `scripts/check_robustness.py` runs, with W13 locally
 and in hosted CI, one guard per row of its `RECOVERY_GUARDS` table: the
@@ -229,10 +223,10 @@ growth below it is invisible there; the Windows job sees it:
 
 | Row | Witness, sizes | Exponent | Larger parse | Memory growth | Kind |
 |---|---|---|---|---|---|
-| KL-002 prefix | `x = ` + `+*`, k = 250 and 1,000 | ≤ 2.5 | ≤ 3 s | ≤ 32 MiB | disclosed limitation: worse than quadratic, a large slowdown or a memory regression fails |
-| KL-002 nested IF | `if a⏎*2`, k = 250 and 1,000 | ≤ 2.5 | ≤ 3 s | ≤ 32 MiB | as above |
-| KL-002 exponent | `x = ` + `2^*`, k = 500 and 2,000 | ≤ 2.5 | ≤ 5 s | ≤ 24 MiB | as above, and a regression test of the `_pow_left` memory fix (before it: 69–84 MiB growth) |
-| KL-002 PRINT across lines | `print ` + `,+⏎`, k = 125 and 500 | ≤ 2.5 | ≤ 5 s | ≤ 32 MiB | as the first row |
+| KL-002 prefix | `x = ` + `+*`, k = 250 and 1,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | regression test of the recovery scanner (before it: exponent 1.92, 505 ms) |
+| KL-002 nested IF | `if a⏎*2`, k = 250 and 1,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | the same (before it: 1.97, 681 ms) |
+| KL-002 exponent | `x = ` + `2^*`, k = 500 and 2,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | the same (before it: 2.00, 2.1 s), and a regression test of the `_pow_left` memory fix (before that: 69–84 MiB growth) |
+| KL-002 PRINT across lines | `print ` + `,+⏎`, k = 125 and 500 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | the same (before it: 1.99, 972 ms) |
 | R-A-01 | `x = ` + `f(*`, k = 500 and 2,000 | ≤ 1.5 | ≤ 300 ms | ≤ 24 MiB | regression test of the Session 05-1 fix (before it: exponent 1.7–2.1, 3 s, 1.24 GiB) |
 | B4-01/B5-02 PRINT unclosed calls | `print ` + `f([)`, k = 1,000 and 16,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | regression test of the `_print_items` memory fix (before it: 386 MiB at 16 KB through the CLI) and of the Session 05-7 recovery scanner (before it: the CLI overflowed its stack at k = 16,000, B5-02) |
 | B5-02 PRINT separators | `print ` + `,+*`, k = 1,000 and 16,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | regression test of the recovery scanner (before it: stack overflow at k = 16,000) |
@@ -264,13 +258,18 @@ guard).
 | malformed brackets | `x = ` + `[`, k = 1,000 and 16,000 | ≤ 1.5 | ≤ 500 ms | the same (before it: 1.91, 369 ms) |
 | unclosed TRY blocks | `try⏎` with no prefix, k = 1,000 and 16,000 | ≤ 1.5 | ≤ 500 ms | the same (before it: 1.90, 701 ms) |
 
-The "before it" values of the rows added in Session 05-7 are these guards
-run on the grammar, parser and query of `47d4047` through the pinned CLI on
-the local Windows host (the live known-bad check of Session 05-7); every one
-of those rows fails there, and the older rows pass there as before. The same
-check on the candidate with a scanner that produces no token fails every B5
-row, and with the method-call pattern in parent form (`(call_expression
-property: (identifier) @function)`) every method, mixed and optional chain row.
+The "before it" values of the rows added or tightened in Session 05-7 are
+these guards run on the grammar, parser and query of `47d4047` through the
+pinned CLI on the local Windows host (the live known-bad check of Session
+05-7); every one of those rows fails there, and the R-A-01, member and
+attribute rows pass there as before. The B4-01/B5-02 PRINT row, run with its
+bounds at k = 1,000 and 4,000 on `8e2ad7c` (the parser before the
+`_print_items` fix; its memory is quadratic, so the larger size is not run),
+fails too (exponent 1.89, 872 ms, 339 MiB growth). The same check on the
+candidate with a scanner that produces no token fails every B5 row and three
+of the four KL-002 rows, and with the method-call pattern in parent form
+(`(call_expression property: (identifier) @function)`) every method, mixed
+and optional chain row.
 
 ## Release qualification lane
 
@@ -314,7 +313,7 @@ by the lane:
 | INCREMENTAL-REPAIR | 28 edit scripts | incremental parse equals a fresh parse; inverse edits restore the original; both comparators detect a planted difference |
 | RESUME-RESET | six registered inputs | resume after cancellation, reset and a new source each equal a fresh parse; two parsers are independent |
 | SUPPORT | B5 and A5-01 points on runtimes 0.25.1 and 0.26.13 | complete within the caps (the product runtime is 0.27.0) |
-| REGRESSION-SWEEP | 270 context × unit × line-end families, k 100, 400, 20,000 | no crash; memory growth < 64 MiB; exponent 400 → 20,000 ≤ 1.5 except the KL-002 units |
+| REGRESSION-SWEEP | 270 context × unit × line-end families, k 100, 400, 20,000 | no crash; memory growth < 64 MiB; exponent 400 → 20,000 ≤ 1.5, the units of the retired KL-002 included |
 | ABS-MEMORY | every registered B5, A5-01 and cancellation point | peak commit ≤ 128 MiB |
 
 The lane's result supports only the identity it names (`identity.json`:

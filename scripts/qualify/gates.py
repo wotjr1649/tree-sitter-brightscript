@@ -34,7 +34,7 @@ VALID_1MIB = [f"{c}-1MiB" for c in cases.LARGE_VALID]
 BUDGETS = [25, 50, 100, 200, 300, 500, 1000, 2000, 4000]
 QUERY_MALFORMED = ["Q-INDEX-MEMBER", "Q-NEG-PAREN-IDX", "Q-PAREN-NEG", "Q-TRY", "Q-PAREN", "Q-ARR"]
 VALID_FAMILIES = ["flat-assign", "nested-if", "array", "aa", "long-expr", "calls"]
-KL002_UNITS = {"+*", "2^*", "(not)"}
+KL002_UNITS = {"+*", "2^*", "(not)"}  # the units of the retired KL-002, reported separately
 
 
 def exponent(t1, t2, n1, n2):
@@ -548,11 +548,11 @@ def sweep(r):
             e = exponent(t[400], t[20000], 400, 20000) if t[400] >= FLOOR_MS else None
             kl002 = unit in KL002_UNITS
             p.update(parse_ms=t, memory_growth=growth, exponent=e, kl002=kl002)
-            p["pass"] = growth < 64 * MIB and (kl002 or e is None or e <= 1.5)
+            p["pass"] = growth < 64 * MIB and (e is None or e <= 1.5)
         else:
             p["termination"] = {k: x["report"]["termination_reason"] for k, x in recs.items()}
             p["pass"] = False
         ok &= p["pass"]
         points.append(p)
     return result("REGRESSION-SWEEP", ok, points, ["270 families x k 100, 400, 20000; crash 0, memory growth < 64 MiB, "
-                                                   "time exponent 400 -> 20000 <= 1.5 except the KL-002 units"])
+                                                   "time exponent 400 -> 20000 <= 1.5, the retired KL-002 units included"])

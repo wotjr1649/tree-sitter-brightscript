@@ -47,14 +47,14 @@ from tscli import cli, cst, has_error, popen
 TIME_LIMIT = 10.0
 MEMORY_LIMIT = 1 << 30
 # (name, prefix, repeated unit, small k, large k, max exponent, max ms of the large parse, max MiB of memory
-# growth). The KL-002 rows are disclosed quadratic-time families; the others were fixed in Session 05-1
-# (R-A-01: time and memory; exponent and PRINT items: memory) or by the Session 05-7 recovery scanner (B5-01,
-# B5-02: the rest of a malformed line is one token) and must stay so.
+# growth). Fixed in Session 05-1 (R-A-01: time and memory; exponent and PRINT items: memory) or by the Session 05-7
+# recovery scanner (B5-01, B5-02 and the retired KL-002 families: the rest of a malformed line is one token); every
+# row must stay so.
 RECOVERY_GUARDS = [
-    ("KL-002 prefix +/- (B-01)", b"x = ", b"+*", 250, 1000, 2.5, 3000, 32),
-    ("KL-002 nested single-line IF", b"", b"if a\n*2", 250, 1000, 2.5, 3000, 32),
-    ("KL-002 exponent, memory fixed", b"x = ", b"2^*", 500, 2000, 2.5, 5000, 24),
-    ("KL-002 PRINT across lines", b"print ", b",+\n", 125, 500, 2.5, 5000, 32),
+    ("KL-002 prefix +/- (B-01, fixed)", b"x = ", b"+*", 250, 1000, 1.5, 50, 8),
+    ("KL-002 nested single-line IF (fixed)", b"", b"if a\n*2", 250, 1000, 1.5, 50, 8),
+    ("KL-002 exponent (fixed)", b"x = ", b"2^*", 500, 2000, 1.5, 50, 8),
+    ("KL-002 PRINT across lines (fixed)", b"print ", b",+\n", 125, 500, 1.5, 50, 8),
     ("R-A-01 unclosed calls (fixed)", b"x = ", b"f(*", 500, 2000, 1.5, 300, 24),
     ("B4-01/B5-02 PRINT unclosed calls (fixed)", b"print ", b"f([)", 1000, 16000, 1.5, 50, 8),
     ("B5-02 PRINT separators (fixed)", b"print ", b",+*", 1000, 16000, 1.5, 50, 8),

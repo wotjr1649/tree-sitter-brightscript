@@ -300,8 +300,8 @@ inlined rule did; `src/node-types.json` and every valid tree are unchanged.
 For the same reason the left operand of `^` is a hidden rule
 `_pow_left` = `expression` with `POSTFIX` precedence: recovery on a run of
 malformed `^` (`x = 2^*2^*…`) otherwise needed quadratic memory at end of
-input (1.1 GiB at 24 KB) and now needs little memory, but its time is
-quadratic (KL-002; 6 KB: 1.4 s native, 0.16 s before). This precedence now
+input (1.1 GiB at 24 KB) and now needs little memory; its quadratic time
+(KL-002; 6 KB: 1.4 s native) ended with the error-recovery scanner (§16). This precedence now
 carries the right associativity of `^` (`2^3^2` = `2^(3^2)`, BS-EXP-011) and
 its binding above the prefix operators (`-2^2` = `-(2^2)`, BS-EXP-012): the
 generator emits the same parser with `prec.left` as with `prec.right` on the
@@ -778,8 +778,8 @@ Added in Session 05-7 ([ADR-0008](../design/decisions/ADR-0008-error-recovery-sc
 The stock runtime handles a malformed token one at a time during error
 recovery; long runs of them made recovery memory, stack depth, end-of-input
 work or query time grow faster than the input (findings B5-01, B5-02,
-S07-M01–M03). Four grammar-level measures bound that work without changing
-any valid tree.
+S07-M01–M03 and the quadratic-time class KL-002, retired). Four grammar-level
+measures bound that work without changing any valid tree.
 
 1. **Recovery tokens.** `src/scanner.c` returns a token only in the runtime's
    error state (every external token is valid there, including

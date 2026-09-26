@@ -13,7 +13,12 @@ found three release-blocking findings, and Session 05-1 ended on hold: 0.1.0
 is not released ([reports/0.1.0-release.md](reports/0.1.0-release.md#status-hold)).
 Sessions 05-2 and 07 found four more material findings and Session 05-3
 fixed part of one (member and attribute chains in the highlight query); all
-seven stay open ([reports/0.1.0-structural-recovery-safety.md](reports/0.1.0-structural-recovery-safety.md)).
+seven stayed open ([reports/0.1.0-structural-recovery-safety.md](reports/0.1.0-structural-recovery-safety.md)).
+Session 05-7 re-froze the public schema before the first release
+(ADR-0007), added the error-recovery scanner (ADR-0008) and qualified one
+candidate that closes all seven and retires KL-002 on the stock runtime
+([reports/0.1.0-integrated-qualification.md](reports/0.1.0-integrated-qualification.md));
+its release awaits the owner's decision.
 The 0.1.0 release will be the commit identified by the `v0.1.0` tag and its
 GitHub Release once they are published; no package is published.
 Phases 1–5 have their exit evidence in
