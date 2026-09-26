@@ -97,9 +97,9 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
 5. The scanner keeps one state byte, flags of the last token it returned in
    a stack version: a long run on the current line (kept by the shorter runs
    after it, cleared by the recovery line end of the line); a long run that
-   stopped before a block keyword (runs, keyword stops and the ordinary line
-   breaks, which the scanner does not see, keep this flag; a recovery line
-   end clears it; it matters only at the end of input); and one or two empty
+   stopped before a block keyword (runs, keyword stops and ordinary line
+   breaks, for which the scanner returns no token, keep this flag; a
+   recovery line end clears it; it matters only at the end of input); and one or two empty
    line ends at the end of input were returned. A valid parse has no scanner
    token, so the byte is never set in one. In runtime 0.27.0 a token that changes the state cannot be skipped
    once recovery to an earlier state has succeeded (`ts_parser__recover`),
@@ -110,7 +110,7 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
    the end of input changes the state, so that the runtime keeps it, and it
    is returned at most twice per stack version: recovery can use one to end
    the last line and one more to leave a construct that the input leaves
-   open.
+   open (or, less often, to enter one; Consequences).
    `create` allocates the byte with `ts_calloc` of `tree_sitter/alloc.h` (the
    C library's `calloc` unless the build defines
    `TREE_SITTER_REUSE_ALLOCATOR`); without it the scanner returns no token.
@@ -193,15 +193,16 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
   8 MiB.
 - **One empty end-of-input line end per stack version** (`494ecb2`) —
   changed after independent review (Session 05-7, A5-04): with one, 14
-  files in each generated end-of-input matrix after a keyword stop (28
-  declarations) were wrapped that two tokens keep (never more than by
-  `47d4047`).
+  files (28 declarations) in each of review A5's three end-of-input
+  matrices after a keyword stop, and 12 or 10 files in each of review A6's,
+  were wrapped that two tokens keep (never more than by `47d4047`).
 - **A second empty end-of-input line end only after a long run**
   (`d3764a3`) — changed after independent review (Session 05-7, A6-01 and
   A6-02): it tied the second token to a keyword stop anywhere earlier in the
   file. Two tokens in every stack version keep declarations that
-  `d3764a3` loses in 39 generated or random end-of-input files and lose them
-  in 1.
+  `d3764a3` loses in 39 generated or random end-of-input files rich in long
+  runs and lose them in 1; on 5,000 random end-of-input files without a
+  long run (review A7's generator) they keep them in 15 and lose them in 5.
 - **Hidden raw token forms** — rejected after a trial: the generator turns a
   hidden single-string rule into a nonterminal, which changes valid trees.
 - **A Rust, Wasm or separate-process parser** — out of scope.
@@ -247,7 +248,7 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
   samples, 22 when a lone `CR` and a statement follow (review A5). The same
   grammar with a scanner that returns nothing gives the same trees, so the
   cause is the grammar's stack shape, not the scanner; `47d4047` keeps those
-  declarations, and loses declarations that the candidate keeps in 3,652 of
+  declarations, and loses declarations that the candidate keeps in 3,697 of
   the prefixes.
 - When the parse stack holds more unclosed constructs than the runtime's
   recovery summary reaches (16 entries), recovery cannot return to a

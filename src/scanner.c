@@ -30,9 +30,9 @@ enum TokenType {
 /* The state, flags of the last token this scanner returned in a stack version. RUN: a long run on
    this line, kept by the shorter runs after it and cleared by the recovery line end of the line.
    TAIL: a long run stopped before a block keyword, where recovery can resume on the same line;
-   its line break is then an ordinary one. Runs, keyword stops and the ordinary line breaks, which
-   the scanner does not see, keep TAIL; a recovery line end clears it; it matters only at the end
-   of input. EOF1, EOF_DONE: one or two empty line ends at the end of input were returned. In
+   its line break is then an ordinary one. Runs, keyword stops and ordinary line breaks (for which
+   the scanner returns no token) keep TAIL; a recovery line end clears it; it matters only at the
+   end of input. EOF1, EOF_DONE: one or two empty line ends at the end of input were returned. In
    runtime 0.27.0 a token that changes the state cannot be skipped once recovery to an earlier
    state succeeded, and an empty token is kept in recovery only if it changes the state. No state
    accepts a run; a line break changes the state only after a long run, where recovery is to
@@ -121,7 +121,7 @@ static bool statement_follows(TSLexer *lexer) {
 
 /* A recovery line end: LF or CR LF (a lone CR is no line break of the grammar, BS-LEX-007, and no
    line end here), or at the end of input an empty token, which the runtime keeps because it
-   changes the state. A stack version receives at most two of these: recovery can use one to end
+   changes the state. A stack version receives at most two empty tokens: recovery can use one to end
    the last line and one more to leave a construct that the input leaves open (or, less often, to
    enter one; ADR-0008). */
 static bool line_end(TSLexer *lexer, State *state, unsigned char prev) {
