@@ -1,21 +1,21 @@
 0:0  - 0:39   •source_file
-0:0  - 0:38     •function_declaration
+0:0  - 0:10     •ERROR
 0:0  - 0:3         "sub"
-0:4  - 0:8         name: identifier `main`
-0:8  - 0:10        parameters: parameter_list
+0:4  - 0:8         identifier `main`
+0:8  - 0:10        parameter_list
 0:8  - 0:9           "("
 0:9  - 0:10          ")"
-0:10 - 0:31       body: •block
-0:13 - 0:22         •assignment_statement
-0:13 - 0:14            left: identifier `x`
-0:15 - 0:16            "="
-0:17 - 0:18           •ERROR
-0:17 - 0:18              ")"
-0:19 - 0:22            right: unary_expression
-0:19 - 0:20              "+"
-0:21 - 0:22              operand: number `1`
-0:25 - 0:30         assignment_statement
-0:25 - 0:26           left: identifier `y`
-0:27 - 0:28           "="
-0:29 - 0:30           right: number `2`
+0:10 - 0:39     •ERROR
+0:10 - 0:11       •ERROR `\r`
+0:13 - 0:14       identifier `x`
+0:15 - 0:16       "="
+0:17 - 0:18       ")"
+0:19 - 0:20       plus_sign `+`
+0:21 - 0:22       number `1`
+0:22 - 0:23       •ERROR `\r`
+0:25 - 0:26       identifier `y`
+0:27 - 0:28       "="
+0:29 - 0:30       number `2`
+0:30 - 0:31       •ERROR `\r`
 0:31 - 0:38       "end sub"
+0:38 - 0:39       •ERROR `\r`

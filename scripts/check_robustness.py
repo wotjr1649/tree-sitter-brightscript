@@ -101,8 +101,8 @@ QUERY_GUARDS = [
 QUERY = ROOT / "queries/highlights.scm"
 RECOVERY = ROOT / "test/recovery"
 # Recovery cases whose later declarations must survive outside every ERROR node (lines after an error, ADR-0008).
-LOCALITY = ["closer-after-stray", "colon-closer", "directive-closer", "directive-header", "eof-open-literal",
-            "header-comma", "if-header-bracket", "literal-last-long-run", "literal-short-run",
+LOCALITY = ["closer-after-stray", "colon-closer", "directive-closer", "directive-header", "else-after-long-run",
+            "eof-open-literal", "header-comma", "if-header-bracket", "literal-last-long-run", "literal-short-run",
             "long-run-next-line", "nested-literal-long-run", "stale-long-run", "two-errors-gap"]
 
 
