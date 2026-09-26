@@ -285,15 +285,17 @@ scanner or runtime change and are never regenerated to make the check pass.
 Earlier Session 05-7 scanners fail them: on `cc664de` (the first scanner)
 every golden then present differed and two `LOCALITY` cases failed; with the
 current set, on `b501847` (a recovery line break at every line break during
-recovery) eleven cases differ and six `LOCALITY` cases fail, on `e093ac8`
-(the A2 fix, rejected after review A3) thirteen differ and four fail, on
-`4ff5633` (the A3 fix, rejected after review A4) five differ and two fail,
-and on `494ecb2` (one empty end-of-input line end per stack version, changed
-after review A5) one differs and fails. On `47d4047` one `LOCALITY` case,
-`eof-after-keyword-stop`, fails (the candidate keeps more there); in the
-others every declaration lies outside every `ERROR` node, and two of them
-give the same trees as the goldens (the others differ at least by the
-error-only names).
+recovery) twelve cases differ and six `LOCALITY` cases fail, on `e093ac8`
+(the A2 fix, rejected after review A3) fourteen differ and four fail, on
+`4ff5633` (the A3 fix, rejected after review A4) six differ and three fail,
+on `494ecb2` (one empty end-of-input line end per stack version, changed
+after review A5) two differ and fail, and on `d3764a3` (a second one only
+after a long run, changed after review A6) one differs and fails. On
+`47d4047` two `LOCALITY` cases, `eof-after-keyword-stop` and
+`eof-open-bracket`, fail (the candidate keeps more there); in the others
+every declaration lies outside every `ERROR` node, and two of them give the
+same trees as the goldens (the others differ at least by the error-only
+names).
 
 The "before it" values of the rows added or tightened in Session 05-7 are
 these guards run on the grammar, parser and query of `47d4047` through the

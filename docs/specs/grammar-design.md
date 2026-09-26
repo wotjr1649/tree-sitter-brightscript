@@ -797,8 +797,8 @@ measures bound that work without changing any valid tree.
    closes or continues a block (or a `:` or `#` before one), or the end of
    input, and `_recovery_newline`, the `LF` or `CR LF` of a line whose run
    of 16 units or more (a long run) did not stop before a block keyword, or
-   an empty token at the end of input (after a long run, and in recovery
-   once more per stack version) (ADR-0008
+   an empty token at the end of input (after a long run and in recovery, at
+   most twice per stack version) (ADR-0008
    decision 3; a state byte records the long run, so that the runtime's
    normal-state re-lexing of that line end after a recovery sees it too,
    decision 5). No rule accepts `_recovery_run`, so recovery skips it as one
@@ -810,8 +810,9 @@ measures bound that work without changing any valid tree.
    ordinary line break lets recovery resume there, as without the scanner.
    It returns nothing either for a malformed rest of fewer than 16 units
    before a line that begins like a statement, for one that begins with a
-   closing bracket, and at the end of input unless a long run precedes it
-   there: in these cases recovery proceeds token by token, because a cheap run
+   closing bracket, and at the end of input unless a long run that did not
+   stop before a block keyword precedes it on its line: in these cases
+   recovery proceeds token by token, because a cheap run
    lets a recovery version skip the line break and take the next line into
    the malformed statement, and a closing bracket lets recovery return into
    its literal (Session 05-7 reviews A-01, A2-04, A3 and A4). A long

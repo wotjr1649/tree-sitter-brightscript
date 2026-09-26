@@ -30,19 +30,21 @@ enum TokenType {
 /* The state, flags of the last token this scanner returned in a stack version. RUN: a long run on
    this line, kept by the shorter runs after it and cleared by the recovery line end of the line.
    TAIL: a long run stopped before a block keyword, where recovery can resume on the same line;
-   its line break is then an ordinary one, which leaves TAIL set until the next token of this
-   scanner, and TAIL matters only at the end of input. EOF_DONE: the empty line end at the end of
-   input was returned without a long run before it. In runtime 0.27.0 a token that
-   changes the state cannot be skipped once recovery to an earlier state succeeded, and an empty
-   token is kept in recovery only if it changes the state. No state accepts a run; a line break
-   changes the state only after a long run, where recovery is to leave the line. */
-enum { RUN = 1, EOF_DONE = 2, TAIL = 4 };
+   its line break is then an ordinary one. Runs, keyword stops and the ordinary line breaks, which
+   the scanner does not see, keep TAIL; a recovery line end clears it; it matters only at the end
+   of input. EOF1, EOF_DONE: one or two empty line ends at the end of input were returned. In
+   runtime 0.27.0 a token that changes the state cannot be skipped once recovery to an earlier
+   state succeeded, and an empty token is kept in recovery only if it changes the state. No state
+   accepts a run; a line break changes the state only after a long run, where recovery is to
+   leave the line. */
+enum { RUN = 1, EOF_DONE = 2, TAIL = 4, EOF1 = 8 };
 
 /* A malformed rest shorter than this is recovered token by token, as without this scanner, before
    a line that may begin a statement (a cheap run there lets a recovery version skip the line break
    and take the next line into the malformed statement), when it begins with a closing bracket
    (recovery can then return into the literal it closes) and at the end of input, unless a long
-   run precedes it there. A rest that stops before a block keyword is a run however short. */
+   run that did not stop before a block keyword precedes it on its line. A rest that stops before
+   a block keyword is a run however short. */
 enum { MIN_RUN = 16 };
 
 typedef struct {
@@ -119,8 +121,9 @@ static bool statement_follows(TSLexer *lexer) {
 
 /* A recovery line end: LF or CR LF (a lone CR is no line break of the grammar, BS-LEX-007, and no
    line end here), or at the end of input an empty token, which the runtime keeps because it
-   changes the state. After a long run the empty token clears the state, so that a stack version
-   can receive one more, which recovery uses to leave a construct left open further up. */
+   changes the state. A stack version receives at most two of these: recovery can use one to end
+   the last line and one more to leave a construct that the input leaves open (or, less often, to
+   enter one; ADR-0008). */
 static bool line_end(TSLexer *lexer, State *state, unsigned char prev) {
   if (!lexer->eof(lexer)) {
     bool cr = lexer->lookahead == '\r';
@@ -130,7 +133,7 @@ static bool line_end(TSLexer *lexer, State *state, unsigned char prev) {
       lexer->advance(lexer, false);
     }
   }
-  state->flags = lexer->eof(lexer) && !(prev & (RUN | TAIL)) ? EOF_DONE : 0;
+  state->flags = !lexer->eof(lexer) ? 0 : (prev & EOF1) ? EOF_DONE : EOF1;
   lexer->mark_end(lexer);
   lexer->result_symbol = RECOVERY_NEWLINE;
   return true;
@@ -163,8 +166,8 @@ bool tree_sitter_brightscript_external_scanner_scan(void *payload, TSLexer *lexe
   /* After a long run the line end is a recovery line end, also when recovery moved back to an
      earlier state and the runtime lexes it again in a normal state. At any other line break the
      scanner returns nothing and the runtime lexes the ordinary line break, as without it. At the
-     end of input the empty line end is returned after a long run, and in recovery once more per
-     stack version, so that recovery can leave the constructs the input leaves open. */
+     end of input the empty line end is returned after a long run (also in a normal state) and in
+     recovery, at most twice per stack version. */
   if (lexer->eof(lexer) || line_break(lexer->lookahead)) {
     if ((prev & RUN) || (lexer->eof(lexer) && (prev & TAIL))) return line_end(lexer, state, prev);
     if (recovering && lexer->eof(lexer) && !(prev & EOF_DONE)) return line_end(lexer, state, prev);

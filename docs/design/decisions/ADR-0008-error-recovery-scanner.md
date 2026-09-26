@@ -60,9 +60,9 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
      end of input; never empty. A run of 16 units or more is *long*;
    - a **recovery line end**: the line break (`LF` or `CR LF`) of a line
      whose long run did not stop before a block keyword, or at the end of
-     input an empty token: after a long run (also in a normal state), and in
-     recovery once more per stack version. The grammar accepts it
-     where a line of statements ends and after the header of a loop,
+     input an empty token, at most twice per stack version: after a long run
+     (also in a normal state) and in recovery. The grammar accepts it where a
+     line of statements ends and after the header of a loop,
      function, TRY, CATCH or directive, not after an IF header (a single-line
      IF with an error would become a block IF) and not inside brackets.
    At any other line break it returns nothing, so the runtime lexes the
@@ -71,14 +71,15 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
    stops before a block keyword, that line's break is ordinary too: recovery
    usually resumes at the keyword on the same line (if it cannot, the next
    line can join the malformed statement; Consequences). It also returns
-   nothing,
-   so that recovery proceeds token by token as without the scanner, for a
+   nothing, so that recovery proceeds token by token as without the scanner,
+   for a
    malformed rest of fewer than 16 units that is followed by a line that
    begins like a statement (a cheap run there lets a recovery version skip
    the line break and take the next line into the malformed statement), that
    begins with a closing bracket (recovery can then return into the literal
-   it closes) or that ends the input (the last unless a long run precedes it
-   there); a rest that stops before a block keyword is a run however short.
+   it closes) or that ends the input (the last unless a long run that did
+   not stop before a block keyword precedes it on its line); a rest that
+   stops before a block keyword is a run however short.
    When recovery returns to an earlier state at the line end of a long run,
    the runtime lexes that line end again in a normal state; the scanner
    returns it as a recovery line end there too. A long malformed line then
@@ -96,20 +97,20 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
 5. The scanner keeps one state byte, flags of the last token it returned in
    a stack version: a long run on the current line (kept by the shorter runs
    after it, cleared by the recovery line end of the line); a long run that
-   stopped before a block keyword (the ordinary line break after it leaves
-   this flag set until the scanner's next token; it matters only at the end
-   of input); and the empty line end at the end of input was returned
-   without a long run before it. A valid parse has no scanner token, so the byte is never set in
-   one. In runtime 0.27.0 a token that changes the state cannot be skipped
+   stopped before a block keyword (runs, keyword stops and the ordinary line
+   breaks, which the scanner does not see, keep this flag; a recovery line
+   end clears it; it matters only at the end of input); and one or two empty
+   line ends at the end of input were returned. A valid parse has no scanner
+   token, so the byte is never set in one. In runtime 0.27.0 a token that changes the state cannot be skipped
    once recovery to an earlier state has succeeded (`ts_parser__recover`),
    and an empty token is kept during recovery only if it changes the state
    (`ts_parser__lex`). The recovery line end of a long run changes the state,
    where recovery is meant to leave the line; the line break after a short
    run is the ordinary one and leaves the state alone; the empty line end at
    the end of input changes the state, so that the runtime keeps it, and it
-   is returned at most twice per stack version (after a long run it clears
-   the state, and recovery can then receive one more to leave a construct
-   left open further up).
+   is returned at most twice per stack version: recovery can use one to end
+   the last line and one more to leave a construct that the input leaves
+   open.
    `create` allocates the byte with `ts_calloc` of `tree_sitter/alloc.h` (the
    C library's `calloc` unless the build defines
    `TREE_SITTER_REUSE_ALLOCATOR`); without it the scanner returns no token.
@@ -191,11 +192,16 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
   R14b) — rejected: the block-keyword recovery guard grew by more than
   8 MiB.
 - **One empty end-of-input line end per stack version** (`494ecb2`) —
-  changed after independent review (Session 05-7, A5-04): after a long run
-  that stopped before a block keyword, the second empty token lets recovery
-  leave a construct left open further up; with one, 14 more declarations
-  per generated end-of-input matrix were wrapped (never more than by
+  changed after independent review (Session 05-7, A5-04): with one, 14
+  files in each generated end-of-input matrix after a keyword stop (28
+  declarations) were wrapped that two tokens keep (never more than by
   `47d4047`).
+- **A second empty end-of-input line end only after a long run**
+  (`d3764a3`) — changed after independent review (Session 05-7, A6-01 and
+  A6-02): it tied the second token to a keyword stop anywhere earlier in the
+  file. Two tokens in every stack version keep declarations that
+  `d3764a3` loses in 39 generated or random end-of-input files and lose them
+  in 1.
 - **Hidden raw token forms** — rejected after a trial: the generator turns a
   hidden single-string rule into a nonterminal, which changes valid trees.
 - **A Rust, Wasm or separate-process parser** — out of scope.
@@ -215,8 +221,14 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
 - The empty line end at the end of input lets recovery leave constructs
   that the input leaves open. On 2,816 generated inputs that end inside open
   constructs (Session 05-7 review A4), the candidate keeps declarations that
-  `e093ac8` loses in 200 and loses declarations that `e093ac8` keeps in 19;
-  it loses none that `47d4047` keeps.
+  `e093ac8` loses in 206 and loses declarations that `e093ac8` keeps in 15;
+  it loses none that `47d4047` keeps. The second empty token can also let
+  recovery enter an open construct instead of leaving one: on 10,000 random
+  end-of-input files (review A6's generator) two tokens lose declarations
+  that one token keeps in 5 and keep declarations that one token loses in
+  19. On those files the candidate loses declarations that `47d4047` keeps
+  in 105, and `47d4047` loses declarations that the candidate keeps in
+  3,260.
 - A short malformed rest that begins with a closing bracket is recovered
   token by token, so an extra closer can end a literal early and its real
   closing lines become errors (1 to 5 more rows in 24 of 360 generated
