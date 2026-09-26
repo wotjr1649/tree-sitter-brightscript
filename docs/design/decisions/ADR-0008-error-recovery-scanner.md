@@ -45,13 +45,23 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
 2. The scanner acts only when a sentinel external token, used by no grammar
    rule, is valid, which happens only in the error state.
 3. It then returns one of two tokens:
-   - a **recovery run**: the rest of the physical line, stopping before a
-     line break (`LF` or `CR LF`), before a `'` comment outside a string
-     literal, or at end of input; never empty;
-   - a **recovery line break**: a line break that the grammar accepts only
-     where a line of statements may end, not as the terminator of a block
-     header and not inside brackets.
-   A malformed line then becomes one `ERROR` node that keeps the native
+   - a **recovery run**: malformed text up to the end of the physical line,
+     stopping before a line break (`LF` or `CR LF`), before a `'` comment
+     outside a string literal, before a keyword that closes or continues a
+     block (`END…`, `NEXT`, `ELSE…`, `CATCH`) or a `:` before one, and, on a
+     last line without a line break, before its last unit (a word or one
+     character); never empty;
+   - a **recovery line break**: a line break, or that last unit, which the
+     grammar accepts where a line of statements ends and after the header
+     of a loop, function, TRY, CATCH or directive, not after an IF header
+     (a single-line IF with an error would become a block IF) and not inside
+     brackets.
+   It returns nothing, so that recovery proceeds token by token as without
+   the scanner, at the start of a line unless the line begins with an
+   operator, and for a malformed rest of fewer than 16 units before a line
+   that begins like a statement: a cheap run there lets a recovery version
+   skip the line break and take the next line into the malformed statement.
+   A long malformed line then becomes one `ERROR` node that keeps the native
    children of the tokens parsed before the error, and parsing resumes at the
    next line when a statement boundary is within reach of recovery.
 4. Tokens that can stay unreduced on the parse stack in long runs without a
@@ -62,10 +72,16 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
    token lists the raw forms, so that the generator keeps their names, and is
    placed so that no public node lists them as children. The raw names are
    public, documented in tree-schema.md as error-only.
-5. The scanner is stateless: `create` returns no payload, `serialize` writes
-   no bytes, `deserialize` ignores its input. It allocates nothing, does not
-   call `get_column`, does not recurse, and each successful scan advances at
-   least one character; a scan is bounded by the length of one line.
+5. The scanner keeps one state byte: set on a run that stopped before the
+   last unit of the input, so that when recovery moves back to a line end
+   and the runtime lexes that unit again in a normal state, the scanner
+   returns it as the recovery line break there too (a valid parse has no
+   run, so the byte is never set in one). `create` allocates the byte with
+   the runtime's `ts_calloc`; `serialize` writes it only when set. The
+   scanner calls `get_column` only in the error state, to recognise the
+   start of a line; it does not recurse, and each successful scan advances
+   at least one character; a scan is bounded by one line plus the blank
+   lines and first character after it.
 6. `src/scanner.c` is hand-written canonical source under the MIT license
    (public `TSLexer` API only, no private runtime structures, no debug output
    or environment dependence in normal builds). It is not a generated file:
@@ -94,26 +110,35 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
 - **Line-level recovery without the recovery line break** — rejected after a
   trial: recovery resumed inside an open bracket, so the next line was parsed
   as part of an array.
+- **A run for every malformed rest of a line** (the first implementation,
+  `cc664de`) — rejected after independent review (Session 05-7, A-01 and
+  B-01): a recovery version skipped whole valid lines as cheap runs, so one
+  stray token could hide the following blocks and subs, and on a last line
+  without a line break the runtime's repair versions re-read the line once
+  per repair (quadratic time).
 - **Hidden raw token forms** — rejected after a trial: the generator turns a
   hidden single-string rule into a nonterminal, which changes valid trees.
 - **A Rust, Wasm or separate-process parser** — out of scope.
 
 ## Consequences
 
-- Recovery trees change: a malformed line is one `ERROR` node instead of
-  several local ones. Recovery trees are not contractual
+- Recovery trees change: a long malformed line is one `ERROR` node instead
+  of several local ones. Recovery trees are not contractual
   ([grammar-contract.md](../../specs/grammar-contract.md) §6), but native
   `ERROR`/`MISSING` nodes, source coverage, the lines after an error and the
-  repair to a valid state are checked.
+  repair to a valid state are checked. On the single-line mutants of the
+  three repository samples, the candidate hides rows that the 0.1.0 parser
+  (`47d4047`) keeps about as often as the reverse, and far less often by
+  five rows or more (the qualification report has the counts).
 - When the parse stack holds more unclosed constructs than the runtime's
   recovery summary reaches (16 entries), recovery cannot return to a
   statement boundary; the following lines are absorbed, as without a scanner.
 - `go-treesitter` needs a Go port of the scanner. It carries hand-written Go
   scanners for other grammars (`Scan(payload, lexer, validSymbols)`), and
-  `ts2go` converts only `parser.c`. This scanner is stateless and uses only
-  `lookahead`, `advance`, `mark_end`, `eof` and `result_symbol`; input and
-  output golden cases for the port are kept here. The port and its V9
-  evidence belong to `go-treesitter`.
+  `ts2go` converts only `parser.c`. This scanner uses `lookahead`, `advance`,
+  `mark_end`, `eof`, `get_column` and `result_symbol` and serializes one
+  byte; input and output golden cases for the port are kept in
+  `test/recovery/`. The port and its V9 evidence belong to `go-treesitter`.
 
 ## Validation / enforcement
 
@@ -122,8 +147,12 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
 - Incremental and fresh parses agree across edits that create or remove a
   recovery run; repaired text parses as the valid tree; a cancelled parse
   resumes and resets correctly; two parsers are independent.
-- Scanner unit cases cover `LF`, `CR LF`, a lone `CR`, end of input, a NUL
-  byte, UTF-8 text and string literals containing `'`.
+- Scanner unit cases cover `LF`, `CR LF`, a lone `CR`, end of input with and
+  without blanks or a final word, a NUL byte, UTF-8 text, string literals
+  containing `'` and a `'` comment; with the lines-after-an-error cases they
+  are the golden trees of `test/recovery/`, compared by
+  `scripts/check_robustness.py`, which also requires every declaration of
+  those cases to stay outside every `ERROR` node.
 - `scripts/check_generated.py` requires this ADR for `src/scanner.c` and an
   `externals` list in `grammar.js`.
 

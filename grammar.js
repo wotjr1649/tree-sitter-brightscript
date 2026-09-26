@@ -74,7 +74,7 @@ module.exports = grammar({
 
   inline: $ => [
     $._assignment_target, $._stmt_chain, $._stmt_callee, $._cc_condition,
-    $._line, $._line_end, $._try_line, $._print_item, $._print_expression, $._sep,
+    $._line, $._line_end, $._try_line, $._print_item, $._print_expression, $._sep, $._body_start,
   ],
 
   rules: {
@@ -87,8 +87,9 @@ module.exports = grammar({
     _line: $ => choice(seq($.statement, $._line_end), $._line_end),
 
     // A line ends with a terminator; during error recovery also with a
-    // recovery line break, valid only here and in `_try_line`, not after a
-    // block header and not inside brackets (ADR-0008).
+    // recovery line break, valid only here, in `_try_line` and after the
+    // header of a loop, function, TRY, CATCH or directive (`_body_start`),
+    // not after an IF header and not inside brackets (ADR-0008).
     _line_end: $ => choice($._terminator, $._recovery_newline),
 
     // BS-LEX-005, 006, 010.
@@ -110,6 +111,15 @@ module.exports = grammar({
     // block, which bounds the end-of-input work on deeply nested unclosed
     // blocks (S07-M01, grammar-design §7).
     _block_head: $ => seq($._terminator, choice(seq($.statement, $._line_end), $._line_end)),
+
+    // The body of a loop, function, CATCH or directive: after a malformed header, recovery may
+    // also end the header at a recovery line break (ADR-0008). An IF body may not,
+    // or a single-line IF with an error would become a block IF.
+    _body: $ => choice($._body_start, seq($._body_head, repeat($._line))),
+
+    _body_start: $ => choice($._terminator, $._recovery_newline),
+
+    _body_head: $ => seq($._body_start, choice(seq($.statement, $._line_end), $._line_end)),
 
     // ------------------------------------------------------------ statements
     statement: $ => choice(
@@ -259,20 +269,20 @@ module.exports = grammar({
     // terminator; bare NEXT ends the innermost FOR or FOR EACH.
     for_statement: $ => seq(
       $._for_header,
-      field('body', $.block),
+      field('body', alias($._body, $.block)),
       choice(endKw('for'), kw('next')),
     ),
 
     for_each_statement: $ => seq(
       $._for_each_header,
-      field('body', $.block),
+      field('body', alias($._body, $.block)),
       choice(endKw('for'), kw('next')),
     ),
 
     // BS-STMT-016, 017, 020: NEXT does not close a WHILE.
     while_statement: $ => seq(
       $._while_header,
-      field('body', $.block),
+      field('body', alias($._body, $.block)),
       choice(endKw('while'), kw('endwhile')),
     ),
 
@@ -484,11 +494,11 @@ module.exports = grammar({
 
     // A separate line rule keeps `catch` a keyword only directly in a TRY
     // body (grammar-design §4).
-    _try_body: $ => seq($._terminator, repeat($._try_line)),
+    _try_body: $ => seq($._body_start, repeat($._try_line)),
 
     _try_line: $ => choice(seq($.statement, $._line_end), $._line_end),
 
-    catch_clause: $ => seq(kw('catch'), field('variable', $.identifier), field('body', $.block)),
+    catch_clause: $ => seq(kw('catch'), field('variable', $.identifier), field('body', alias($._body, $.block))),
 
     throw_statement: $ => seq(kw('throw'), field('value', $.expression)),
 
@@ -501,14 +511,14 @@ module.exports = grammar({
         field('name', $.identifier),
         field('parameters', $.parameter_list),
         optional(seq(kw('as'), field('return_type', $.type))),
-        field('body', $.block),
+        field('body', alias($._body, $.block)),
         choice(endKw('function'), kw('endfunction')),
       ),
       seq(
         kw('sub'),
         field('name', $.identifier),
         field('parameters', $.parameter_list),
-        field('body', $.block),
+        field('body', alias($._body, $.block)),
         choice(endKw('sub'), kw('endsub')),
       ),
     ),
@@ -517,13 +527,13 @@ module.exports = grammar({
     anonymous_function: $ => choice(
       seq(
         $._anonymous_function_header,
-        field('body', $.block),
+        field('body', alias($._body, $.block)),
         choice(endKw('function'), kw('endfunction')),
       ),
       seq(
         kw('sub'),
         field('parameters', $.parameter_list),
-        field('body', $.block),
+        field('body', alias($._body, $.block)),
         choice(endKw('sub'), kw('endsub')),
       ),
     ),
@@ -607,7 +617,7 @@ module.exports = grammar({
     if_directive: $ => seq(
       directive('if', 1),
       choice(
-        seq(field('condition', $._cc_condition), field('consequence', $.block)),
+        seq(field('condition', $._cc_condition), field('consequence', alias($._body, $.block))),
         seq(field('condition', $.false), field('consequence', $.inactive_text)),
       ),
       repeat(field('alternative', $.else_if_directive)),
@@ -620,12 +630,12 @@ module.exports = grammar({
       directive('else', 1),
       kw('if'),
       choice(
-        seq(field('condition', $._cc_condition), field('consequence', $.block)),
+        seq(field('condition', $._cc_condition), field('consequence', alias($._body, $.block))),
         seq(field('condition', $.false), field('consequence', $.inactive_text)),
       ),
     ),
 
-    else_directive: $ => seq(directive('else', 1), field('body', $.block)),
+    else_directive: $ => seq(directive('else', 1), field('body', alias($._body, $.block))),
 
     error_directive: $ => seq(directive('error'), optional(field('message', $.error_message))),
 

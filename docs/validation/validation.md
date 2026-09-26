@@ -200,7 +200,7 @@ compared).
 | ID | State | Requirement | Behaviour | Demonstrating fixture |
 |---|---|---|---|---|
 | KL-001 | retired (unused): the ADR-0004 spike passed with design V1 on 2026-09-23 | BS-COND-007 | A literal-`false` conditional branch whose text is not BrightScript (the documented block-comment idiom) produces `ERROR` nodes | `BS-COND-007: block comment with prose` and the spike fixtures S3, S5–S8, S10–S12, asserted with `:error` |
-| KL-002 | retired 2026-09-26: the Session 05-7 error-recovery scanner ([ADR-0008](../design/decisions/ADR-0008-error-recovery-scanner.md)) makes every measured family linear; accepted for 0.1.0 by the owner on 2026-09-24 as a class of behaviour until then | none is violated (robustness only); the constructs involved are right-recursive nestings the grammar accepts: prefix operators (BS-EXP-012, 018; their nesting BS-EXP-027, 028 is provisional), the right-associative `^` (BS-EXP-011), single-line IFs nested in a single-line branch (BS-STMT-009, provisional) and the PRINT item list (BS-STMT-024–026, 040; 026 provisional, 040 tolerated) | Error recovery time grew with the square of the number of repeated malformed pieces that kept such a nesting pending in one statement or its continuation (the measured families and their history: [0.1.0-performance.md](../reports/0.1.0-performance.md#known-limitation-kl-002)). With the scanner the rest of a malformed line is one token. Through the pinned CLI all 18 known families (prefix operators, also in closed groups, call arguments, after `return`, across lines and `:`; `^` before `*`, `)`, `,`, `-*`; nested single-line IFs and the IF expression across lines; directives in expressions, after `print` and in `f(`; PRINT continued by `,+` and `;-` lines) have local exponents 0.07–1.06 from k = 1,000 to 16,000, at most 128 ms and 20 MiB at k = 16,000, and the 74 families of the lane's regression sweep built from the KL-002 units at most 1.45 ([0.1.0-integrated-qualification.md](../reports/0.1.0-integrated-qualification.md)). Nestings that were never measured are not claimed | W13 seeds `KL-002 B-01 witness k=1000`, `KL-002 nested single-line IF witness k=1000`, `KL-002 prefix operators across lines k=1000`, `KL-002 exponent witness k=2000`, `KL-002 PRINT across lines k=500`, kept as regression seeds, and the KL-002 rows of the recovery scaling guards, now scaling regression tests |
+| KL-002 | retired 2026-09-26: the Session 05-7 error-recovery scanner ([ADR-0008](../design/decisions/ADR-0008-error-recovery-scanner.md)) makes every measured family linear; accepted for 0.1.0 by the owner on 2026-09-24 as a class of behaviour until then | none is violated (robustness only); the constructs involved are right-recursive nestings the grammar accepts: prefix operators (BS-EXP-012, 018; their nesting BS-EXP-027, 028 is provisional), the right-associative `^` (BS-EXP-011), single-line IFs nested in a single-line branch (BS-STMT-009, provisional) and the PRINT item list (BS-STMT-024–026, 040; 026 provisional, 040 tolerated) | Error recovery time grew with the square of the number of repeated malformed pieces that kept such a nesting pending in one statement or its continuation (the measured families and their history: [0.1.0-performance.md](../reports/0.1.0-performance.md#known-limitation-kl-002)). With the scanner a long malformed rest of a line is one token. Through the pinned CLI all 18 known families (prefix operators, also in closed groups, call arguments, after `return`, across lines and `:`; `^` before `*`, `)`, `,`, `-*`; nested single-line IFs and the IF expression across lines; directives in expressions, after `print` and in `f(`; PRINT continued by `,+` and `;-` lines), each with and without a final line break, stay linear from k = 1,000 to 16,000, and so do the lane's regression-sweep families built from the KL-002 units; the figures are in [0.1.0-integrated-qualification.md](../reports/0.1.0-integrated-qualification.md). Nestings that were never measured are not claimed | W13 seeds `KL-002 B-01 witness k=1000`, `KL-002 nested single-line IF witness k=1000`, `KL-002 prefix operators across lines k=1000`, `KL-002 exponent witness k=2000`, `KL-002 PRINT across lines k=500`, kept as regression seeds, and the KL-002 rows of the recovery scaling guards, now scaling regression tests |
 | KL-003 | retired 2026-09-24: the `_pow_left` change of Session 05-1 (grammar-design §5) removed its quadratic memory; its quadratic time is part of KL-002, and the owner's exception to the bounded-memory condition is withdrawn | — | Error recovery on a run of `^` each followed by a token that cannot start an operand needed quadratic memory at end of input (1.1 GiB at 24 KB) that the progress callback could not interrupt | — |
 
 KL-002 and the V10 bound. Until its retirement an input of the KL-002 class
@@ -234,6 +234,10 @@ growth below it is invisible there; the Windows job sees it:
 | B5-01 prefix and unclosed calls | `x = ` + `+f([)`, k = 250 and 1,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | regression test of the recovery scanner (before it: exponent 2.00, 1.8 s, 778 MiB growth) |
 | B5-01 minus statements | `-f(-)` with no prefix, k = 250 and 1,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | the same (before it: 1.95, 1.8 s, 773 MiB) |
 | B5-01 associative arrays | `x = ` + `{a:@*}<`, k = 250 and 1,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | the same (before it: 1.92, 912 ms, 315 MiB; 5.2 GiB at k = 4,000) |
+| B5-01 prefix, no final line break | `x = ` + `+f([)`, k = 1,000 and 16,000, no line break after the last unit | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | regression test of the end-of-input line end (before it, on `cc664de`: 1.75; 47 ms) |
+| B5-02 PRINT calls, no final line break | `print ` + `f([)`, k = 1,000 and 16,000, the same | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | the same (before it: 1.58; 23 ms; on `47d4047` the CLI overflows its stack) |
+| KL-002 NOT, no final line break | `x = ` + `(not)`, k = 1,000 and 16,000, the same | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | the same (before it: 1.72; 40 ms) |
+| KL-002 prefix operators across lines | `x = -⏎` + `-⏎`, k = 1,000 and 4,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | regression test of runs on lines that begin with an operator (on `47d4047`: 2.13; 11.9 s) |
 
 Query scaling guards. The same script runs one guard per row of its
 `QUERY_GUARDS` table: the full highlight query over a witness at two
@@ -257,6 +261,19 @@ guard).
 | malformed parentheses | `x = ` + `(`, k = 1,000 and 16,000 | ≤ 1.5 | ≤ 500 ms | the same (before it: 1.92, 413 ms) |
 | malformed brackets | `x = ` + `[`, k = 1,000 and 16,000 | ≤ 1.5 | ≤ 500 ms | the same (before it: 1.91, 369 ms) |
 | unclosed TRY blocks | `try⏎` with no prefix, k = 1,000 and 16,000 | ≤ 1.5 | ≤ 500 ms | the same (before it: 1.90, 701 ms) |
+
+Recovery goldens. The same script parses every `test/recovery/*.brs` and
+compares the node lines of its `--cst` output with the `.cst` golden beside
+it: the scanner unit cases (line breaks, a lone `CR`, inputs that end
+without a line break, NUL, UTF-8, strings with `'`, comments), the lines
+after an error and lines that begin with an operator. In the cases of its
+`LOCALITY` list every sub or function declaration must lie outside every
+`ERROR` node. The goldens are the recovery trees of the pinned runtime, not
+a language contract; they change only with a reviewed grammar, scanner or
+runtime change and are never regenerated to make the check pass. On
+`cc664de` (the first scanner) every golden differs and two `LOCALITY` cases
+fail; on `47d4047` the three lines-after-an-error cases give the same trees
+as the goldens.
 
 The "before it" values of the rows added or tightened in Session 05-7 are
 these guards run on the grammar, parser and query of `47d4047` through the

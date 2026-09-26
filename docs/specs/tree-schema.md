@@ -261,7 +261,8 @@ Rules applied: every node cites at least one requirement, except the six
 error-only names, which exist for [ADR-0008](../design/decisions/ADR-0008-error-recovery-scanner.md);
 `block`, `argument_list` and `parameter_list` are public because fields point
 to them and queries match them, not for parser convenience; hidden helpers
-(`_line`, `_line_end`, `_terminator`, `_newline`, `_block_head`, `_block_if`,
+(`_line`, `_line_end`, `_terminator`, `_newline`, `_block_head`, `_body` (aliased
+`block`), `_body_start`, `_body_head`, `_block_if`,
 `_single_line_if`, `_inline_else`, `_inline_block`, `_inline_statement`,
 `_print_items`, `_print_item`, `_print_expression`, `_try_body`, `_try_line`,
 `_postfix_operand`, `_callee`, `_pow_left`, `_assignment_target`, the

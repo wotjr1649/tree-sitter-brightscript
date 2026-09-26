@@ -169,7 +169,7 @@ and Ubuntu.
 | W01, W02, W04, W07 (valid), W09 (fixtures), W11 | `python scripts/tscli.py test` (verified binary, private parser library, validation.md "Identity binding") and `python scripts/check_registry.py --complete` |
 | W03 | `python scripts/check_samples.py` |
 | W05 | `python scripts/check_spellings.py` |
-| W06, W07 (invalid bytes), W08, W13 (recovery scaling guards included), W11 query scaling guards | `python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N]` |
+| W06, W07 (invalid bytes), W08, W13 (recovery scaling guards and recovery goldens included), W11 query scaling guards | `python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N]` |
 | W09 (C4), W10 (C5 included) | `python scripts/check_spike.py`, `python scripts/check_incremental.py` |
 | W12 | `python scripts/record_oracle.py` (clean tree; output under `artifacts/oracle/`) |
 | W14 | in `go-treesitter`, from the W12 inputs and W10 edits of the same identity |

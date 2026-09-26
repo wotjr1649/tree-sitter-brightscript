@@ -27,6 +27,11 @@ Usage: python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N] 
   excluded; minimum of three runs). The local exponent must not exceed the
   row's bound and the larger run must stay within the row's time.
   A guard run that times out or prints no time fails its guard.
+- Recovery goldens (validation.md "Recovery goldens"): every test/recovery/*.brs
+  parses to the node lines of its .cst golden, the recovery tree of the pinned
+  runtime (scanner unit cases, inputs ending without a line break, and lines
+  after an error); in the LOCALITY cases every declaration stays outside every
+  ERROR node.
 Crash = a timeout, an exit status other than 0 or 1, or status 1 without the
 CLI's parse-error summary line (status 1 also reports failures to run). Error
 state is the root line of `--cst` output, read by scripts/tscli.py `has_error`
@@ -43,7 +48,7 @@ import time
 from pathlib import Path
 
 from corpus import ROOT, read_corpus
-from tscli import cli, cst, has_error, popen
+from tscli import CST_LINE, cli, cst, cst_nodes, has_error, popen
 TIME_LIMIT = 10.0
 MEMORY_LIMIT = 1 << 30
 # (name, prefix, repeated unit, small k, large k, max exponent, max ms of the large parse, max MiB of memory
@@ -62,6 +67,10 @@ RECOVERY_GUARDS = [
     ("B5-01 prefix and unclosed calls (fixed)", b"x = ", b"+f([)", 250, 1000, 1.5, 50, 8),
     ("B5-01 minus statements (fixed)", b"", b"-f(-)", 250, 1000, 1.5, 50, 8),
     ("B5-01 associative arrays (fixed)", b"x = ", b"{a:@*}<", 250, 1000, 1.5, 50, 8),
+    ("B5-01 prefix, no final line break (fixed)", b"x = ", b"+f([)", 1000, 16000, 1.5, 50, 8, b""),
+    ("B5-02 PRINT calls, no final line break (fixed)", b"print ", b"f([)", 1000, 16000, 1.5, 50, 8, b""),
+    ("KL-002 NOT, no final line break (fixed)", b"x = ", b"(not)", 1000, 16000, 1.5, 50, 8, b""),
+    ("KL-002 prefix operators across lines (fixed)", b"x = -\n", b"-\n", 1000, 4000, 1.5, 50, 8),
 ]
 # (name, prefix, repeated unit, small k, large k, max exponent, max ms of the larger run). The highlight query on
 # left-deep chains (S07-M03): the member and attribute patterns match the operator and the name as siblings, so no
@@ -83,11 +92,14 @@ QUERY_GUARDS = [
     ("unclosed TRY blocks", b"", b"try\n", 1000, 16000, 1.5, 500),
 ]
 QUERY = ROOT / "queries/highlights.scm"
+RECOVERY = ROOT / "test/recovery"
+# Recovery cases whose later declarations must survive outside every ERROR node (lines after an error, ADR-0008).
+LOCALITY = ["closer-after-stray", "colon-closer", "directive-header", "header-comma", "two-errors-gap"]
 
 
-def witness(unit, k, prefix=b"x = "):
-    """`prefix` followed by `unit` k times and a line end."""
-    return prefix + unit * k + b"\n"
+def witness(unit, k, prefix=b"x = ", end=b"\n"):
+    """`prefix` followed by `unit` k times and `end` (a line end unless stated)."""
+    return prefix + unit * k + end
 
 
 def w06():
@@ -192,12 +204,12 @@ def scaling_verdict(small_bytes, small_ms, large_bytes, large_ms, growth_mib, ma
 
 
 def recovery_guards(tmp, fail):
-    for name, prefix, unit, small, large, max_exponent, max_ms, max_growth in RECOVERY_GUARDS:
+    for name, prefix, unit, small, large, max_exponent, max_ms, max_growth, *end in RECOVERY_GUARDS:
         sizes, problems = [], []
         try:
             for k in (small, large):
                 path = tmp / f"guard-{k}.brs"
-                path.write_bytes(witness(unit, k, prefix))
+                path.write_bytes(witness(unit, k, prefix, *end))
                 ms = min(parse_ms(path) for _ in range(3))
                 code, _, peak, _ = (run if sys.platform == "win32" else run_posix)(path)
                 if code is None or peak < 0:
@@ -242,6 +254,28 @@ def query_guards(tmp, fail, query=QUERY):
         print(f"  {name}: k={small} {sb:,} bytes {sm:.2f} ms; k={large} {lb:,} bytes {lm:.2f} ms; exponent {exponent:.2f} "
               f"(limit {max_exponent}){' FAIL ' + ', '.join(problems) if problems else ''}")
         fail += [f"{name} query guard: {p}" for p in problems]
+
+
+def recovery_goldens(fail):
+    """Each test/recovery/*.brs parses to the node lines of its .cst golden (the pinned runtime's recovery tree), and
+    in the LOCALITY cases every sub or function declaration lies outside every ERROR node."""
+    for src in sorted(RECOVERY.glob("*.brs")):
+        _, out = cst(src, timeout=TIME_LIMIT * 3)
+        got = [line for line in out.splitlines() if CST_LINE.match(line)]
+        want = src.with_suffix(".cst").read_text(encoding="utf-8").splitlines()
+        problems = []
+        if got != want:
+            first = next((i for i, (a, b) in enumerate(zip(got, want)) if a != b), min(len(got), len(want)))
+            problems.append(f"differs from its golden at node line {first + 1}")
+        if src.stem in LOCALITY:
+            nodes = cst_nodes(out)
+            errors = [n[:4] for n in nodes if n[5] == "ERROR"]
+            decls = [n[:4] for n in nodes if n[5] == "function_declaration"]
+            inside = [d for d in decls for e in errors if e[:2] <= d[:2] and d[2:] <= e[2:]]
+            if len(decls) < 2 or inside:
+                problems.append("a declaration is missing or inside an ERROR node")
+        print(f"  {src.stem}: {len(got)} nodes{' FAIL ' + ', '.join(problems) if problems else ''}")
+        fail += [f"recovery case {src.stem}: {p}" for p in problems]
 
 
 def run(path):
@@ -338,6 +372,8 @@ def main():
         recovery_guards(tmp, fail)
         print("Query scaling guards (minimum of 3 CLI query times, captures with predicates)")
         query_guards(tmp, fail)
+        print("Recovery goldens and lines after an error (test/recovery, ADR-0008)")
+        recovery_goldens(fail)
     if "--skip-fuzz" not in sys.argv:
         iterations = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--fuzz-iterations=")), "1000")
         seed = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--fuzz-seed=")), "1")

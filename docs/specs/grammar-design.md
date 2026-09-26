@@ -61,15 +61,20 @@ Statement lists:
 source_file := (statement _line_end | _line_end)* statement?
 block       := _terminator | _block_head (statement _line_end | _line_end)*
 _block_head := _terminator (statement _line_end | _line_end)
+_body       := _body_start | _body_head (statement _line_end | _line_end)*   (aliased block)
+_body_head  := _body_start (statement _line_end | _line_end)
+_body_start := _terminator | recovery line break
 _line_end   := _terminator | recovery line break
 _terminator := _newline | ':'
 ```
 
 The recovery line break is a token of the error-recovery scanner (§16); a
-valid parse never contains it, so for valid input `_line_end` is
-`_terminator` and `block` is `_terminator (statement _terminator |
-_terminator)*` as before. `_block_head` only groups the terminator and the
-first line into one parse-stack entry (§16); it is hidden, so every tree is
+valid parse never contains it, so for valid input `_line_end` and
+`_body_start` are `_terminator`, and `block` is `_terminator (statement
+_terminator | _terminator)*` as before. `_block_head` and `_body_head` only
+group the terminator and the first line into one parse-stack entry (§16);
+loops, functions, TRY, CATCH and directives use `_body`, IF branches use
+`block` (§16 item 5). All are hidden or aliased `block`, so every tree is
 unchanged.
 
 `block` always begins with the terminator that ends its header, so a block
@@ -778,23 +783,33 @@ Added in Session 05-7 ([ADR-0008](../design/decisions/ADR-0008-error-recovery-sc
 The stock runtime handles a malformed token one at a time during error
 recovery; long runs of them made recovery memory, stack depth, end-of-input
 work or query time grow faster than the input (findings B5-01, B5-02,
-S07-M01–M03 and the quadratic-time class KL-002, retired). Four grammar-level
+S07-M01–M03 and the quadratic-time class KL-002, retired). Five grammar-level
 measures bound that work without changing any valid tree.
 
 1. **Recovery tokens.** `src/scanner.c` returns a token only in the runtime's
    error state (every external token is valid there, including
    `_recovery_sentinel`, which no rule uses). At a line break it returns
-   `_recovery_newline`; anywhere else it returns `_recovery_run`, the rest of
-   the physical line up to a line break, a `'` comment outside a string
-   literal, or the end of input. No rule accepts `_recovery_run`, so recovery
-   skips it as one token; `_recovery_newline` is valid only in `_line_end`,
-   where a line of statements may end, so recovery resumes at the next line,
-   not inside a bracket and not after a block header. A malformed line
-   becomes one `ERROR` node holding the native nodes of the tokens parsed
-   before the error. The runtime looks back at most 16 parse-stack entries for
-   a state that accepts the line break; below more unclosed constructs than
-   that, the following lines are absorbed into the error, as they were
-   without the scanner.
+   `_recovery_newline`; otherwise it returns `_recovery_run`, malformed text up
+   to a line break, a `'` comment outside a string literal, a keyword that
+   closes or continues a block (or a `:` before one), or, on a last line
+   without a line break, its last unit, which it then returns as
+   `_recovery_newline` (ADR-0008 decision 3; a state byte lets the runtime's
+   normal-state re-lexing of that unit see it too, decision 5). No rule
+   accepts `_recovery_run`, so recovery skips it as one token;
+   `_recovery_newline` is valid in `_line_end`, where a line of statements
+   ends, and in `_body_start`, after the header of a loop, function, TRY,
+   CATCH or directive (item 5), so recovery resumes at the next line, not
+   inside a bracket and not after an IF header. The scanner returns nothing
+   at the start of a line that does not begin with an operator, and for a
+   malformed rest of fewer than 16 units before a line that begins like a
+   statement: there recovery proceeds token by token, as without the
+   scanner, because a cheap run lets a recovery version skip the line break
+   and take the next line into the malformed statement (Session 05-7 review
+   A-01). A long malformed line becomes one `ERROR` node holding the native
+   nodes of the tokens parsed before the error. The runtime looks back at
+   most 16 parse-stack entries for a state that accepts the line break;
+   below more unclosed constructs than that, the following lines are
+   absorbed into the error, as they were without the scanner.
 2. **Error-only names.** `(`, `[`, `-`, `+`, `not` and `try` can stay unreduced
    on the parse stack in long runs with no named node between them (unclosed
    `((((…`, `[[[[…`, `-(-(…`, `try` lines); at the end of input the runtime
@@ -820,3 +835,9 @@ measures bound that work without changing any valid tree.
    `_print_expression` and `_sep` are inlined, and PRINT items carry no
    `expression` wrapper (§6), which reduces the memory and the deletion time
    of large valid files (S08-M01).
+5. **Body starts.** The body of a loop, function, CATCH or directive is the
+   hidden `_body`, aliased `block`, which begins with `_body_start`: a
+   terminator or, only during recovery, `_recovery_newline`. A malformed
+   header then ends at its line break and the block survives; IF bodies keep
+   `block`, whose terminator excludes the recovery line break. The public
+   tree is unchanged (`src/node-types.json` is byte-identical).
