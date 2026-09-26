@@ -26,12 +26,13 @@ def pe(parse_ms, cancelled=False, cross=-1.0, callback=False, live=0, peak=0, bu
     return {k: v for k, v in event.items() if k not in drop}
 
 
-def rec(parse, cleanup=1.0, completed=True, final=True):
-    """A runner record; a cancelled parse has no tree to delete (tree_delete_ms -1, probe.c)."""
+def rec(parse, cleanup=1.0, completed=True, final=True, tree=None):
+    """A runner record; a cancelled parse has no tree to delete (tree_delete_ms -1, probe.c) unless `tree` says."""
     cancelled = parse.get("cancelled") is True
+    tree = (-1.0 if cancelled else cleanup) if tree is None else tree
     return {"completed": completed, "final": {"final": True} if final else None,
             "report": {"termination_reason": "COMPLETED" if completed else "MEMORY_LIMIT", "exit_code_raw": 0},
-            "events": {"parse": parse, "cleanup": {"tree_delete_ms": -1.0 if cancelled else cleanup,
+            "events": {"parse": parse, "cleanup": {"tree_delete_ms": tree,
                                                    "parser_delete_ms": cleanup if cancelled else 0.0}}}
 
 
@@ -87,6 +88,9 @@ MATRIX = [
      "MEASURED_ALLOCATION_CROSSING"),
     ("C16-no-final", rec(pe(180.0), final=False), rec(pe(180.0)), False, False, "CENSORED"),
     ("C16-cap", rec(pe(180.0)), rec(pe(180.0), completed=False), False, False, "CENSORED"),
+    ("C09-tree-deleted-when-cancelled", rec(CANCELLED, tree=5.0), rec(ALLOC_X), True, False, "MEASUREMENT_INCONSISTENT"),
+    ("C09-no-tree-without-cancel", rec(pe(180.0), tree=-1.0), rec(pe(180.0)), False, False, "MEASUREMENT_INCONSISTENT"),
+    ("C08-non-bool-flag", rec(pe(180.0, cancelled=0)), rec(pe(180.0)), False, False, "MEASUREMENT_INCONSISTENT"),
 ]
 
 # Edits of gates.py's text (Session 05-7-1 C2 mutants); each must change the verdict of some matrix case.
@@ -102,6 +106,9 @@ MUTANTS = {
     "NOT_RUN counted as a pass": ('point_status, live_ok = status, status == "NOT_APPLICABLE_BEFORE_BUDGET"',
                                   'point_status, live_ok = status, status != "MEASUREMENT_INCONSISTENT"'),
     "uninstrumented reach ignored": ('elif status == "NOT_APPLICABLE_BEFORE_BUDGET" and plain_reached:', "elif False:"),
+    "tree and cancellation not cross-checked": (
+        "not (tree_ms == -1 and cancelled or number(tree_ms) is not None\n", "not (number(tree_ms) is not None or True\n"),
+    "flag types not checked": ("or type(cancelled) is not bool or type(at_callback) is not bool", ""),
 }
 
 
