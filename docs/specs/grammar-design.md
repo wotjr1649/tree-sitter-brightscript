@@ -791,10 +791,10 @@ measures bound that work without changing any valid tree.
    `_recovery_sentinel`, which no rule uses). At a line break it returns
    `_recovery_newline`; otherwise it returns `_recovery_run`, malformed text up
    to a line break, a `'` comment outside a string literal, a keyword that
-   closes or continues a block (or a `:` before one), or, on a last line
-   without a line break, its last unit, which it then returns as
-   `_recovery_newline` (ADR-0008 decision 3; a state byte lets the runtime's
-   normal-state re-lexing of that unit see it too, decision 5). No rule
+   closes or continues a block (or a `:` before one), or, on a last line of
+   16 units or more without a line break, its last unit, which it then
+   returns as `_recovery_newline` (ADR-0008 decision 3; a state byte lets the
+   runtime's normal-state re-lexing of that unit see it too, decision 5). No rule
    accepts `_recovery_run`, so recovery skips it as one token;
    `_recovery_newline` is valid in `_line_end`, where a line of statements
    ends, and in `_body_start`, after the header of a loop, function, TRY,
@@ -802,8 +802,8 @@ measures bound that work without changing any valid tree.
    inside a bracket and not after an IF header. The scanner returns nothing
    at the start of a line that does not begin with an operator, and for a
    malformed rest of fewer than 16 units before a line that begins like a
-   statement: there recovery proceeds token by token, as without the
-   scanner, because a cheap run lets a recovery version skip the line break
+   statement or at the end of input: there recovery proceeds token by token,
+   as without the scanner, because a cheap run lets a recovery version skip the line break
    and take the next line into the malformed statement (Session 05-7 review
    A-01). A long malformed line becomes one `ERROR` node holding the native
    nodes of the tokens parsed before the error. The runtime looks back at

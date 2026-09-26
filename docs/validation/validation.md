@@ -264,9 +264,9 @@ guard).
 
 Recovery goldens. The same script parses every `test/recovery/*.brs` and
 compares the node lines of its `--cst` output with the `.cst` golden beside
-it: the scanner unit cases (line breaks, a lone `CR`, inputs that end
-without a line break, NUL, UTF-8, strings with `'`, comments), the lines
-after an error and lines that begin with an operator. In the cases of its
+it: the scanner unit cases (line breaks, a lone `CR`, short and long inputs
+that end without a line break, NUL, UTF-8, strings with `'`, comments), the
+lines after an error and lines that begin with an operator. In the cases of its
 `LOCALITY` list every sub or function declaration must lie outside every
 `ERROR` node. The goldens are the recovery trees of the pinned runtime, not
 a language contract; they change only with a reviewed grammar, scanner or

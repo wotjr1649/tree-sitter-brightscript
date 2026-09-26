@@ -1,5 +1,9 @@
 0:0  - 0:11   •source_file
-0:0  - 0:8      •ERROR
-0:0  - 0:1         identifier `x`
+0:0  - 0:11     •assignment_statement
+0:0  - 0:1         left: identifier `x`
 0:2  - 0:3         "="
-0:4  - 0:5         ")"
+0:4  - 0:5        •ERROR
+0:4  - 0:5           ")"
+0:6  - 0:11        right: unary_expression
+0:6  - 0:7           "+"
+0:8  - 0:11          operand: identifier `abc`

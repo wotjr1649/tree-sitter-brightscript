@@ -50,7 +50,7 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
      outside a string literal, before a keyword that closes or continues a
      block (`END…`, `NEXT`, `ELSE…`, `CATCH`) or a `:` before one, and, on a
      last line without a line break, before its last unit (a word or one
-     character); never empty;
+     character) when the run holds 16 units or more; never empty;
    - a **recovery line break**: a line break, or that last unit, which the
      grammar accepts where a line of statements ends and after the header
      of a loop, function, TRY, CATCH or directive, not after an IF header
@@ -59,8 +59,12 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
    It returns nothing, so that recovery proceeds token by token as without
    the scanner, at the start of a line unless the line begins with an
    operator, and for a malformed rest of fewer than 16 units before a line
-   that begins like a statement: a cheap run there lets a recovery version
-   skip the line break and take the next line into the malformed statement.
+   that begins like a statement or at the end of input: a cheap run there
+   lets a recovery version skip the line break and take the next line into
+   the malformed statement, and at the end of input the unit that ends the
+   line would lose its node. Only the last unit of a long last line without
+   a line break is therefore outside every `ERROR` node, as a hidden line
+   end.
    A long malformed line then becomes one `ERROR` node that keeps the native
    children of the tokens parsed before the error, and parsing resumes at the
    next line when a statement boundary is within reach of recovery.

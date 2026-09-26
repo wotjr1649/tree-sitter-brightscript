@@ -6,9 +6,10 @@
  * it recognises by the validity of RECOVERY_SENTINEL: no grammar rule uses that
  * token, so the runtime marks it valid only in its error state. A valid parse
  * never receives a token from here. The one exception is the last unit of an
- * input whose final line was malformed and has no line break: after recovery
- * moved back to a line end, the runtime lexes it again in a normal state, and
- * the state byte of the run before it marks it as that line end.
+ * input whose final line holds a long malformed run and has no line break:
+ * after recovery moved back to a line end, the runtime lexes that unit again in
+ * a normal state, and the state byte of the run before it marks it as that line
+ * end.
  */
 
 #include "tree_sitter/alloc.h"
@@ -58,9 +59,10 @@ static bool operator_start(int32_t c) {
          c == '>' || c == ';' || c == '@';
 }
 
-/* A short malformed rest of a line before a line that may begin a statement is recovered token by
-   token, as without this scanner: a cheap run there lets a recovery version skip the line break and
-   take the next line into the malformed statement. */
+/* A short malformed rest of a line, before a line that may begin a statement or at the end of input,
+   is recovered token by token, as without this scanner: a cheap run there lets a recovery version
+   skip the line break and take the next line into the malformed statement, and at the end of input
+   the unit that ends the line would lose its node. */
 enum { MIN_RUN = 16 };
 
 /* Called at the end of a run (a line break or a `'` comment): reads ahead past the rest of the line
@@ -127,6 +129,7 @@ bool tree_sitter_brightscript_external_scanner_scan(void *payload, TSLexer *lexe
     if (state->eof_line_end && valid_symbols[RECOVERY_NEWLINE]) return final_line_end(lexer);
     return false;
   }
+  bool after_eof_run = state->eof_line_end;
   state->eof_line_end = 0;
 
   bool line_start = lexer->get_column(lexer) == 0;
@@ -154,18 +157,19 @@ bool tree_sitter_brightscript_external_scanner_scan(void *payload, TSLexer *lexe
 
   /* A run: up to a line break, a `'` comment outside a string literal, a keyword that closes or
      continues a block (or a `:` before one), or the end of input. The token end is marked before
-     each unit, so at the end of input the run stops before its last unit, which then ends the
+     each unit, so at the end of input a long run stops before its last unit, which then ends the
      line. Every iteration consumes at least one character or returns. */
   bool in_string = false;
   bool after_word = false;
   for (;;) {
     if (lexer->eof(lexer)) {
-      if (units == 0) return false;
-      if (units == 1) {
-        lexer->mark_end(lexer);
+      if (units == 1 && after_eof_run) {
+        lexer->mark_end(lexer); /* the last unit after a run that stopped before it: the line end */
         lexer->result_symbol = RECOVERY_NEWLINE;
+      } else if (units >= MIN_RUN) {
+        lexer->result_symbol = RECOVERY_RUN; /* ends before its last unit */
       } else {
-        lexer->result_symbol = RECOVERY_RUN;
+        return false; /* a short last line is recovered token by token */
       }
       state->eof_line_end = 1;
       return true;
