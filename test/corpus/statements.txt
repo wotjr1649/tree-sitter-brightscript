@@ -119,22 +119,19 @@ m.top.observeField("x", "onX")
     function: (identifier)
     arguments: (argument_list
       (call_expression
-        function: (member_expression
-          object: (identifier)
-          property: (identifier))
+        object: (identifier)
+        property: (identifier)
         arguments: (argument_list))))
   (call_expression
-    function: (member_expression
-      object: (identifier)
-      property: (identifier))
+    object: (identifier)
+    property: (identifier)
     arguments: (argument_list
       (string)))
   (call_expression
-    function: (member_expression
-      object: (member_expression
-        object: (identifier)
-        property: (identifier))
+    object: (member_expression
+      object: (identifier)
       property: (identifier))
+    property: (identifier)
     arguments: (argument_list
       (string)
       (string))))

@@ -80,9 +80,8 @@ b = -2^2
     left: (identifier)
     right: (unary_expression
       operand: (call_expression
-        function: (member_expression
-          object: (number)
-          property: (identifier))
+        object: (number)
+        property: (identifier)
         arguments: (argument_list))))
   (assignment_statement
     left: (identifier)
@@ -352,14 +351,13 @@ y = f(1)[2].g(3)
   (assignment_statement
     left: (identifier)
     right: (call_expression
-      function: (member_expression
-        object: (index_expression
-          object: (call_expression
-            function: (identifier)
-            arguments: (argument_list
-              (number)))
-          index: (number))
-        property: (identifier))
+      object: (index_expression
+        object: (call_expression
+          function: (identifier)
+          arguments: (argument_list
+            (number)))
+        index: (number))
+      property: (identifier)
       arguments: (argument_list
         (number)))))
 

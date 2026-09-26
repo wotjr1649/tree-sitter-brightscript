@@ -659,14 +659,12 @@ x = obj.end + obj.if + obj.print
 
 (source_file
   (call_expression
-    function: (member_expression
-      object: (identifier)
-      property: (identifier))
+    object: (identifier)
+    property: (identifier)
     arguments: (argument_list))
   (call_expression
-    function: (member_expression
-      object: (identifier)
-      property: (identifier))
+    object: (identifier)
+    property: (identifier)
     arguments: (argument_list))
   (assignment_statement
     left: (identifier)

@@ -4,7 +4,8 @@
  *
  * Canonical design: docs/specs/grammar-design.md. Requirements (BS-*):
  * docs/specs/language-conformance.md. Planned public tree:
- * docs/specs/tree-schema.md.
+ * docs/specs/tree-schema.md. The external scanner (src/scanner.c) acts only
+ * during error recovery (ADR-0008).
  */
 
 /// <reference types="tree-sitter-cli/dsl" />
@@ -23,6 +24,8 @@ const PREC = {
   UNARY: 8,
   EXPONENT: 9,
   POSTFIX: 10,
+  // A called member (`a.b(1)`) is one call_expression, not a call of a member.
+  METHOD: 11,
 };
 
 /** Regex source matching `word` in any letter case. */
@@ -62,17 +65,31 @@ module.exports = grammar({
   // BS-LEX-026: keyword boundaries (grammar-design §3, §4).
   word: $ => $.identifier,
 
+  // ADR-0008: produced only by src/scanner.c during error recovery, never in a
+  // valid parse. No rule uses `_recovery_sentinel`, so it is valid only in the
+  // error state; `_raw_token_marker` is never produced. Order = scanner enum.
+  externals: $ => [$._recovery_run, $._recovery_newline, $._recovery_sentinel, $._raw_token_marker],
+
   supertypes: $ => [$.statement, $.expression],
 
-  inline: $ => [$._assignment_target, $._stmt_chain, $._cc_condition],
+  inline: $ => [
+    $._assignment_target, $._stmt_chain, $._stmt_callee, $._cc_condition,
+    $._line, $._line_end, $._try_line, $._print_item, $._print_expression, $._sep,
+  ],
 
   rules: {
     // ---------------------------------------------------------------- lines
     // BS-LEX-005, 008-011, BS-STMT-033 (grammar-design §2, §7): the last
-    // statement needs no terminator.
-    source_file: $ => seq(repeat($._line), optional($.statement)),
+    // statement needs no terminator. `_error_token_forms` never occurs (its
+    // first token is never produced, ADR-0008); it only keeps raw token names.
+    source_file: $ => seq(repeat($._line), optional($.statement), optional($._error_token_forms)),
 
-    _line: $ => choice(seq($.statement, $._terminator), $._terminator),
+    _line: $ => choice(seq($.statement, $._line_end), $._line_end),
+
+    // A line ends with a terminator; during error recovery also with a
+    // recovery line break, valid only here and in `_try_line`, not after a
+    // block header and not inside brackets (ADR-0008).
+    _line_end: $ => choice($._terminator, $._recovery_newline),
 
     // BS-LEX-005, 006, 010.
     _terminator: $ => choice($._newline, ':'),
@@ -87,13 +104,19 @@ module.exports = grammar({
     )),
 
     // BS-STMT-035: a block starts with the terminator that ends its header.
-    block: $ => seq($._terminator, repeat($._line)),
+    block: $ => choice($._terminator, seq($._block_head, repeat($._line))),
+
+    // The terminator and the first line as one parse-stack entry of an open
+    // block, which bounds the end-of-input work on deeply nested unclosed
+    // blocks (S07-M01, grammar-design §7).
+    _block_head: $ => seq($._terminator, choice(seq($.statement, $._line_end), $._line_end)),
 
     // ------------------------------------------------------------ statements
     statement: $ => choice(
       $.assignment_statement,
       $.update_statement,
       alias($._stmt_call, $.call_expression),
+      alias($._stmt_method_call, $.call_expression),
       $.if_statement,
       $.for_statement,
       $.for_each_statement,
@@ -123,21 +146,37 @@ module.exports = grammar({
       alias($._stmt_member, $.member_expression),
       alias($._stmt_index, $.index_expression),
       alias($._stmt_call, $.call_expression),
+      alias($._stmt_method_call, $.call_expression),
     ),
 
     _stmt_member: $ => seq(field('object', $._stmt_chain), '.', field('property', $.identifier)),
 
     _stmt_index: $ => seq(
       field('object', $._stmt_chain),
-      '[', commaSep1(field('index', $.expression)), ']',
+      alias($.open_bracket, '['), commaSep1(field('index', $.expression)), ']',
     ),
 
     _stmt_call: $ => seq(
-      field('function', $._stmt_chain),
+      field('function', $._stmt_callee),
       field('arguments', alias($._stmt_arguments, $.argument_list)),
     ),
 
-    _stmt_arguments: $ => seq('(', commaSep($.expression), ')'),
+    // A called member is one call_expression (object, property, arguments).
+    _stmt_callee: $ => choice(
+      $.identifier,
+      alias($._stmt_index, $.index_expression),
+      alias($._stmt_call, $.call_expression),
+      alias($._stmt_method_call, $.call_expression),
+    ),
+
+    _stmt_method_call: $ => seq(
+      field('object', $._stmt_chain),
+      '.',
+      field('property', $.identifier),
+      field('arguments', alias($._stmt_arguments, $.argument_list)),
+    ),
+
+    _stmt_arguments: $ => seq(alias($.open_parenthesis, '('), commaSep($.expression), ')'),
 
     _assignment_target: $ => choice(
       $.identifier,
@@ -203,6 +242,7 @@ module.exports = grammar({
       $.assignment_statement,
       $.update_statement,
       alias($._stmt_call, $.call_expression),
+      alias($._stmt_method_call, $.call_expression),
       $.print_statement,
       $.return_statement,
       $.exit_statement,
@@ -218,31 +258,20 @@ module.exports = grammar({
     // BS-STMT-012, 013, 015, 036: each loop closes only with its own
     // terminator; bare NEXT ends the innermost FOR or FOR EACH.
     for_statement: $ => seq(
-      kw('for'),
-      field('counter', $.identifier),
-      '=',
-      field('start', $.expression),
-      kw('to'),
-      field('end', $.expression),
-      optional(seq(kw('step'), field('step', $.expression))),
+      $._for_header,
       field('body', $.block),
       choice(endKw('for'), kw('next')),
     ),
 
     for_each_statement: $ => seq(
-      kw('for'),
-      kw('each'),
-      field('item', $.identifier),
-      kw('in'),
-      field('collection', $.expression),
+      $._for_each_header,
       field('body', $.block),
       choice(endKw('for'), kw('next')),
     ),
 
     // BS-STMT-016, 017, 020: NEXT does not close a WHILE.
     while_statement: $ => seq(
-      kw('while'),
-      field('condition', $.expression),
+      $._while_header,
       field('body', $.block),
       choice(endKw('while'), kw('endwhile')),
     ),
@@ -259,20 +288,28 @@ module.exports = grammar({
     // expression grammar allows (LIST precedence is below every operator).
     print_statement: $ => seq(choice(kw('print'), '?'), optional($._print_items)),
 
-    // A right-recursive list rather than repeat(): with repeat(), error
-    // recovery on runs of malformed items kept a deep merged stack whose
-    // end-of-input acceptance needed quadratic memory (grammar-design §6).
-    _print_items: $ => seq($._print_item, optional($._print_items)),
+    // A balanced repetition (A5-01): a hidden rule whose body is a repetition
+    // is its own binary tree. The error-recovery scanner keeps malformed item
+    // runs from growing the recovery stack (B4-01, ADR-0008). Items name the
+    // expression kinds directly, without an `expression` wrapper node per item.
+    _print_items: $ => repeat1($._print_item),
 
-    _print_item: $ => prec(PREC.LIST, choice($.expression, ',', ';')),
+    _print_item: $ => prec(PREC.LIST, choice($._print_expression, ',', ';')),
+
+    _print_expression: $ => choice(
+      $.identifier, $.number, $.string, $.true, $.false, $.invalid, $.source_literal,
+      $.array_literal, $.associative_array_literal, $.parenthesized_expression,
+      $.anonymous_function, $.unary_expression, $.binary_expression, $.call_expression,
+      $.member_expression, $.index_expression, $.attribute_expression,
+    ),
 
     // BS-ARRAY-004, 005: brackets or parentheses, one declarator.
     dim_statement: $ => seq(
       kw('dim'),
       field('name', $.identifier),
       choice(
-        seq('[', commaSep1(field('dimension', $.expression)), ']'),
-        seq('(', commaSep1(field('dimension', $.expression)), ')'),
+        seq(alias($.open_bracket, '['), commaSep1(field('dimension', $.expression)), ']'),
+        seq(alias($.open_parenthesis, '('), commaSep1(field('dimension', $.expression)), ')'),
       ),
     ),
 
@@ -323,16 +360,34 @@ module.exports = grammar({
     )),
 
     // BS-EXP-002.
-    parenthesized_expression: $ => seq('(', $.expression, ')'),
+    parenthesized_expression: $ => seq(alias($.open_parenthesis, '('), $.expression, ')'),
 
     // BS-EXP-003-007, 021: one postfix level applied left to right; the
     // optional forms share the node types (BS-LEX-029).
-    call_expression: $ => prec(PREC.POSTFIX, seq(
-      field('function', $._postfix_operand),
-      field('arguments', $.argument_list),
+    call_expression: $ => choice(
+      prec(PREC.POSTFIX, seq(
+        field('function', $._callee),
+        field('arguments', $.argument_list),
+      )),
+      // A called member (`a.b(1)`, `a?.b(1)`): the called name and the
+      // argument list are siblings, which keeps queries on chains linear (S07-M03).
+      prec(PREC.METHOD, seq(
+        field('object', choice($._postfix_operand, $.number, $.string)),
+        choice('.', '?.'),
+        field('property', $.identifier),
+        field('arguments', $.argument_list),
+      )),
+    ),
+
+    _callee: $ => prec(PREC.POSTFIX, choice(
+      $.identifier,
+      $.parenthesized_expression,
+      $.call_expression,
+      $.index_expression,
+      $.attribute_expression,
     )),
 
-    argument_list: $ => seq(choice('(', '?('), commaSep($.expression), ')'),
+    argument_list: $ => seq(choice(alias($.open_parenthesis, '('), '?('), commaSep($.expression), ')'),
 
     member_expression: $ => prec(PREC.POSTFIX, seq(
       field('object', choice($._postfix_operand, $.number, $.string)),
@@ -342,7 +397,7 @@ module.exports = grammar({
 
     index_expression: $ => prec(PREC.POSTFIX, seq(
       field('object', $._postfix_operand),
-      choice('[', '?['),
+      choice(alias($.open_bracket, '['), '?['),
       commaSep1(field('index', $.expression)),
       ']',
     )),
@@ -356,8 +411,11 @@ module.exports = grammar({
     // BS-EXP-012, 018, 027, BS-LIT-004: a prefix operator binds its operand at
     // its own level, also as the right operand of a tighter operator.
     unary_expression: $ => choice(
-      prec(PREC.UNARY, seq(field('operator', choice('-', '+')), field('operand', $.expression))),
-      prec(PREC.NOT, seq(field('operator', kw('not')), field('operand', $.expression))),
+      prec(PREC.UNARY, seq(
+        field('operator', choice(alias($.minus_sign, '-'), alias($.plus_sign, '+'))),
+        field('operand', $.expression),
+      )),
+      prec(PREC.NOT, seq(field('operator', alias($.not_operator, 'not')), field('operand', $.expression))),
     ),
 
     // The left operand of `^` as its own rule with POSTFIX precedence: the
@@ -373,7 +431,7 @@ module.exports = grammar({
       )),
       ...[
         [PREC.MULTIPLICATIVE, choice('*', '/', kw('mod'), '\\')],
-        [PREC.ADDITIVE, choice('+', '-')],
+        [PREC.ADDITIVE, choice(alias($.plus_sign, '+'), alias($.minus_sign, '-'))],
         [PREC.SHIFT, choice('<<', '>>')],
         [PREC.COMPARE, choice('=', '<>', '<', '>', '<=', '>=')],
         [PREC.AND, kw('and')],
@@ -387,7 +445,7 @@ module.exports = grammar({
     // BS-ARRAY-001-003: line breaks after `[`, between elements (with or
     // without commas) and before `]`; a trailing separator is tolerated.
     array_literal: $ => seq(
-      '[',
+      alias($.open_bracket, '['),
       repeat($._newline),
       optional(seq($.expression, repeat(seq($._sep, $.expression)), optional($._sep))),
       ']',
@@ -418,7 +476,7 @@ module.exports = grammar({
     // ------------------------------------------------- error handling (§10)
     // BS-ERR-001-005: CATCH is required and takes one identifier.
     try_statement: $ => seq(
-      kw('try'),
+      alias($.try_keyword, 'try'),
       field('body', alias($._try_body, $.block)),
       field('handler', $.catch_clause),
       choice(endKw('try'), kw('endtry')),
@@ -428,7 +486,7 @@ module.exports = grammar({
     // body (grammar-design §4).
     _try_body: $ => seq($._terminator, repeat($._try_line)),
 
-    _try_line: $ => choice(seq($.statement, $._terminator), $._terminator),
+    _try_line: $ => choice(seq($.statement, $._line_end), $._line_end),
 
     catch_clause: $ => seq(kw('catch'), field('variable', $.identifier), field('body', $.block)),
 
@@ -458,9 +516,7 @@ module.exports = grammar({
     // BS-FUNC-009-011.
     anonymous_function: $ => choice(
       seq(
-        kw('function'),
-        field('parameters', $.parameter_list),
-        optional(seq(kw('as'), field('return_type', $.type))),
+        $._anonymous_function_header,
         field('body', $.block),
         choice(endKw('function'), kw('endfunction')),
       ),
@@ -472,9 +528,37 @@ module.exports = grammar({
       ),
     ),
 
+    // Headers of blocks that can stay open: one parse-stack entry each, which
+    // bounds the end-of-input work on deeply nested unclosed blocks (S07-M01).
+    _for_header: $ => seq(
+      kw('for'),
+      field('counter', $.identifier),
+      '=',
+      field('start', $.expression),
+      kw('to'),
+      field('end', $.expression),
+      optional(seq(kw('step'), field('step', $.expression))),
+    ),
+
+    _for_each_header: $ => seq(
+      kw('for'),
+      kw('each'),
+      field('item', $.identifier),
+      kw('in'),
+      field('collection', $.expression),
+    ),
+
+    _while_header: $ => seq(kw('while'), field('condition', $.expression)),
+
+    _anonymous_function_header: $ => seq(
+      kw('function'),
+      field('parameters', $.parameter_list),
+      optional(seq(kw('as'), field('return_type', $.type))),
+    ),
+
     // A line break is allowed after a comma only (BS-FUNC-006).
     parameter_list: $ => seq(
-      '(',
+      alias($.open_parenthesis, '('),
       optional(seq($.parameter, repeat(seq(',', repeat($._newline), $.parameter)))),
       ')',
     ),
@@ -576,6 +660,21 @@ module.exports = grammar({
       repeat(seq(directive('else', 1), optional($._inactive_line), $._newline, repeat($._inactive_item))),
       directive('end', 1), kw('if'),
     ),
+
+    // ADR-0008 error-only raw forms of tokens that can stay on the parse stack
+    // in long runs with no named node between them. Productions use them under
+    // their anonymous names; `_error_token_forms` uses them unaliased, so the
+    // raw names survive and appear only inside ERROR nodes (tree-schema.md).
+    _error_token_forms: $ => seq($._raw_token_marker, choice(
+      $.open_parenthesis, $.open_bracket, $.minus_sign, $.plus_sign, $.not_operator, $.try_keyword,
+    )),
+
+    open_parenthesis: _ => '(',
+    open_bracket: _ => '[',
+    minus_sign: _ => '-',
+    plus_sign: _ => '+',
+    not_operator: _ => new RegExp(ci('not')),
+    try_keyword: _ => new RegExp(ci('try')),
 
     // BS-LEX-015, 017, 018: the designator is part of the identifier. Defined
     // last: an equal-length match goes to the earlier token, so every keyword

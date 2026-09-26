@@ -199,17 +199,15 @@ x = (-5).tostr()
   (print_statement
     (binary_expression
       left: (call_expression
-        function: (member_expression
-          object: (number)
-          property: (identifier))
+        object: (number)
+        property: (identifier)
         arguments: (argument_list))
       right: (string)))
   (if_statement
     condition: (binary_expression
       left: (call_expression
-        function: (member_expression
-          object: (number)
-          property: (identifier))
+        object: (number)
+        property: (identifier)
         arguments: (argument_list))
       right: (string))
     consequence: (block
@@ -217,11 +215,10 @@ x = (-5).tostr()
   (assignment_statement
     left: (identifier)
     right: (call_expression
-      function: (member_expression
-        object: (parenthesized_expression
-          (unary_expression
-            operand: (number)))
-        property: (identifier))
+      object: (parenthesized_expression
+        (unary_expression
+          operand: (number)))
+      property: (identifier)
       arguments: (argument_list))))
 
 ================================================================================
@@ -236,17 +233,15 @@ y = "01234567".left(3)
     left: (identifier)
     right: (binary_expression
       left: (call_expression
-        function: (member_expression
-          object: (string)
-          property: (identifier))
+        object: (string)
+        property: (identifier)
         arguments: (argument_list))
       right: (number)))
   (assignment_statement
     left: (identifier)
     right: (call_expression
-      function: (member_expression
-        object: (string)
-        property: (identifier))
+      object: (string)
+      property: (identifier)
       arguments: (argument_list
         (number)))))
 

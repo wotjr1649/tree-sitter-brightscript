@@ -18,7 +18,7 @@ Token spellings are described, not written as grammar code.
 
 | Constraint | Rule | Source |
 |---|---|---|
-| External scanner | Forbidden. No `externals`, no `src/scanner.c`. | [ADR-0005](../design/decisions/ADR-0005-external-scanner-policy.md) |
+| External scanner | Only the error-recovery scanner of ADR-0008: `src/scanner.c` returns tokens only in the runtime's error state, never in a valid parse; no syntax depends on it (§13, §16). | [ADR-0005](../design/decisions/ADR-0005-external-scanner-policy.md), [ADR-0008](../design/decisions/ADR-0008-error-recovery-scanner.md) |
 | Generator | Exact stable release, `--abi 15`, selected by the adoption procedure. | [ADR-0002](../design/decisions/ADR-0002-generator-pin-and-generated-artifacts.md) |
 | DSL features | Only features present in every eligible stable release (0.26.0 or later, ADR-0002 adoption procedure): `word`, `supertypes`, `extras`, `inline`, `prec*`, `alias`, `field`, `token`, `token.immediate`. `eof()` (0.27 only) and `reserved` word sets are not used by the primary design. | Tree-sitter docs @ `v0.26.13`, `v0.27.0` (Level 3) |
 | Conflicts | `conflicts` starts empty. An entry is added only under §14. | this document |
@@ -58,10 +58,19 @@ explicit class `[ \t]`.
 Statement lists:
 
 ```text
-source_file := (statement _terminator | _terminator)* statement?
-block       := _terminator (statement _terminator | _terminator)*
+source_file := (statement _line_end | _line_end)* statement?
+block       := _terminator | _block_head (statement _line_end | _line_end)*
+_block_head := _terminator (statement _line_end | _line_end)
+_line_end   := _terminator | recovery line break
 _terminator := _newline | ':'
 ```
+
+The recovery line break is a token of the error-recovery scanner (§16); a
+valid parse never contains it, so for valid input `_line_end` is
+`_terminator` and `block` is `_terminator (statement _terminator |
+_terminator)*` as before. `_block_head` only groups the terminator and the
+first line into one parse-stack entry (§16); it is hidden, so every tree is
+unchanged.
 
 `block` always begins with the terminator that ends its header, so a block
 exists even when the body is empty, its range starts at that terminator, and a
@@ -257,6 +266,7 @@ constants are an internal mapping only.
 
 | Level | Constant | Operators | Kind | Assoc. | Requirements |
 |---|---|---|---|---|---|
+| 1 | `METHOD` = 11 | call of a member `.name(…)` `?.name(…)` (also with `?(`) | postfix | left (chain) | BS-EXP-003, 004, 007, 021 |
 | 1 | `POSTFIX` = 10 | call `(…)` `?(…)`; member `.` `?.`; index `[…]` `?[…]`; attribute `@` `?@` | postfix | left (chain) | BS-EXP-003–007, 021 |
 | 2 | `EXPONENT` = 9 | `^` | binary | right | BS-EXP-011 |
 | 3 | `UNARY` = 8 | `-` `+` | prefix | — | BS-EXP-012 |
@@ -301,8 +311,17 @@ the BS-EXP-011 fixture checks.
 
 | Postfix form | Accepted left operand |
 |---|---|
-| call, index, attribute | `_postfix_operand` |
+| index, attribute | `_postfix_operand` |
+| call | `_callee`: `_postfix_operand` without `member_expression` |
+| call of a member (`object`, `property`, `arguments`) | `_postfix_operand`, `number`, `string` (BS-LIT-014) |
 | member | `_postfix_operand`, `number`, `string` (BS-LIT-014) |
+
+A call of a member is one `call_expression` whose fields are `object`,
+`property` and `arguments` (tree-schema.md, Placement rules), so the called
+name and its argument list are siblings. `METHOD` precedence, one step above
+`POSTFIX`, makes `a.b(1)` that node rather than a call of `member_expression`
+`a.b` (which `_callee` does not admit), also after `print` (`print a.b (1)`).
+`(a.b)(1)` stays a call whose `function` is the parenthesized member.
 
 Other operand kinds (calls or indexes on literals, access on array and AA
 literals) have no rule (BS-EXP-025, unresolved).
@@ -353,11 +372,13 @@ use hidden chain rules whose head is an `identifier` and that contain no
 optional-chaining operator and no attribute access:
 
 ```text
-_stmt_chain  := identifier | _stmt_member | _stmt_index | _stmt_call
-_stmt_member := object:_stmt_chain '.' property:identifier                  alias member_expression
-_stmt_index  := object:_stmt_chain '[' index:expression (',' index:expression)* ']'   alias index_expression
-_stmt_call   := function:_stmt_chain arguments:argument_list                alias call_expression ('(' only)
-call statement      := _stmt_call
+_stmt_chain       := identifier | _stmt_member | _stmt_index | _stmt_call | _stmt_method_call
+_stmt_member      := object:_stmt_chain '.' property:identifier                  alias member_expression
+_stmt_index       := object:_stmt_chain '[' index:expression (',' index:expression)* ']'   alias index_expression
+_stmt_call        := function:_stmt_callee arguments:argument_list               alias call_expression ('(' only)
+_stmt_callee      := identifier | _stmt_index | _stmt_call | _stmt_method_call
+_stmt_method_call := object:_stmt_chain '.' property:identifier arguments:argument_list   alias call_expression
+call statement      := _stmt_call | _stmt_method_call
 _assignment_target  := identifier | _stmt_member | _stmt_index
 ```
 
@@ -383,21 +404,26 @@ Boundary rules:
 | Block IF clauses | `ELSE IF`/`ELSEIF` + condition + optional THEN + `block`; `ELSE` + `block` | BS-STMT-010, 011 |
 | Labels | `label_statement` only in `source_file`/`block` lists, never in single-line branches | BS-LEX-027, 028 |
 | Comments | extras; they never end a statement, the following `_newline` does; placement in the tree follows the tree-schema comment rule | BS-LEX-012 |
-| PRINT items | `print_statement` = (`print` or `?`) then any sequence of `expression`, `,`, `;`, as the right-recursive hidden list `_print_items`; each item has `LIST` precedence so every operator or postfix continuation extends the current item | BS-STMT-024–026, 040 |
+| PRINT items | `print_statement` = (`print` or `?`) then any sequence of expressions, `,`, `;`, as the hidden repetition `_print_items`; each item has `LIST` precedence so every operator or postfix continuation extends the current item | BS-STMT-024–026, 040 |
 | Directive lines | directives are statements, placed wherever statements are; their bodies are `block`s | BS-COND-002–008, 012 |
 | END vs END X | the two-word terminators are single tokens (§3); `end` alone is `end_statement` | BS-STMT-029, 036 |
 | NEXT | a terminator only of the innermost open FOR/FOR EACH; inside a WHILE body it closes nothing, so the WHILE is an error whether `next` lexes there as a keyword or an identifier | BS-STMT-013, 017 |
 
-PRINT item list. With `repeat()`, error recovery on a run of malformed PRINT
-items (`print f([)f([)…`, `print ,+*,+*…`) left a deep merged stack whose
-end-of-input acceptance needed quadratic memory that the progress callback
-could not interrupt (1.4 GiB at 32 KB; Session 05-1 delta re-audit findings
-B4-01, B4-02). The right-recursive hidden list `_print_items` needs little
-memory on the same input; a PRINT continued by malformed lines (for example
-`print ,+⏎,+⏎…`) takes quadratic time instead (KL-002), and a highlight query
-within one PRINT takes time quadratic in its item count (open finding A5-01,
-0.1.0-release.md "Status: hold"). `src/node-types.json` and every valid tree are unchanged: a hidden
-list's items are children of `print_statement` either way.
+PRINT item list. `_print_items` is a hidden rule whose whole body is a
+repetition, so the generator makes it its own binary tree, which the runtime
+keeps balanced: field, index and query access within one long PRINT stay
+linear (A5-01). History: with `repeat()` alone, error recovery on a run of
+malformed items (`print f([)f([)…`, `print ,+*,+*…`) left a deep merged stack
+whose end-of-input acceptance needed quadratic memory (1.4 GiB at 32 KB;
+findings B4-01, B4-02), so Session 05-1 made the list right-recursive, which
+made A5-01 quadratic. The error-recovery scanner now handles such a run as one
+recovery token (§16), so the balanced repetition no longer revives B4-01 (the
+B4-01 guard of `scripts/check_robustness.py` still checks it). The items are
+the expression kinds themselves (`_print_expression`, inlined), not the
+`expression` supertype: a supertype adds a hidden node per item, which doubled
+the memory and deletion time of a 1 MiB PRINT (S08-M01). Every tree is
+unchanged; `node-types.json` lists the 17 kinds as the children of
+`print_statement` instead of `expression`.
 
 ## 7. Top level
 
@@ -640,7 +666,7 @@ the `inactive_text` form.
 | Identifiers and keywords | word token, `kw()` | BS-LEX-001, 015–026, BS-ERR-005 | `identifier` | keyword contextuality (§4) | `lexical.txt` | line |
 | Literals | numbers, strings, booleans, `invalid`, `LINE_NUM` | BS-LIT-* | `number`, `string`, `true`, `false`, `invalid`, `source_literal` | fraction vs member dot | `literals.txt` | identifiers |
 | Types | `AS` names | BS-TYPE-001 | `type` | type words contextual | `functions.txt` | keywords |
-| Postfix expressions | call, member, index, attribute, optional forms | BS-EXP-003–010, 021, BS-ARRAY-007, BS-LIT-014, BS-LEX-029–031, 035 | `call_expression` (function, arguments), `argument_list`, `member_expression` (object, property), `index_expression` (object, index), `attribute_expression` (object, attribute) | `?` tokenisation; optional variants aliased to one node | `expressions.txt` | literals |
+| Postfix expressions | call, member, index, attribute, optional forms | BS-EXP-003–010, 021, BS-ARRAY-007, BS-LIT-014, BS-LEX-029–031, 035 | `call_expression` (function or object and property, arguments), `argument_list`, `member_expression` (object, property), `index_expression` (object, index), `attribute_expression` (object, attribute) | `?` tokenisation; optional variants aliased to one node | `expressions.txt` | literals |
 | Operators | unary, binary, grouping | BS-EXP-001, 002, 011–020, 027 | `unary_expression` (operator, operand), `binary_expression` (left, operator, right), `parenthesized_expression` | precedence only | `precedence.txt` | postfix |
 | Collections | array and AA literals, DIM | BS-ARRAY-*, BS-AA-* | `array_literal`, `associative_array_literal`, `associative_array_entry` (key, value), `dim_statement` (name, dimension) | trailing `_sep` | `collections.txt` | operators, line |
 | Simple statements | assignment, update, call, PRINT, RETURN, EXIT, CONTINUE, GOTO, labels, END, STOP, LIBRARY | BS-STMT-001–006, 018, 019, 023–034, 039, BS-LEX-027, 028 | `assignment_statement` (left, operator, right), `update_statement` (operand, operator), `print_statement`, `return_statement` (value), `exit_statement`, `continue_statement`, `goto_statement` (label), `label_statement` (name), `end_statement`, `stop_statement`, `library_statement` (path) | statement chains (§6); PRINT juxtaposition | `statements.txt` | collections |
@@ -660,8 +686,10 @@ the `inactive_text` form.
 | `?` PRINT vs optional chaining | same first character | indivisible tokens + context-aware lexing (§3) |
 | Single-line vs block IF | decided by the next token | LR(1) factoring (§6) |
 | Literal-false bodies | opaque text | spike with a line token (§11, V1/V2); failure → KL-001, not a scanner |
+| Resource use of error recovery | runs of malformed tokens handled one by one | not a syntax need: the ADR-0008 scanner (§16) |
 
-No requirement needs lexer state; ADR-0005 stays closed.
+No syntax requirement needs lexer state. The only scanner is the ADR-0008
+error-recovery scanner, which returns nothing during a valid parse.
 
 ## 14. Conflict policy
 
@@ -678,6 +706,8 @@ Expected ambiguity points and the planned mechanism:
 | `?` alias vs optional chaining | lexical distinction (§3) |
 | PRINT item juxtaposition | `LIST` precedence below every operator |
 | operand of a postfix form vs PRINT item (`print a [1]`) | `POSTFIX` precedence on `_postfix_operand` (§5) |
+| call of a member vs call of a `member_expression` | `METHOD` precedence; `_callee` admits no member (§5) |
+| empty block vs block with a first line | factoring: `block` = terminator, or `_block_head` and more lines (§2) |
 | associativity of `^`, `^` vs prefix operators | `POSTFIX` precedence on `_pow_left` (§5) |
 | anonymous function vs declaration | LR(1): identifier vs `(` after `function`/`sub` |
 | END vs END X | single tokens for the two-word terminators (§3) |
@@ -741,3 +771,52 @@ produce it, with the reason recorded in the same commit.
 
 Downstream parity (V9) and review follow in the implementation session plan;
 they change no grammar design.
+
+## 16. Error recovery and resource safety
+
+Added in Session 05-7 ([ADR-0008](../design/decisions/ADR-0008-error-recovery-scanner.md)).
+The stock runtime handles a malformed token one at a time during error
+recovery; long runs of them made recovery memory, stack depth, end-of-input
+work or query time grow faster than the input (findings B5-01, B5-02,
+S07-M01–M03). Four grammar-level measures bound that work without changing
+any valid tree.
+
+1. **Recovery tokens.** `src/scanner.c` returns a token only in the runtime's
+   error state (every external token is valid there, including
+   `_recovery_sentinel`, which no rule uses). At a line break it returns
+   `_recovery_newline`; anywhere else it returns `_recovery_run`, the rest of
+   the physical line up to a line break, a `'` comment outside a string
+   literal, or the end of input. No rule accepts `_recovery_run`, so recovery
+   skips it as one token; `_recovery_newline` is valid only in `_line_end`,
+   where a line of statements may end, so recovery resumes at the next line,
+   not inside a bracket and not after a block header. A malformed line
+   becomes one `ERROR` node holding the native nodes of the tokens parsed
+   before the error. The runtime looks back at most 16 parse-stack entries for
+   a state that accepts the line break; below more unclosed constructs than
+   that, the following lines are absorbed into the error, as they were
+   without the scanner.
+2. **Error-only names.** `(`, `[`, `-`, `+`, `not` and `try` can stay unreduced
+   on the parse stack in long runs with no named node between them (unclosed
+   `((((…`, `[[[[…`, `-(-(…`, `try` lines); at the end of input the runtime
+   wraps such a stack into one `ERROR` node, on whose anonymous children the
+   stock query cursor is quadratic. Each of these tokens is a named rule used
+   aliased to its anonymous name in every production, and once unaliased in
+   `_error_token_forms`, which starts with `_raw_token_marker`, a token the
+   scanner never returns. The generator keeps a raw name only for a symbol that
+   appears unaliased somewhere (`extract_default_aliases.rs` @ `v0.27.0`), so
+   inside `ERROR` nodes these tokens appear under their named raw forms and
+   the cursor's sibling scan stops at the next one. `_error_token_forms` sits
+   at the end of `source_file`, where the marker is valid only at file-level
+   line starts; as an extra it would be valid in every state, which measured
+   one more heap node per PRINT item pair.
+3. **One stack entry per open block.** The headers of FOR, FOR EACH, WHILE and
+   anonymous FUNCTION blocks are hidden rules (`_for_header`,
+   `_for_each_header`, `_while_header`, `_anonymous_function_header`), and
+   `_block_head` joins a block's first terminator and first line, so a deeply
+   nested unclosed block costs fewer parse-stack entries at the end of input,
+   where the runtime copies and releases the stack without a progress
+   callback (S07-M01).
+4. **Fewer hidden nodes.** `_line`, `_line_end`, `_try_line`, `_print_item`,
+   `_print_expression` and `_sep` are inlined, and PRINT items carry no
+   `expression` wrapper (§6), which reduces the memory and the deletion time
+   of large valid files (S08-M01).

@@ -300,9 +300,8 @@ end if
 (source_file
   (if_statement
     condition: (call_expression
-      function: (member_expression
-        object: (identifier)
-        property: (identifier))
+      object: (identifier)
+      property: (identifier)
       arguments: (argument_list))
     consequence: (block
       (return_statement
