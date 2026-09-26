@@ -5,10 +5,10 @@
  * It returns a token only while the parser is recovering from an error, which
  * it recognises by the validity of RECOVERY_SENTINEL: no grammar rule uses that
  * token, so the runtime marks it valid only in its error state. A valid parse
- * never receives a token from here. The one exception is the rest of an input
- * whose final line holds a long malformed run and has no line break: after
- * recovery moved back to a line end, the runtime lexes that rest again in a
- * normal state, and a flag of the run before it marks it as that line end.
+ * never receives a token from here. The one exception is the line end after a
+ * long malformed run: when recovery moved back to an earlier state, the runtime
+ * lexes that line end again in a normal state, and the state flag of the run
+ * marks it as a recovery line end there too.
  */
 
 #include "tree_sitter/alloc.h"
@@ -17,27 +17,24 @@
 /* Order = `externals` in grammar.js. */
 enum TokenType {
   RECOVERY_RUN,      /* malformed text of one line, as one token */
-  RECOVERY_NEWLINE,  /* a line break, valid only where a line or a block body may begin */
+  RECOVERY_NEWLINE,  /* a line end, valid only where a line or a block body may begin */
   RECOVERY_SENTINEL, /* never produced; valid only in the error state */
   RAW_TOKEN_MARKER,  /* never produced; keeps raw token names (grammar.js) */
 };
 
-/* The state: flags of the last token this scanner returned in a stack version. In runtime 0.27.0 a
-   token that changes them cannot be skipped once recovery to an earlier state succeeded. No state
-   accepts a run, and a line break changes them only after a long or whole-line run, where recovery
-   is to leave the line; after a short run the line break is an ordinary one. */
-enum {
-  EOF_LINE_END = 1, /* a run stopped before the rest of the input, which ends the line */
-  RUN = 2,          /* a long or whole-line run: the line break after it is a recovery line break */
-  LONG = 4,         /* a run of MIN_RUN units or more */
-  AFTER_LONG = 8,   /* the line break after a long run: the next line is one run */
-  EOF_TAIL = 16,    /* a long run stopped at a keyword or a comment on the last line */
-};
+/* The state, flags of the last token this scanner returned in a stack version. RUN: set by a long
+   run and kept by the shorter runs after it on its line, cleared by the recovery line end of that
+   line. EOF_DONE: the empty line end at the end of input was returned. In runtime 0.27.0 a token
+   that changes the state cannot be skipped once recovery to an earlier state succeeded, and an
+   empty token is kept in recovery only if it changes the state. No state accepts a run; a line
+   break changes the state only after a long run, where recovery is to leave the line. */
+enum { RUN = 1, EOF_DONE = 2 };
 
-/* A malformed rest shorter than this, before a line that may begin a statement or at the end of
-   input, is recovered token by token, as without this scanner: a cheap run there lets a recovery
-   version skip the line break and take the next line into the malformed statement. */
-enum { MIN_RUN = 16, TAIL_LOOKAHEAD = 256 };
+/* A malformed rest shorter than this is recovered token by token, as without this scanner, before
+   a line that may begin a statement (a cheap run there lets a recovery version skip the line break
+   and take the next line into the malformed statement), when it begins with a closing bracket
+   (recovery can then return into the literal it closes) and at the end of input. */
+enum { MIN_RUN = 16 };
 
 typedef struct {
   unsigned char flags;
@@ -111,33 +108,28 @@ static bool statement_follows(TSLexer *lexer) {
   return !lexer->eof(lexer) && statement_start(lexer->lookahead);
 }
 
-/* True if the end of input comes within `limit` characters without a line break. */
-static bool end_follows(TSLexer *lexer, unsigned limit) {
-  for (unsigned i = 0; i < limit; i++) {
-    if (lexer->eof(lexer)) return true;
-    if (line_break(lexer->lookahead)) return false;
+/* A recovery line end: a line break (LF or CR LF if `any`; a lone CR, which is no line break of the
+   grammar, BS-LEX-007, if `lone_cr`), or if `any` at the end of input an empty token, which the
+   runtime keeps because it clears the state. */
+static bool line_end(TSLexer *lexer, State *state, bool any, bool lone_cr) {
+  if (lexer->eof(lexer)) {
+    if (!any) return false;
+  } else {
+    bool cr = lexer->lookahead == '\r';
     lexer->advance(lexer, false);
-  }
-  return lexer->eof(lexer);
-}
-
-/* The rest of the input, if it holds no line break, as the line end of a long last line. */
-static bool rest_as_line_end(TSLexer *lexer, State *state) {
-  while (blank(lexer->lookahead)) lexer->advance(lexer, true);
-  if (lexer->eof(lexer)) return false;
-  while (!lexer->eof(lexer)) {
-    if (line_break(lexer->lookahead)) return false;
-    lexer->advance(lexer, false);
+    bool crlf = cr && lexer->lookahead == '\n';
+    if (crlf) lexer->advance(lexer, false);
+    if (cr && !crlf ? !lone_cr : !any) return false;
   }
   lexer->mark_end(lexer);
   lexer->result_symbol = RECOVERY_NEWLINE;
-  state->flags = EOF_LINE_END;
+  state->flags = 0;
   return true;
 }
 
-static bool run(TSLexer *lexer, State *state, unsigned units, unsigned char flags) {
+static bool run(TSLexer *lexer, State *state, unsigned units, unsigned char prev) {
   lexer->result_symbol = RECOVERY_RUN;
-  state->flags = (unsigned char)(flags | (units >= MIN_RUN ? RUN | LONG : 0));
+  state->flags = (unsigned char)(units >= MIN_RUN ? RUN : prev & RUN);
   return true;
 }
 
@@ -145,53 +137,41 @@ bool tree_sitter_brightscript_external_scanner_scan(void *payload, TSLexer *lexe
   State *state = payload;
   if (!state) return false;
   unsigned char prev = state->flags;
-  if (!valid_symbols[RECOVERY_SENTINEL]) {
-    /* After recovery at the end of input moved back to a line end, the runtime lexes the rest
-       again in a normal state; it is the line end there too. */
-    if ((prev & EOF_LINE_END) && valid_symbols[RECOVERY_NEWLINE]) return rest_as_line_end(lexer, state);
-    return false;
-  }
-  if (prev & EOF_LINE_END) return rest_as_line_end(lexer, state);
+  bool recovering = valid_symbols[RECOVERY_SENTINEL];
+  if (!recovering && !((prev & RUN) && valid_symbols[RECOVERY_NEWLINE])) return false;
 
   while (blank(lexer->lookahead)) lexer->advance(lexer, true);
-  if (lexer->eof(lexer)) return false;
 
-  /* A line break (LF, CR LF or a lone CR) is a recovery line break after a long or whole-line run;
-     otherwise the runtime lexes it as an ordinary line break, as without this scanner. A lone CR
-     is no line break of the grammar (BS-LEX-007), so in recovery it is always one here. */
-  if (line_break(lexer->lookahead)) {
-    bool cr = lexer->lookahead == '\r';
-    lexer->advance(lexer, false);
-    bool crlf = cr && lexer->lookahead == '\n';
-    if (crlf) lexer->advance(lexer, false);
-    if (!(prev & RUN) && (!cr || crlf)) return false;
-    lexer->mark_end(lexer);
-    lexer->result_symbol = RECOVERY_NEWLINE;
-    state->flags = (prev & LONG) ? AFTER_LONG : 0;
-    return true;
+  /* After a long run the line end is a recovery line end, also when recovery moved back to an
+     earlier state and the runtime lexes it again in a normal state. At any other line break the
+     scanner returns nothing and the runtime lexes the ordinary line break, as without it; a lone CR
+     in recovery ends the line in any case. At the end of input in recovery an empty line end is
+     returned once per stack version, so that recovery can leave the constructs the input leaves
+     open. */
+  if (lexer->eof(lexer) || line_break(lexer->lookahead)) {
+    if (recovering && lexer->eof(lexer) && !(prev & (RUN | EOF_DONE))) {
+      lexer->mark_end(lexer);
+      lexer->result_symbol = RECOVERY_NEWLINE;
+      state->flags = EOF_DONE;
+      return true;
+    }
+    return line_end(lexer, state, prev & RUN, recovering);
   }
+  if (!recovering) return false;
 
   /* A run: up to a line break, a `'` comment outside a string literal, a keyword that closes or
      continues a block (or a `:` or `#` before one), or the end of input. The token end is marked
-     before each unit (before a `:` or `#` and the word after it), so at the end of input a run stops
-     before its last unit, which then ends the line. Every iteration consumes at least one character
-     or returns. After the line break of a long run, and after a long run that stopped on the last
-     line, the whole line is one run. */
-  bool whole_line = prev & (AFTER_LONG | EOF_TAIL);
+     before each unit, so that a run can stop before a keyword. Every iteration consumes at least
+     one character or returns; a run is never empty. */
   bool in_string = false;
   bool after_word = false;
   unsigned units = 0;
+  bool closing = lexer->lookahead == ')' || lexer->lookahead == ']' || lexer->lookahead == '}';
   for (;;) {
     if (lexer->eof(lexer)) {
-      if (units == 0) return false;
-      if (units == 1 && (prev & EOF_TAIL)) {
-        lexer->mark_end(lexer);
-        lexer->result_symbol = RECOVERY_NEWLINE;
-        state->flags = EOF_LINE_END;
-        return true;
-      }
-      if (units < MIN_RUN && !whole_line) return false;
-      return run(lexer, state, units, EOF_LINE_END); /* ends before its last unit */
+      if (units < MIN_RUN && !(prev & RUN)) return false;
+      lexer->mark_end(lexer);
+      return run(lexer, state, units, prev);
     }
     int32_t c = lexer->lookahead;
     if (line_break(c)) break;
@@ -201,11 +181,8 @@ bool tree_sitter_brightscript_external_scanner_scan(void *payload, TSLexer *lexe
       continue;
     }
     lexer->mark_end(lexer);
-    if (!in_string && !whole_line && c == '\'') {
-      if (units >= MIN_RUN && end_follows(lexer, (unsigned)-1)) return run(lexer, state, units, EOF_TAIL);
-      break;
-    }
-    if (!in_string && !whole_line && (c == ':' || c == '#')) {
+    if (!in_string && c == '\'') break;
+    if (!in_string && (c == ':' || c == '#')) {
       unsigned before = units;
       lexer->advance(lexer, false);
       units++;
@@ -214,19 +191,17 @@ bool tree_sitter_brightscript_external_scanner_scan(void *payload, TSLexer *lexe
       if (!lexer->eof(lexer) && word_start(lexer->lookahead)) {
         if (closer_word(lexer)) {
           if (before == 0) return false;
-          bool tail = before >= MIN_RUN && end_follows(lexer, TAIL_LOOKAHEAD);
-          return run(lexer, state, before, tail ? EOF_TAIL : 0); /* ends before the `:` or `#` */
+          return run(lexer, state, before, prev); /* ends before the `:` or `#` */
         }
         units++;
         after_word = true;
       }
       continue;
     }
-    if (!in_string && !whole_line && !after_word && word_start(c)) {
+    if (!in_string && !after_word && word_start(c)) {
       if (closer_word(lexer)) {
         if (units == 0) return false;
-        bool tail = units >= MIN_RUN && end_follows(lexer, TAIL_LOOKAHEAD);
-        return run(lexer, state, units, tail ? EOF_TAIL : 0); /* ends before the keyword */
+        return run(lexer, state, units, prev); /* ends before the keyword */
       }
       units++;
       after_word = true;
@@ -239,6 +214,6 @@ bool tree_sitter_brightscript_external_scanner_scan(void *payload, TSLexer *lexe
   }
   if (units == 0) return false;
   lexer->mark_end(lexer);
-  if (units < MIN_RUN && !whole_line && statement_follows(lexer)) return false;
-  return run(lexer, state, whole_line ? 0 : units, whole_line ? RUN : 0);
+  if (units < MIN_RUN && (closing || statement_follows(lexer))) return false;
+  return run(lexer, state, units, prev);
 }

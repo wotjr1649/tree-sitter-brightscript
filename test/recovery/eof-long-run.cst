@@ -1,5 +1,5 @@
 0:0  - 0:44   •source_file
-0:0  - 0:43     •ERROR
+0:0  - 0:44     •ERROR
 0:0  - 0:1         identifier `x`
 0:2  - 0:3         "="
 0:4  - 0:5         plus_sign `+`

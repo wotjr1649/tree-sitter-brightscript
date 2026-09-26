@@ -43,36 +43,36 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
    produces no token while a parse is valid; every BrightScript form stays
    expressed by `grammar.js` alone.
 2. The scanner acts only when a sentinel external token, used by no grammar
-   rule, is valid, which happens only in the error state.
+   rule, is valid, which happens only in the error state, and at the line end
+   after a long run of the same stack version (Decision 3), which exists only
+   after an error.
 3. It then returns one of two tokens:
    - a **recovery run**: malformed text of one line, stopping before a line
      break (`LF`, `CR LF` or a lone `CR`), before a `'` comment outside a
      string literal, before a keyword that closes or continues a block
-     (`END…`, `NEXT`, `ELSE…`, `CATCH`) or a `:` or `#` before one, and at
-     the end of input before its last unit (a word or one character, or a
-     `:` or `#` with the word after it); never empty. A run of 16 units or more is *long*. After the line break of a
-     long run, and after a long run that stopped at such a keyword or comment
-     on the last line, the next run takes the whole line without those
-     stops;
-   - a **recovery line break**: the line break after a long or whole-line
-     run, a lone `CR`, or the rest of a last line after a run that stopped
-     before it. The grammar accepts it where a line of statements ends and
-     after the header of a loop, function, TRY, CATCH or directive, not after
-     an IF header (a single-line IF with an error would become a block IF)
-     and not inside brackets.
+     (`END…`, `NEXT`, `ELSE…`, `CATCH`) or a `:` or `#` before one, or at the
+     end of input; never empty. A run of 16 units or more is *long*;
+   - a **recovery line end**: the line break of a line that holds a long run,
+     a lone `CR`, or at the end of input an empty token (after a long run,
+     and otherwise once per stack version). The grammar accepts it where a
+     line of statements ends and after the header of a loop, function, TRY,
+     CATCH or directive, not after an IF header (a single-line IF with an
+     error would become a block IF) and not inside brackets.
    At any other line break it returns nothing, so the runtime lexes the
    ordinary line break and recovery may resume after an IF header or inside
    a multi-line bracket literal, as without the scanner. It also returns
    nothing, so that recovery proceeds token by token as without the scanner,
-   for a malformed rest of fewer than 16 units before a line that begins like
-   a statement or at the end of input: a cheap run there lets a recovery
-   version skip the line break and take the next line into the malformed
-   statement, and at the end of input the unit that ends the line would lose
-   its node. Only the rest of a long last line without a line break is
-   therefore outside every `ERROR` node, as a hidden line end.
-   A long malformed line then becomes one `ERROR` node that keeps the native
-   children of the tokens parsed before the error, and parsing resumes at the
-   next line when a statement boundary is within reach of recovery.
+   for a malformed rest of fewer than 16 units that is followed by a line
+   that begins like a statement (a cheap run there lets a recovery version
+   skip the line break and take the next line into the malformed statement),
+   that begins with a closing bracket (recovery can then return into the
+   literal it closes) or that ends the input. When recovery returns to an
+   earlier state at the line end of a long run, the runtime lexes that line
+   end again in a normal state; the scanner returns it as a recovery line end
+   there too. A long malformed line then becomes one `ERROR` node that keeps
+   the native children of the tokens parsed before the error, and parsing
+   resumes at the next line when a statement boundary is within reach of
+   recovery.
 4. Tokens that can stay unreduced on the parse stack in long runs without a
    named node between them (the openers `(` and `[`, the prefix operators
    `-`, `+` and `not`, and `try`) get named raw forms that appear only inside
@@ -82,26 +82,28 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
    placed so that no public node lists them as children. The raw names are
    public, documented in tree-schema.md as error-only.
 5. The scanner keeps one state byte, flags of the last token it returned in
-   a stack version: the run stopped before the rest of the input (so that
-   when recovery moves back to a line end and the runtime lexes that rest
-   again in a normal state, the scanner returns it as the recovery line
-   break there too), the run was long or whole-line, the token is the line
-   break after a long run, and a long run stopped on the last line. A valid
-   parse has no scanner token, so the byte is never set in one. In runtime
-   0.27.0 a token that changes the state cannot be skipped once recovery to
-   an earlier state has succeeded (`ts_parser__recover`); a line break
-   changes it only after a long or whole-line run, where recovery is meant
-   to leave the line, and the line break after a short run is the ordinary
-   one. `create` allocates the byte with `ts_calloc` of
-   `tree_sitter/alloc.h` (the C library's `calloc` unless the build defines
+   a stack version: a long run was returned on the current line (set by a
+   long run, kept by the shorter runs after it on that line, cleared by the
+   recovery line end of that line), and the empty line end at the end of
+   input was returned. A valid parse has no scanner token, so the byte is
+   never set in one. In runtime 0.27.0 a token that changes the state cannot
+   be skipped once recovery to an earlier state has succeeded
+   (`ts_parser__recover`), and an empty token is kept during recovery only
+   if it changes the state (`ts_parser__lex`). The recovery line end of a
+   long run changes the state, where recovery is meant to leave the line;
+   the line break after a short run is the ordinary one and leaves the state
+   alone; the empty line end at the end of input sets its flag, so that the
+   runtime keeps it and it is returned at most once per stack version.
+   `create` allocates the byte with `ts_calloc` of `tree_sitter/alloc.h` (the
+   C library's `calloc` unless the build defines
    `TREE_SITTER_REUSE_ALLOCATOR`); without it the scanner returns no token.
    `serialize` writes the byte only when set. The scanner does not call
    `get_column` (in runtime 0.27.0 it re-reads the line from its start,
    which made a line with many block keywords after an error quadratic;
    Session 05-7 review B2-01), does not recurse, and each successful scan
-   advances at least one character; a scan reads at most the rest of its
-   line and, at the end of a line, the blank lines and first character
-   after it.
+   except the empty line end advances at least one character; a scan reads
+   at most the rest of its line and, at the end of a line, the blank lines
+   and first character after it.
 6. `src/scanner.c` is hand-written canonical source under the MIT license
    (public `TSLexer` API only, no private runtime structures, no debug output
    or environment dependence in normal builds). It is not a generated file:
@@ -140,14 +142,24 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
   — rejected after independent review (Session 05-7, A2-04): after an error
   in an IF header or in a bracket, the recovery line break was valid neither
   there nor anywhere within reach of recovery, so the rest of the file became
-  one `ERROR` node. Only the line break after a long run is now a recovery
-  line break.
+  one `ERROR` node. Now only the line end of a line with a long run, and a
+  lone `CR`, is a recovery line end.
 - **A recovery line break after every run** (Session 05-7 trial R11) —
   rejected: the line break after a short run then changed the state, so the
   runtime dropped the version that skips it whenever recovery could leave
   the line (see Decision 5), and one stray token in a multi-line array or
   associative-array literal turned the literal's earlier lines into an
   `ERROR` node.
+- **The last unit of the input as its line end, a 256-character look-ahead
+  to the end of input after a block keyword, and a whole-line run after the
+  line break of a long run** (`e093ac8`) — rejected after independent review
+  (Session 05-7, A3-01 to A3-04): the flag of a long run stayed set when
+  recovery lexed its line break again as an ordinary one, so the A2-04 fix
+  failed for every later error in the file; a block keyword more than 256
+  characters before the end of input left end-of-input recovery quadratic
+  (10.7 s at 1 MiB); the whole-line run hid the rest of the file after a
+  long malformed line in a nested literal; and short errors in a deeply open
+  construct wrapped the whole file at the end of input.
 - **Hidden raw token forms** — rejected after a trial: the generator turns a
   hidden single-string rule into a nonterminal, which changes valid trees.
 - **A Rust, Wasm or separate-process parser** — out of scope.
@@ -166,12 +178,16 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
   could have resumed, such as the statement after `THEN`.
 - When the parse stack holds more unclosed constructs than the runtime's
   recovery summary reaches (16 entries), recovery cannot return to a
-  statement boundary; the following lines are absorbed, as without a scanner.
+  statement boundary at the line end of a long run; it continues on the next
+  lines token by token or at a closing bracket and can absorb lines that the
+  parser without the scanner keeps.
 - `go-treesitter` needs a Go port of the scanner. It carries hand-written Go
   scanners for other grammars (`Scan(payload, lexer, validSymbols)`), and
   `ts2go` converts only `parser.c`. This scanner uses `lookahead`, `advance`,
-  `mark_end`, `eof` and `result_symbol` and serializes one byte; input and output golden cases for the port are kept in
-  `test/recovery/`. The port and its V9 evidence belong to `go-treesitter`.
+  `mark_end`, `eof` and `result_symbol`, serializes one byte and returns an
+  empty token at the end of input, which the port's runtime must keep as the
+  stock runtime does (the state changes); input and output golden cases for
+  the port are kept in `test/recovery/`. The port and its V9 evidence belong to `go-treesitter`.
 
 ## Validation / enforcement
 
@@ -182,7 +198,8 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
   resumes and resets correctly; two parsers are independent.
 - Scanner unit cases cover `LF`, `CR LF`, a lone `CR` in a run and between
   lines, end of input with and without blanks, a final word, a final block
-  keyword or a final comment, a NUL byte, UTF-8 text, string literals
+  keyword, a final comment or a block keyword far from the end, a NUL byte,
+  UTF-8 text, string literals
   containing `'` and a `'` comment; with the lines-after-an-error cases they
   are the golden trees of `test/recovery/`, compared by
   `scripts/check_robustness.py`, which also requires every declaration of

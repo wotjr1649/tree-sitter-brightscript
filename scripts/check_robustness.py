@@ -72,6 +72,8 @@ RECOVERY_GUARDS = [
     ("KL-002 NOT, no final line break (fixed)", b"x = ", b"(not)", 1000, 16000, 1.5, 50, 8, b""),
     ("B5-01 prefix before a final comment (fixed)", b"x = ", b"+f([)", 1000, 16000, 1.5, 50, 8, b" ' c"),
     ("B5-01 prefix before a final NEXT (fixed)", b"x = ", b"+f([)", 1000, 16000, 1.5, 50, 8, b" next"),
+    ("B5-01 prefix before END IF and a long final comment (fixed)", b"x = ", b"+f([)", 1000, 16000, 1.5, 50, 8,
+     b" end if ' " + b"c" * 300),
     ("KL-002 prefix operators across lines (fixed)", b"x = -\n", b"-\n", 1000, 4000, 1.5, 50, 8),
     ("block keywords on one malformed line (fixed)", b"", b"if a then b = ) else ", 1000, 8000, 1.5, 100, 8),
     ("minified blocks after an error (fixed)", b"x = ) : ", b"if a then : b = 1 : end if : ", 1000, 8000, 1.5, 150, 8),
@@ -99,8 +101,9 @@ QUERY_GUARDS = [
 QUERY = ROOT / "queries/highlights.scm"
 RECOVERY = ROOT / "test/recovery"
 # Recovery cases whose later declarations must survive outside every ERROR node (lines after an error, ADR-0008).
-LOCALITY = ["closer-after-stray", "colon-closer", "directive-closer", "directive-header", "header-comma",
-            "if-header-bracket", "literal-short-run", "long-run-next-line", "two-errors-gap"]
+LOCALITY = ["closer-after-stray", "colon-closer", "directive-closer", "directive-header", "eof-open-literal",
+            "header-comma", "if-header-bracket", "literal-last-long-run", "literal-short-run",
+            "long-run-next-line", "nested-literal-long-run", "stale-long-run", "two-errors-gap"]
 
 
 def witness(unit, k, prefix=b"x = ", end=b"\n"):

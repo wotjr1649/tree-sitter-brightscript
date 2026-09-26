@@ -1,0 +1,392 @@
+0:0    - 51:0     •source_file
+1:0    - 21:12      function_declaration
+1:0    - 1:8          "function"
+1:9    - 1:21         name: identifier `LoadSettings`
+1:21   - 1:68         parameters: parameter_list
+1:21   - 1:22           "("
+1:22   - 1:36           parameter
+1:22   - 1:26             name: identifier `name`
+1:27   - 1:29             "as"
+1:30   - 1:36             type: type
+1:30   - 1:36               "string"
+1:36   - 1:37           ","
+1:38   - 1:67           parameter
+1:38   - 1:46             name: identifier `fallback`
+1:47   - 1:48             "="
+1:49   - 1:56             default: invalid `invalid`
+1:57   - 1:59             "as"
+1:60   - 1:67             type: type
+1:60   - 1:67               "dynamic"
+1:67   - 1:68           ")"
+1:69   - 1:71         "as"
+1:72   - 1:78         return_type: type
+1:72   - 1:78           "object"
+1:78   - 21:0         body: block
+2:4    - 7:5            assignment_statement
+2:4    - 2:10             left: identifier `values`
+2:11   - 2:12             "="
+2:13   - 7:5              right: array_literal
+2:13   - 2:14               "["
+3:8    - 3:9                number `1`
+3:16   - 3:29               comment `' first value`
+4:8    - 4:9                number `2`
+4:9    - 4:10               ","
+5:8    - 5:12               number `&hFF`
+5:12   - 5:13               ","
+5:14   - 5:19               number `&h1f&`
+5:19   - 5:20               ","
+5:21   - 5:32               number `9876543210&`
+6:8    - 6:11               number `3.5`
+6:11   - 6:12               ","
+6:13   - 6:18               number `1.5e3`
+6:18   - 6:19               ","
+6:20   - 6:26               number `2.5d-2`
+6:26   - 6:27               ","
+6:28   - 6:31               number `.25`
+6:31   - 6:32               ","
+6:33   - 6:35               number `7!`
+6:35   - 6:36               ","
+6:37   - 6:39               number `8#`
+6:39   - 6:40               ","
+6:41   - 6:43               number `9%`
+7:4    - 7:5                "]"
+8:4    - 13:5           assignment_statement
+8:4    - 8:9              left: identifier `table`
+8:10   - 8:11             "="
+8:12   - 13:5             right: associative_array_literal
+8:12   - 8:13               "{"
+9:8    - 9:19               associative_array_entry
+9:8    - 9:13                 key: identifier `title`
+9:13   - 9:14                 ":"
+9:15   - 9:19                 value: identifier `name`
+9:19   - 9:20               ","
+10:8   - 10:26              associative_array_entry
+10:8   - 10:20                key: string `\"quoted key\"`
+10:20  - 10:21                ":"
+10:22  - 10:26                value: true `true`
+11:8   - 11:22              associative_array_entry
+11:8   - 11:14                key: identifier `values`
+11:14  - 11:15                ":"
+11:16  - 11:22                value: identifier `values`
+11:23  - 11:41              comment `' trailing comment`
+12:8   - 12:19              associative_array_entry
+12:8   - 12:12                key: identifier `flag`
+12:12  - 12:13                ":"
+12:14  - 12:19                value: false `false`
+12:19  - 12:20              ","
+13:4   - 13:5               "}"
+14:4   - 16:16          assignment_statement
+14:4   - 14:16            left: member_expression
+14:4   - 14:9               object: identifier `table`
+14:9   - 14:10              "."
+14:10  - 14:16              property: identifier `onLoad`
+14:17  - 14:18            "="
+14:19  - 16:16            right: anonymous_function
+14:19  - 14:27              "function"
+14:27  - 14:44              parameters: parameter_list
+14:27  - 14:28                "("
+14:28  - 14:43                parameter
+14:28  - 14:33                  name: identifier `event`
+14:34  - 14:36                  "as"
+14:37  - 14:43                  type: type
+14:37  - 14:43                    "object"
+14:43  - 14:44                ")"
+14:45  - 14:47              "as"
+14:48  - 14:55              return_type: type
+14:48  - 14:55                "boolean"
+14:55  - 16:0               body: block
+15:8   - 15:40                return_statement
+15:8   - 15:14                  "return"
+15:15  - 15:40                  value: binary_expression
+15:15  - 15:33                    left: index_expression
+15:15  - 15:26                      object: member_expression
+15:15  - 15:20                        object: identifier `event`
+15:20  - 15:22                        "?."
+15:22  - 15:26                        property: identifier `data`
+15:26  - 15:28                      "?["
+15:28  - 15:32                      index: string `\"ok\"`
+15:32  - 15:33                      "]"
+15:34  - 15:35                    "="
+15:36  - 15:40                    right: true `true`
+16:4   - 16:16              "end function"
+17:4   - 19:11          assignment_statement
+17:4   - 17:17            left: member_expression
+17:4   - 17:9               object: identifier `table`
+17:9   - 17:10              "."
+17:10  - 17:17              property: identifier `onClose`
+17:18  - 17:19            "="
+17:20  - 19:11            right: anonymous_function
+17:20  - 17:23              "sub"
+17:23  - 17:25              parameters: parameter_list
+17:23  - 17:24                "("
+17:24  - 17:25                ")"
+17:25  - 19:0               body: block
+18:8   - 18:22                print_statement
+18:8   - 18:13                  "print"
+18:14  - 18:22                  string `\"closed\"`
+19:4   - 19:11              "end sub"
+20:4   - 20:16          return_statement
+20:4   - 20:10            "return"
+20:11  - 20:16            value: identifier `table`
+21:0   - 21:12        "end function"
+23:0   - 33:7       function_declaration
+23:0   - 23:3         "sub"
+23:4   - 23:10        name: identifier `Report`
+23:10  - 23:42        parameters: parameter_list
+23:10  - 23:11          "("
+23:11  - 23:25          parameter
+23:11  - 23:15            name: identifier `data`
+23:16  - 23:18            "as"
+23:19  - 23:25            type: type
+23:19  - 23:25              "object"
+23:25  - 23:26          ","
+23:27  - 23:41          parameter
+23:27  - 23:32            name: identifier `total`
+23:33  - 23:35            "as"
+23:36  - 23:41            type: type
+23:36  - 23:41              "float"
+23:41  - 23:42          ")"
+23:42  - 33:0         body: block
+24:4   - 24:22          assignment_statement
+24:4   - 24:11            left: identifier `xmlNode`
+24:12  - 24:13            "="
+24:14  - 24:22            right: member_expression
+24:14  - 24:18              object: identifier `data`
+24:18  - 24:19              "."
+24:19  - 24:22              property: identifier `xml`
+25:4   - 25:25          assignment_statement
+25:4   - 25:9             left: identifier `title`
+25:10  - 25:11            "="
+25:12  - 25:25            right: attribute_expression
+25:12  - 25:19              object: identifier `xmlNode`
+25:19  - 25:20              "@"
+25:20  - 25:25              attribute: identifier `title`
+26:4   - 26:37          assignment_statement
+26:4   - 26:9             left: identifier `maybe`
+26:10  - 26:11            "="
+26:12  - 26:37            right: attribute_expression
+26:12  - 26:31              object: member_expression
+26:12  - 26:24                object: member_expression
+26:12  - 26:16                  object: identifier `data`
+26:16  - 26:18                  "?."
+26:18  - 26:24                  property: identifier `nested`
+26:24  - 26:26                "?."
+26:26  - 26:31                property: identifier `child`
+26:31  - 26:33              "?@"
+26:33  - 26:37              attribute: identifier `attr`
+27:4   - 27:38          assignment_statement
+27:4   - 27:12            left: identifier `callback`
+27:13  - 27:14            "="
+27:15  - 27:38            right: call_expression
+27:15  - 27:19              object: identifier `data`
+27:19  - 27:20              "."
+27:20  - 27:27              property: identifier `handler`
+27:27  - 27:38              arguments: argument_list
+27:27  - 27:29                "?("
+27:29  - 27:30                number `1`
+27:30  - 27:31                ","
+27:32  - 27:37                string `\"two\"`
+27:37  - 27:38                ")"
+28:4   - 28:61          assignment_statement
+28:4   - 28:10            left: identifier `result`
+28:11  - 28:12            "="
+28:13  - 28:61            right: binary_expression
+28:13  - 28:56              left: binary_expression
+28:13  - 28:51                left: binary_expression
+28:13  - 28:41                  left: binary_expression
+28:13  - 28:19                    left: unary_expression
+28:13  - 28:14                      "-"
+28:14  - 28:19                      operand: binary_expression
+28:14  - 28:15                        left: number `2`
+28:16  - 28:17                        "^"
+28:18  - 28:19                        right: number `2`
+28:20  - 28:21                    "+"
+28:22  - 28:41                    right: binary_expression
+28:22  - 28:37                      left: binary_expression
+28:22  - 28:31                        left: binary_expression
+28:22  - 28:27                          left: binary_expression
+28:22  - 28:23                            left: number `3`
+28:24  - 28:25                            "*"
+28:26  - 28:27                            right: number `4`
+28:28  - 28:29                          "/"
+28:30  - 28:31                          right: number `2`
+28:32  - 28:35                        "mod"
+28:36  - 28:37                        right: number `5`
+28:38  - 28:39                      "\\"
+28:40  - 28:41                      right: number `2`
+28:42  - 28:43                  "-"
+28:44  - 28:51                  right: parenthesized_expression
+28:44  - 28:45                    "("
+28:45  - 28:50                    binary_expression
+28:45  - 28:46                      left: number `1`
+28:47  - 28:48                      "+"
+28:49  - 28:50                      right: number `2`
+28:50  - 28:51                    ")"
+28:52  - 28:54                "<<"
+28:55  - 28:56                right: number `1`
+28:57  - 28:59              ">>"
+28:60  - 28:61              right: number `1`
+29:4   - 29:100         assignment_statement
+29:4   - 29:11            left: identifier `compare`
+29:12  - 29:13            "="
+29:14  - 29:100           right: binary_expression
+29:14  - 29:54              left: binary_expression
+29:14  - 29:24                left: binary_expression
+29:14  - 29:20                  left: identifier `result`
+29:21  - 29:22                  "="
+29:23  - 29:24                  right: number `3`
+29:25  - 29:27                "or"
+29:28  - 29:54                right: binary_expression
+29:28  - 29:39                  left: binary_expression
+29:28  - 29:34                    left: identifier `result`
+29:35  - 29:37                    "<>"
+29:38  - 29:39                    right: number `4`
+29:40  - 29:43                  "and"
+29:44  - 29:54                  right: binary_expression
+29:44  - 29:50                    left: identifier `result`
+29:51  - 29:52                    "<"
+29:53  - 29:54                    right: number `5`
+29:55  - 29:57              "or"
+29:58  - 29:100             right: binary_expression
+29:58  - 29:84                left: binary_expression
+29:58  - 29:68                  left: binary_expression
+29:58  - 29:64                    left: identifier `result`
+29:65  - 29:66                    ">"
+29:67  - 29:68                    right: number `6`
+29:69  - 29:72                  "and"
+29:73  - 29:84                  right: binary_expression
+29:73  - 29:79                    left: identifier `result`
+29:80  - 29:82                    "<="
+29:83  - 29:84                    right: number `7`
+29:85  - 29:88                "and"
+29:89  - 29:100               right: binary_expression
+29:89  - 29:95                  left: identifier `result`
+29:96  - 29:98                  ">="
+29:99  - 29:100                 right: number `8`
+30:4   - 30:25          assignment_statement
+30:4   - 30:11            left: identifier `negated`
+30:12  - 30:13            "="
+30:14  - 30:25            right: unary_expression
+30:14  - 30:17              "not"
+30:18  - 30:25              operand: identifier `compare`
+31:4   - 31:52          assignment_statement
+31:4   - 31:8             left: identifier `text`
+31:9   - 31:10            "="
+31:11  - 31:52            right: binary_expression
+31:11  - 31:38              left: binary_expression
+31:11  - 31:26                left: string `\"say \"\"hello\"\"\"`
+31:27  - 31:28                "+"
+31:29  - 31:38                right: call_expression
+31:29  - 31:30                  object: number `5`
+31:30  - 31:31                  "."
+31:31  - 31:36                  property: identifier `tostr`
+31:36  - 31:38                  arguments: argument_list
+31:36  - 31:37                    "("
+31:37  - 31:38                    ")"
+31:39  - 31:40              "+"
+31:41  - 31:52              right: call_expression
+31:41  - 31:44                object: string `\"x\"`
+31:44  - 31:45                "."
+31:45  - 31:49                property: identifier `left`
+31:49  - 31:52                arguments: argument_list
+31:49  - 31:50                  "("
+31:50  - 31:51                  number `1`
+31:51  - 31:52                  ")"
+32:4   - 32:64          print_statement
+32:4   - 32:9             "print"
+32:10  - 32:15            identifier `title`
+32:15  - 32:16            ";"
+32:17  - 32:22            identifier `maybe`
+32:22  - 32:23            ";"
+32:24  - 32:32            identifier `callback`
+32:32  - 32:33            ";"
+32:34  - 32:40            identifier `result`
+32:40  - 32:41            ";"
+32:42  - 32:49            identifier `compare`
+32:49  - 32:50            ";"
+32:51  - 32:58            identifier `negated`
+32:58  - 32:59            ";"
+32:60  - 32:64            identifier `text`
+33:0   - 33:7         "end sub"
+35:0   - 51:0       •ERROR
+35:0   - 35:8         "function"
+35:9   - 35:16        identifier `Attempt`
+35:16  - 35:34        parameter_list
+35:16  - 35:17          "("
+35:17  - 35:33          parameter
+35:17  - 35:22            name: identifier `times`
+35:23  - 35:25            "as"
+35:26  - 35:33            type: type
+35:26  - 35:33              "integer"
+35:33  - 35:34          ")"
+35:35  - 35:37        "as"
+35:38  - 35:45        type
+35:38  - 35:45          "dynamic"
+36:4   - 36:7         try_keyword `try`
+37:8   - 37:42        if_statement
+37:8   - 37:10          "if"
+37:11  - 37:20          condition: binary_expression
+37:11  - 37:16            left: identifier `times`
+37:17  - 37:18            "<"
+37:19  - 37:20            right: number `0`
+37:21  - 37:25          "then"
+37:26  - 37:42          consequence: block
+37:26  - 37:42            throw_statement
+37:26  - 37:31              "throw"
+37:32  - 37:42              value: string `\"negative\"`
+38:8   - 38:11        try_keyword `try`
+38:11  - 51:0         •block
+39:12  - 39:54          assignment_statement
+39:12  - 39:17            left: identifier `inner`
+39:18  - 39:19            "="
+39:20  - 39:54            right: call_expression
+39:20  - 39:32              function: identifier `CreateObject`
+39:32  - 39:54              arguments: argument_list
+39:32  - 39:33                "("
+39:33  - 39:53                string `\"roAssociativeArray\"`
+39:53  - 39:54                ")"
+40:12  - 51:0           •ERROR
+40:12  - 40:17            "throw"
+40:18  - 40:19            "{"
+40:20  - 40:37            associative_array_entry
+40:20  - 40:27              key: identifier `message`
+40:27  - 40:28              ":"
+40:29  - 40:37              value: string `\"nested\"`
+40:37  - 40:38            ","
+40:39  - 40:47            associative_array_entry
+40:39  - 40:43              key: identifier `code`
+40:43  - 40:44              ":"
+40:45  - 40:47              value: number `42`
+41:8   - 41:24            •ERROR
+41:8   - 41:13              identifier `catch`
+41:14  - 41:24              identifier `innerError`
+42:12  - 42:36            •ERROR
+42:12  - 42:17              identifier `print`
+42:18  - 42:28              identifier `innerError`
+42:28  - 42:29              "."
+42:29  - 42:36              identifier `message`
+43:12  - 43:28            •ERROR
+43:12  - 43:17              identifier `throw`
+43:18  - 43:28              identifier `innerError`
+44:8   - 44:15            •ERROR
+44:8   - 44:11              identifier `end`
+44:12  - 44:15              try_keyword `try`
+45:4   - 45:20            •ERROR
+45:4   - 45:9               identifier `catch`
+45:10  - 45:20              identifier `outerError`
+46:8   - 46:36            •ERROR
+46:8   - 46:13              identifier `print`
+46:14  - 46:24              string `\"caught: \"`
+46:24  - 46:25              ";"
+46:26  - 46:36              identifier `outerError`
+47:8   - 47:22            •ERROR
+47:8   - 47:14              identifier `return`
+47:15  - 47:22              identifier `invalid`
+48:4   - 48:11            •ERROR
+48:4   - 48:7               identifier `end`
+48:8   - 48:11              try_keyword `try`
+49:4   - 49:16            •ERROR
+49:4   - 49:10              identifier `return`
+49:11  - 49:16              identifier `times`
+50:0   - 50:3             identifier `end`
+50:4   - 50:12            "function"
