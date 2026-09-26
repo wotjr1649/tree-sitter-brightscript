@@ -202,14 +202,22 @@ def cancel(r):
                        + v["events"]["cleanup"]["parser_delete_ms"] for v in vals]
             cancelled = [v["events"]["parse"]["cancelled"] for v in vals]
             pa = a["events"]["parse"]
-            post = pa["peak_after_budget"] - pa["live_at_budget"] if pa["budget_cross_ms"] >= 0 else None
+            # The counting allocator notices the budget at the first allocation after it. An instrumented parse that
+            # ran past the budget without noticing it allocated nothing after the budget: its growth is 0.
+            ran_past = pa["cancelled"] or pa["parse_ms"] >= 200
+            if pa["budget_cross_ms"] >= 0:
+                post, status = pa["peak_after_budget"] - pa["live_at_budget"], "MEASURED"
+            elif ran_past:
+                post, status = 0, "MEASURED: no allocation after the budget"
+            else:
+                post, status = None, None
             p.update(return_median_ms=med(ret), return_max_ms=max(ret), cleanup_max_ms=max(cleanup),
                      cancelled_runs=sum(cancelled), runs=len(vals), post_budget_live=post,
-                     budget_reached=pa["budget_cross_ms"] >= 0 or any(cancelled))
+                     budget_reached=pa["budget_cross_ms"] >= 0 or ran_past or any(cancelled))
             live_ok = post < 64 * MIB if post is not None else not p["budget_reached"]
-            p["post_budget_live_status"] = ("MEASURED" if post is not None else
-                                            "NOT_APPLICABLE: parse returned before the budget" if not p["budget_reached"]
-                                            else "NOT_RUN: no allocation after the budget")
+            p["post_budget_live_status"] = status or ("NOT_APPLICABLE: parse returned before the budget"
+                                                      if not p["budget_reached"] else
+                                                      "NOT_RUN: the instrumented parse ended before the budget")
             must_cancel = case in CANCEL_ACTUAL
             p["pass_"] = max(ret) <= 300 and max(cleanup) <= 100 and live_ok and (not must_cancel or all(cancelled))
         p["pass"] = p.pop("pass_")
