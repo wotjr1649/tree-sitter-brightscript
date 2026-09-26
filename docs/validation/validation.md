@@ -317,25 +317,31 @@ by the lane:
 
 | Gate | Inputs | Pass condition |
 |---|---|---|
-| B5-01-MEMORY | `x = ` + `+f([)` and `-f(-)` k ≤ 800, `x = ` + `{a:@*}<` k ≤ 600 | allocator peak live and working-set growth < 64 MiB; live-memory exponent of the two largest sizes ≤ 1.5 |
+| B5-01-MEMORY | `x = ` + `+f([)` and `-f(-)` k ≤ 800, `x = ` + `{a:@*}<` k ≤ 600 | allocator peak live and working-set growth < 64 MiB; live-memory exponent of every consecutive pair ≤ 1.5 (a pair below 1 MiB of live bytes passes) |
 | B5-02-LIFECYCLE | `print ` + `f([)` and `,+*`, k 1,000–20,000; `x = ` + `-f(-)` k ≤ 20,000 | parse, tree and parser deletion complete; call exponent 1,000 → 4,000 ≤ 1.5 |
-| A5-01-COST | PRINT items `a;`, `1;` k ≤ 32,000 and `a ` k ≤ 8,000 | query and cursor, field and index navigation, paired with BEFORE_PRINT: same work, ratio ≤ 1.5; exponents ≤ 1.5 |
-| CANCEL | the v3 cases and seven 1 MiB inputs registered to run past the budget | 200 ms budget: return ≤ 300 ms, deletion ≤ 100 ms, live memory after the budget < 64 MiB; the registered inputs are cancelled |
-| CANCEL-OVERSHOOT | cancellation and 1 MiB malformed inputs, budgets 25 ms–4 s | overshoot ≤ 100 ms |
+| A5-01-COST | PRINT items `a;`, `1;` k ≤ 32,000 and `a ` k ≤ 8,000 | query and cursor, field and index navigation, paired with BEFORE_PRINT: same work (and the query match limit never exceeded), ratio ≤ 1.5; exponents ≤ 1.5 |
+| CANCEL | the v3 cases and seven 1 MiB inputs registered to run past the budget | 200 ms budget: return ≤ 300 ms, deletion ≤ 100 ms, live memory after the budget < 64 MiB, measured from the first allocation or progress callback after the budget (a reached budget without a recorded crossing is `NOT_RUN`, not a pass); the registered inputs are cancelled |
+| CANCEL-OVERSHOOT | cancellation and 1 MiB malformed inputs, budgets 25 ms–4 s | overshoot ≤ 100 ms on every point that reaches its budget; the number of such points is reported |
 | MAX-CALLBACK-GAP, CLEANUP-ALL | the same and six 1 MiB valid inputs | progress-callback gap ≤ 100 ms; tree and parser deletion ≤ 100 ms |
 | LARGE-INPUT | 1 MiB malformed and valid inputs | completes, peak commit ≤ 256 MiB, parse ≤ 10 s (the PRINT-separator input time-exempt as in v3) |
-| QUERY-MALFORMED | six unclosed-group families, k 2,000 and 20,000 | full highlight query exponent ≤ 1.5 |
+| QUERY-MALFORMED | six unclosed-group families, k 2,000 and 20,000 | full highlight query exponent ≤ 1.5, match limit never exceeded |
 | VALID-PARSE | PRINT items, six valid families 4–256 KiB, W03 | paired with H: ratio ≤ 1.5; exponent of the largest pairs ≤ 1.2 |
 | SEM-PUBLIC | the 2,811 inputs of the tree comparison | projection of the re-frozen schema onto H's (tree-schema.md "Re-freeze of 0.1.0") equal on every valid input; error presence equal; every mutant of the projection detected |
 | INCREMENTAL-REPAIR | 28 edit scripts | incremental parse equals a fresh parse; inverse edits restore the original; both comparators detect a planted difference |
-| RESUME-RESET | six registered inputs | resume after cancellation, reset and a new source each equal a fresh parse; two parsers are independent |
+| RESUME-RESET | six registered inputs | resume after cancellation, reset and a new source each equal a fresh parse; an input whose parse ends before the trigger is `NOT_TRIGGERED` and gives no evidence, and at least one must be triggered; two parsers are independent |
 | SUPPORT | B5 and A5-01 points on runtimes 0.25.1 and 0.26.13 | complete within the caps (the product runtime is 0.27.0) |
-| REGRESSION-SWEEP | 270 context × unit × line-end families, k 100, 400, 20,000 | no crash; memory growth < 64 MiB; exponent 400 → 20,000 ≤ 1.5, the units of the retired KL-002 included |
+| REGRESSION-SWEEP | 270 context × unit × line-end families (line ends: a line break, `:` and a statement, none), k 100, 400, 4,000, 20,000, 1 warmup and 5 runs each (median) | no crash; memory growth < 64 MiB; exponents 400 → 20,000 and 4,000 → 20,000 ≤ 1.5 with the smaller time clamped to the 0.1 ms floor, the units of the retired KL-002 included |
 | ABS-MEMORY | every registered B5, A5-01 and cancellation point | peak commit ≤ 128 MiB |
+| RECOVERY-LOCALITY | the 1,699 single-line mutants of `program.brs`, `compact.brs` and `highlights.brs` (ten mutations per line) | rows under `ERROR` or `MISSING` apart from the mutated one, through the pinned CLI: the candidate hides rows that H keeps, by five and by twenty rows or more, in no more mutants than the reverse |
 
 The lane's result supports only the identity it names (`identity.json`:
-compiler, supervisor, candidate files, probe images, git HEAD). The CLI guards
-are its hosted subset; a lane gate is never inferred from a CLI guard.
+compiler, supervisor, candidate files, probe images, the lane's own sources,
+git HEAD and whether the working tree was clean). The CLI guards are its
+hosted subset; a lane gate is never inferred from a CLI guard. After the
+Session 05-7 review the lane gained the RECOVERY-LOCALITY gate, the 4,000
+sweep point and floor clamp, every B5-01 pair, the match-limit checks, the
+callback crossing of CANCEL and two RESUME-RESET inputs that are long enough
+to trigger; each makes a gate stricter or measures what it could not.
 
 ## Highlight query changes
 

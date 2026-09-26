@@ -36,7 +36,7 @@ REFERENCES = {"h": ("47d40474ca6e2f5ed900baf5075e90545e16747d",
               "bp": ("8e2ad7c", "3f3eafd1f8b5f7c07357998a352b0303ea9adbcef611c8b097c787faebef9443")}
 ALL_GATES = ["B5-01-MEMORY", "B5-02-LIFECYCLE", "A5-01-COST", "CANCEL", "CANCEL-OVERSHOOT", "MAX-CALLBACK-GAP",
              "LARGE-INPUT", "QUERY-MALFORMED", "VALID-PARSE", "SEM-PUBLIC", "INCREMENTAL-REPAIR", "RESUME-RESET",
-             "SUPPORT", "REGRESSION-SWEEP", "ABS-MEMORY"]
+             "SUPPORT", "REGRESSION-SWEEP", "ABS-MEMORY", "RECOVERY-LOCALITY"]
 
 
 def sha(path):
@@ -122,8 +122,8 @@ class Lab:
 class Runner:
     """What the gates call: measurements of built probes on generated inputs."""
 
-    def __init__(self, lab, probes, query):
-        self.lab, self.probes, self.query = lab, probes, query
+    def __init__(self, lab, probes, query, roots=None):
+        self.lab, self.probes, self.query, self.roots = lab, probes, query, roots or {}
 
     def input(self, case):
         path = self.lab.out / "inputs" / f"{case}.brs"
@@ -176,6 +176,21 @@ class Runner:
         if not (report["termination_reason"] == "COMPLETED" and report["exit_code_raw"] == 0):
             raise RuntimeError(f"{build} {tag}: {report['termination_reason']} {report['exit_code_raw']}")
         return text
+
+    def error_rows(self, build, path):
+        """Rows covered by ERROR or MISSING nodes in the pinned CLI's --cst tree of `path` for the checkout of
+        `build` ("cand" or a reference), each with its own parser-library directory (the CLI caches by name)."""
+        libdir = self.lab.out / "env" / f"libdir-{build}"
+        libdir.mkdir(parents=True, exist_ok=True)
+        code, out, err = tscli.cli("parse", "--cst", str(path), cwd=self.roots[build], timeout=120,
+                                   env={"TREE_SITTER_LIBDIR": str(libdir)})
+        if code not in (0, 1) or not tscli.CST_LINE.search(out):
+            raise RuntimeError(f"{build}: parse --cst {path} printed no tree (exit {code}): {err[-300:]}")
+        rows = set()
+        for a, _, c, d, _, kind in tscli.cst_nodes(out):
+            if kind == "ERROR" or kind.startswith("MISSING"):
+                rows.update(range(a, c + (1 if d > 0 else 0)) if c > a else {a})
+        return rows
 
     def probe_final(self, build, args, tag):
         return next((e for e in self.json_lines(self.probe(build, args, tag)) if e.get("final")), None)
@@ -297,7 +312,12 @@ def main():
         version, root = spec.split("=", 1)
         probes[f"cand-rt{version}"] = (probe(f"cand-rt{version}", cand, runtime_objects(version, root), root), query)
         support_versions.append(version)
+    lane_files = ["run.py", "gates.py", "cases.py", "probe.c", "supervisor.c", "benign.c", "recorded-inputs.json",
+                  "runtime-0.27.0.sha256", "runtime-0.25.1.sha256", "runtime-0.26.13.sha256"]
+    status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, timeout=60)
     identity = {"cc": str(lab.cc), "cc_sha256": sha(lab.cc), "supervisor_sha256": sha(lab.supervisor),
+                "lane_sources": {f: sha(HERE / f) for f in lane_files},
+                "git_clean": status.returncode == 0 and not status.stdout.strip(),
                 "selftest": selftest, "candidate": {f: sha(ROOT / f) for f in ("grammar.js", "src/parser.c", "src/scanner.c",
                                                                           "src/node-types.json", "queries/highlights.scm")},
                 "probes": {n: sha(p) for n, (p, _) in probes.items()},
@@ -305,7 +325,7 @@ def main():
                                            timeout=60).stdout.strip(),
                 "runtime": "0.27.0", "support": support_versions, "seed": args.seed, "gates": selected}
     (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
-    r = Runner(lab, probes, query)
+    r = Runner(lab, probes, query, roots={"cand": ROOT, "h": refs["h"]})
     results = []
     plan = {"B5-01-MEMORY": lambda: gates.b5_01_memory(r), "B5-02-LIFECYCLE": lambda: gates.b5_02_lifecycle(r),
             "A5-01-COST": lambda: gates.a5_01_cost(r, args.seed), "CANCEL": lambda: gates.cancel(r),
@@ -314,7 +334,7 @@ def main():
             "VALID-PARSE": lambda: gates.valid_parse(r, args.seed), "SEM-PUBLIC": lambda: gates.sem_public(r, args.seed),
             "INCREMENTAL-REPAIR": lambda: gates.incremental_repair(r), "RESUME-RESET": lambda: gates.resume_and_two(r),
             "SUPPORT": lambda: gates.support(r, support_versions), "REGRESSION-SWEEP": lambda: gates.sweep(r),
-            "ABS-MEMORY": lambda: gates.abs_memory(lab.runs)}
+            "ABS-MEMORY": lambda: gates.abs_memory(lab.runs), "RECOVERY-LOCALITY": lambda: gates.recovery_locality(r)}
     for g in selected:
         out = plan[g]()
         for res in (out if isinstance(out, list) else [out]):

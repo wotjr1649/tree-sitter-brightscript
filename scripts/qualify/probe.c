@@ -46,6 +46,7 @@ static uint64_t live_bytes, peak_bytes, total_bytes, allocations;
 static int parse_active;
 static double parse_start, budget_ms;
 static double budget_cross_ms = -1;
+static int cross_at_callback;
 static uint64_t live_at_budget, peak_after_budget;
 
 #ifdef MEASURE_ALLOC
@@ -194,6 +195,15 @@ static bool progress(TSParseState *state) {
   callbacks++;
   if (budget_ms > 0 && t >= budget_ms) {
     if (request_ms < 0) request_ms = t;
+    /* The budget crossing is also taken here, so a parse that allocates nothing after the budget
+       still has one. No allocation happened since the budget instant, so the live bytes here are at
+       most those at that instant, and the growth measured from them is not smaller. */
+    if (budget_cross_ms < 0) {
+      budget_cross_ms = t;
+      cross_at_callback = 1;
+      live_at_budget = live_bytes;
+      peak_after_budget = live_bytes;
+    }
     return true;
   }
   return false;
@@ -235,10 +245,11 @@ static int run(const char *op, const char *input_path, const char *query_path, d
   if (tail > edges) edges = tail;
   printf("{\"event\":\"parse\",\"parse_ms\":%.6f,\"cancelled\":%s,\"callbacks\":%llu,\"head_gap_ms\":%.6f,"
          "\"max_gap_ms\":%.6f,\"tail_gap_ms\":%.6f,\"max_gap_incl_edges_ms\":%.6f,\"budget_ms\":%.6f,"
-         "\"request_ms\":%.6f,\"budget_cross_ms\":%.6f,\"live_at_budget\":%llu,\"peak_after_budget\":%llu,"
-         "\"live_at_return\":%llu,\"working_set_at_return\":%llu,\"commit_at_return\":%llu}\n",
+         "\"request_ms\":%.6f,\"budget_cross_ms\":%.6f,\"cross_at_callback\":%s,\"live_at_budget\":%llu,"
+         "\"peak_after_budget\":%llu,\"live_at_return\":%llu,\"working_set_at_return\":%llu,\"commit_at_return\":%llu}\n",
          parse_ms, tree ? "false" : "true", (unsigned long long)callbacks, head, max_gap, tail, edges, budget,
-         request_ms, budget_cross_ms, (unsigned long long)live_at_budget, (unsigned long long)peak_after_budget,
+         request_ms, budget_cross_ms, cross_at_callback ? "true" : "false", (unsigned long long)live_at_budget,
+         (unsigned long long)peak_after_budget,
          (unsigned long long)live_at_return, (unsigned long long)ws_return, (unsigned long long)commit_return);
   fflush(stdout);
 

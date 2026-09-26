@@ -1,5 +1,5 @@
 {
- "about": "SHA-256 of release-gate inputs as stored by Sessions 05-2 (protocol v3, resume-07/08) and their aggregate digests; scripts/qualify/cases.py regenerates every input and must reproduce these bytes.",
+ "about": "SHA-256 of release-gate inputs as stored by Sessions 05-2 (protocol v3, resume-07/08) and their aggregate digests; scripts/qualify/cases.py regenerates every input and must reproduce these bytes. locality_aggregate: SHA-256 over name:row and the SHA-256 of each RECOVERY-LOCALITY mutant in generation order (registered in Session 05-7 before the gate first ran).",
  "cases": {
   "A5-01-k01000": "0ebd1ab63c54e324cec14526cef33d990851e511d0c2873d1544bb7bb8ef097b",
   "A5-01-k02000": "e4cf2092905be6725a8d45ca851fe3a1c237d3df51aab848447fad85accc6064",
@@ -126,5 +126,7 @@
   "scattered-001",
   "scattered-010",
   "scattered-100"
- ]
+ ],
+ "locality_aggregate": "3d23efbfa3bcc94303657b6918cefa41ec2b7b8665b4148d1256a652a0d5c7fe",
+ "locality_count": 1699
 }

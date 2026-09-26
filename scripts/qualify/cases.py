@@ -138,6 +138,38 @@ def tree_compare():
     return items
 
 
+# RECOVERY-LOCALITY (Session 05-7 review A-01): every single-line mutant of these files.
+LOCALITY_BASES = ["test/samples/program.brs", "test/samples/compact.brs", "test/highlight/highlights.brs"]
+MUTATIONS = {
+    "paren": lambda line: line + " (",
+    "plus": lambda line: line + " +",
+    "dropc": lambda line: line[:-1],
+    "comma": lambda line: line + ",",
+    "eqeq": lambda line: line.replace("=", "= =", 1),
+    "brack": lambda line: line + " [",
+    "quote": lambda line: line + ' "x',
+    "rparen": lambda line: line[: len(line) // 2] + ")" + line[len(line) // 2:],
+    "dot": lambda line: line + ".",
+    "brace": lambda line: line + " {",
+}
+
+
+def locality_mutants():
+    """(name, bytes, mutated row): each mutation that changes a non-blank, non-comment line of a base file."""
+    out = []
+    for base in LOCALITY_BASES:
+        lines = (ROOT / base).read_text(encoding="utf-8").split("\n")
+        for i, line in enumerate(lines):
+            if not line.strip() or line.lstrip().startswith(("'", "rem", "REM")):
+                continue
+            for name, mutate in MUTATIONS.items():
+                changed = mutate(line)
+                if changed != line:
+                    data = "\n".join(lines[:i] + [changed] + lines[i + 1:]).encode("utf-8")
+                    out.append((f"{Path(base).stem}_{i}_{name}", data, i))
+    return out
+
+
 def _cli_to_bytes(text, edit):
     pos, deleted, inserted = edit.split(" ", 2)
     row, col = (int(x) for x in pos.split(","))
@@ -198,6 +230,12 @@ def check():
         h.update(hashlib.sha256(edits).digest())
     if h.hexdigest() != RECORDED["incremental_aggregate"]:
         bad.append("incremental")
+    h = hashlib.sha256()
+    for name, data, row in locality_mutants():
+        h.update(f"{name}:{row}".encode())
+        h.update(hashlib.sha256(data).digest())
+    if h.hexdigest() != RECORDED.get("locality_aggregate"):
+        bad.append("locality")
     return bad
 
 

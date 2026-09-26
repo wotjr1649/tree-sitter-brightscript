@@ -93,11 +93,16 @@ def b5_01_memory(r):
         ok &= p["pass"]
         points.append(p)
     pairs = []
-    for fam, ks in (("prefix", (400, 800)), ("minus", (400, 800)), ("aa", (300, 600))):
-        a, b = live[f"B5-01-{fam}-k{ks[0]:05d}"], live[f"B5-01-{fam}-k{ks[1]:05d}"]
-        e = exponent(a, b, *ks) if a and b else None
-        pairs.append({"family": fam, "sizes": ks, "exponent": e, "pass": e is not None and e <= 1.5})
-        ok &= pairs[-1]["pass"]
+    # Every consecutive pair of each family's series (Session 05-7 review B-11); a pair whose live bytes are both
+    # below 1 MiB is below the growth that matters and passes with its exponent recorded.
+    for fam, ks in (("prefix", (100, 200, 400, 800)), ("minus", (100, 200, 400, 800)), ("aa", (150, 300, 600))):
+        for k0, k1 in zip(ks, ks[1:]):
+            a, b = live[f"B5-01-{fam}-k{k0:05d}"], live[f"B5-01-{fam}-k{k1:05d}"]
+            e = exponent(a, b, k0, k1) if a and b else None
+            small = a is not None and b is not None and max(a, b) < MIB
+            pairs.append({"family": fam, "sizes": (k0, k1), "exponent": e,
+                          "pass": small or (e is not None and e <= 1.5)})
+            ok &= pairs[-1]["pass"]
     return result("B5-01-MEMORY", ok, points + pairs)
 
 
@@ -163,6 +168,7 @@ def a5_01_cost(r, seed):
                 if op == "QUERY_ONLY":
                     same = (last_c["query"]["captures"], last_c["query"]["digest"]) == (last_b["query"]["captures"],
                                                                                          last_b["query"]["digest"])
+                    same = same and not any(x["events"]["query"]["exceeded"] for x in recs["cand"] + recs["bp"])
                 else:
                     nc, nb = last_c["navigation"], last_b["navigation"]
                     same = (nc["digest"], nc["visits"], nc["child_calls"]) == (nb["digest"], nb["visits"], nb["child_calls"])
@@ -202,22 +208,18 @@ def cancel(r):
                        + v["events"]["cleanup"]["parser_delete_ms"] for v in vals]
             cancelled = [v["events"]["parse"]["cancelled"] for v in vals]
             pa = a["events"]["parse"]
-            # The counting allocator notices the budget at the first allocation after it. An instrumented parse that
-            # ran past the budget without noticing it allocated nothing after the budget: its growth is 0.
-            ran_past = pa["cancelled"] or pa["parse_ms"] >= 200
-            if pa["budget_cross_ms"] >= 0:
-                post, status = pa["peak_after_budget"] - pa["live_at_budget"], "MEASURED"
-            elif ran_past:
-                post, status = 0, "MEASURED: no allocation after the budget"
-            else:
-                post, status = None, None
+            # The crossing is taken at the first allocation or progress callback after the budget, whichever comes
+            # first (probe.c). A budget that was reached without a recorded crossing is NOT_RUN, not a pass
+            # (gate contract CANCEL).
+            post = pa["peak_after_budget"] - pa["live_at_budget"] if pa["budget_cross_ms"] >= 0 else None
             p.update(return_median_ms=med(ret), return_max_ms=max(ret), cleanup_max_ms=max(cleanup),
                      cancelled_runs=sum(cancelled), runs=len(vals), post_budget_live=post,
-                     budget_reached=pa["budget_cross_ms"] >= 0 or ran_past or any(cancelled))
+                     cross_at_callback=pa.get("cross_at_callback"),
+                     budget_reached=pa["budget_cross_ms"] >= 0 or pa["cancelled"] or any(cancelled))
             live_ok = post < 64 * MIB if post is not None else not p["budget_reached"]
-            p["post_budget_live_status"] = status or ("NOT_APPLICABLE: parse returned before the budget"
-                                                      if not p["budget_reached"] else
-                                                      "NOT_RUN: the instrumented parse ended before the budget")
+            p["post_budget_live_status"] = ("MEASURED" if post is not None else
+                                            "NOT_APPLICABLE: parse returned before the budget" if not p["budget_reached"]
+                                            else "NOT_RUN: no budget crossing recorded")
             must_cancel = case in CANCEL_ACTUAL
             p["pass_"] = max(ret) <= 300 and max(cleanup) <= 100 and live_ok and (not must_cancel or all(cancelled))
         p["pass"] = p.pop("pass_")
@@ -250,7 +252,10 @@ def overshoot(r):
                  "pass": not late_uncancelled and max(reps) <= 100}
             ok &= p["pass"]
             points.append(p)
-    return result("CANCEL-OVERSHOOT", ok, points)
+    exercised = [p for p in points if "overshoot_ms" in p]
+    return result("CANCEL-OVERSHOOT", ok, points,
+                  [f"{len(exercised)} points on {len({p['case'] for p in exercised})} inputs reached their budget; "
+                   f"{sum(1 for p in points if 'status' in p)} inputs finished before the smallest budget reached"])
 
 
 def gaps_and_cleanup(r):
@@ -292,10 +297,14 @@ def query_malformed(r):
     points, ok = [], True
     for fam in QUERY_MALFORMED:
         t = {}
+        exceeded = False
         for k in (2000, 20000):
             vals, recs = timed(r, "cand", "QUERY_ONLY", f"{fam}-k{k:05d}", 3, m_query)
             t[k] = med(vals) if vals else None
-        if None in t.values():
+            exceeded |= any(completed(x) and x["events"]["query"]["exceeded"] for x in recs)
+        if exceeded:
+            p = {"family": fam, "median_ms": t, "status": "query match limit exceeded", "pass": False}
+        elif None in t.values():
             p = {"family": fam, "censored": True, "pass": False}
         elif t[20000] < FLOOR_MS:
             p = {"family": fam, "median_ms": t, "exponent": None, "status": "below the 0.1 ms floor at k=20,000",
@@ -485,9 +494,9 @@ RESUME_PLAN = [
     ("VALID-calls-064k", "VALID-flat-assign-016k", 64, 20),
     ("A5-01-k08000", "VALID-flat-assign-016k", 64, 20),
     ("L-FOREACH-1MiB", "VALID-flat-assign-016k", 4096, 200),
-    ("B5-01-prefix-k16000", "VALID-flat-assign-016k", 64, 1),
+    ("L-WHILE-1MiB", "VALID-flat-assign-016k", 4096, 200),
     ("Q-PAREN-k20000", "VALID-flat-assign-016k", 64, 5),
-    ("KL2-plusstar-k08000", "VALID-flat-assign-016k", 64, 1),
+    ("V-PRINT-1MiB", "VALID-flat-assign-016k", 4096, 200),
 ]
 
 
@@ -505,7 +514,10 @@ def resume_and_two(r):
         if len(resumed) == 3 and not triggered:
             # The parse ended before the trigger: no resume or reset happened, so this input is no evidence.
             p["status"] = "NOT_TRIGGERED"
-            p["pass"] = p["chunked_equals_whole"]
+            p["pass"] = None
+            ok &= p["chunked_equals_whole"]
+            points.append(p)
+            continue
         else:
             p["pass"] = (p["chunked_equals_whole"] and len(resumed) == 3 and len(triggered) == 3
                          and all(c["equals_fresh"] for c in triggered))
@@ -519,6 +531,29 @@ def resume_and_two(r):
     ok &= points[-1]["pass"]
     return result("RESUME-RESET", ok, points, ["E4.4: D1 resume same source, D2 reset same source, D3 reset new source; "
                                                "a case whose parse ends before the trigger is NOT_TRIGGERED, not a pass"])
+
+
+# ------------------------------------------------------------------ RECOVERY-LOCALITY
+def recovery_locality(r):
+    """Lines after an error (ADR-0008; Session 05-7 review A-01). For every single-line mutant of the sample files
+    (cases.locality_mutants), the rows covered by ERROR or MISSING nodes apart from the mutated row are compared
+    between the candidate and H. Registered before the gate first ran: the candidate may hide rows that H keeps by
+    five rows or more, and by twenty rows or more, in no more mutants than H hides rows that the candidate keeps."""
+    counts = {"cand_hides_more": {1: 0, 5: 0, 20: 0}, "h_hides_more": {1: 0, 5: 0, 20: 0}}
+    examples = []
+    mutants = cases.locality_mutants()
+    for name, data, row in mutants:
+        path = r.write_input(f"locality/{name}.brs", data)
+        cand, ref = r.error_rows("cand", path) - {row}, r.error_rows("h", path) - {row}
+        for key, extra in (("cand_hides_more", cand - ref), ("h_hides_more", ref - cand)):
+            for n in (1, 5, 20):
+                counts[key][n] += len(extra) >= n
+        if len(cand - ref) >= 5 and len(examples) < 30:
+            examples.append({"mutant": name, "rows": len(cand - ref)})
+    c, h = counts["cand_hides_more"], counts["h_hides_more"]
+    ok = c[5] <= h[5] and c[20] <= h[20]
+    return result("RECOVERY-LOCALITY", ok, [{"mutants": len(mutants), "counts": counts, "examples": examples}],
+                  ["rows under ERROR or MISSING through the pinned CLI, candidate against H (47d4047)"])
 
 
 # ------------------------------------------------------------------ SUPPORT, sweep
@@ -540,19 +575,28 @@ def support(r, versions):
 def sweep(r):
     points, ok = [], True
     for fam, ctx, unit, end in cases.sweep_families():
-        recs = {k: r.run("cand", "PARSE", f"{fam}-k{k:05d}", 0) for k in (100, 400, 20000)}
-        p = {"family": fam, "completed": all(completed(x) for x in recs.values())}
+        # 1 warmup + 5 runs per point, median (gate contract `sampling`, short points).
+        series = {k: timed(r, "cand", "PARSE", f"{fam}-k{k:05d}", 5, m_parse) for k in (100, 400, 4000, 20000)}
+        recs = {k: rs[-1] for k, (_, rs) in series.items()}
+        p = {"family": fam, "completed": all(v is not None for v, _ in series.values())}
         if p["completed"]:
-            t = {k: m_parse(x) for k, x in recs.items()}
-            growth = recs[20000]["report"]["peak_commit_bytes"] - recs[100]["report"]["peak_commit_bytes"]
-            e = exponent(t[400], t[20000], 400, 20000) if t[400] >= FLOOR_MS else None
+            t = {k: med(v) for k, (v, _) in series.items()}
+            peak = {k: max(x["report"]["peak_commit_bytes"] for x in rs) for k, (_, rs) in series.items()}
+            growth = peak[20000] - peak[100]
+            # The smaller time of each pair is clamped to the 0.1 ms floor, so a startup-dominated or sub-floor point
+            # bounds the exponent from above instead of hiding it (Session 05-7 review B-01, B-06).
+            es = {f"{a}-{b}": exponent(max(t[a], FLOOR_MS), t[b], a, b) for a, b in ((400, 20000), (4000, 20000))}
+            e = max(es.values())
             kl002 = unit in KL002_UNITS
-            p.update(parse_ms=t, memory_growth=growth, exponent=e, kl002=kl002)
-            p["pass"] = growth < 64 * MIB and (e is None or e <= 1.5)
+            p.update(parse_ms=t, memory_growth=growth, exponents=es, exponent=e, kl002=kl002)
+            p["pass"] = growth < 64 * MIB and e <= 1.5
         else:
             p["termination"] = {k: x["report"]["termination_reason"] for k, x in recs.items()}
             p["pass"] = False
         ok &= p["pass"]
         points.append(p)
-    return result("REGRESSION-SWEEP", ok, points, ["270 families x k 100, 400, 20000; crash 0, memory growth < 64 MiB, "
-                                                   "time exponent 400 -> 20000 <= 1.5, the retired KL-002 units included"])
+    return result("REGRESSION-SWEEP", ok, points, ["270 families x k 100, 400, 4000, 20000, 1 warmup + 5 runs each, "
+                                                   "median; crash 0, memory growth "
+                                                   "< 64 MiB; time exponents 400 -> 20000 and 4000 -> 20000, the "
+                                                   "smaller time clamped to the 0.1 ms floor, <= 1.5; the retired "
+                                                   "KL-002 units included"])
