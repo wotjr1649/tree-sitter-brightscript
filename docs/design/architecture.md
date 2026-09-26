@@ -119,7 +119,8 @@ README holding every contract.
 | Generator pin, generated artifacts | [ADR-0002](decisions/ADR-0002-generator-pin-and-generated-artifacts.md) |
 | Language versions | [ADR-0003](decisions/ADR-0003-current-language-superset-grammar.md) |
 | Conditional compilation | [ADR-0004](decisions/ADR-0004-conditional-compilation-representation.md) |
-| External scanner | [ADR-0005](decisions/ADR-0005-external-scanner-policy.md) |
+| External scanner | [ADR-0005](decisions/ADR-0005-external-scanner-policy.md), [ADR-0008](decisions/ADR-0008-error-recovery-scanner.md) (error-recovery resource safety) |
+| Pre-release schema re-freeze, 0.1.0 continuation branch | [ADR-0007](decisions/ADR-0007-pre-release-schema-refreeze.md) |
 | Downstream boundary | [ADR-0006](decisions/ADR-0006-downstream-integration-boundary.md) |
 | Acceptance policy | [grammar-contract.md](../specs/grammar-contract.md) |
 | Line model, tokens, reserved words, precedence, statement boundaries, implementation order | [grammar-design.md](../specs/grammar-design.md) |

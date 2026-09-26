@@ -43,6 +43,10 @@ The grammar version in `tree-sitter.json` is embedded in generated
 | Internal change only | PATCH if `node-types.json` is unchanged, otherwise MINOR | MINOR |
 | Fix with no node-type or structure change | PATCH | PATCH |
 
+Before its first publication, a frozen version's public tier may be
+re-frozen under [ADR-0007](../design/decisions/ADR-0007-pre-release-schema-refreeze.md);
+the table applies from the first publication on.
+
 From 1.0 this matches Tree-sitter's
 [publishing guidance](https://tree-sitter.github.io/tree-sitter/creating-parsers/6-publishing.html)
 (incompatible node-type or structure changes are major; new node types are

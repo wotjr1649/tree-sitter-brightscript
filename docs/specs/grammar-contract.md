@@ -71,7 +71,10 @@ otherwise the documented block-comment idiom is a named known limitation.
 
 **Requirement.** No external scanner unless
 [ADR-0005](../design/decisions/ADR-0005-external-scanner-policy.md) is satisfied
-by a new, accepted ADR.
+by a new, accepted ADR. [ADR-0008](../design/decisions/ADR-0008-error-recovery-scanner.md)
+admits one scanner for the resource safety of error recovery: it produces no
+token while a parse is valid, so every documented form stays expressed by
+`grammar.js` alone.
 
 ## 6. Invalid input and recovery
 

@@ -1,6 +1,8 @@
 # ADR-0005 — External scanner policy
 
-Status: Accepted
+Status: Accepted; superseded in part by
+[ADR-0008](ADR-0008-error-recovery-scanner.md) (2026-09-26) for a scanner whose
+purpose is the resource safety of error recovery
 Date: 2026-09-23
 
 ## Context
