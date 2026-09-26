@@ -191,6 +191,43 @@ def a5_01_cost(r, seed):
 
 
 # ------------------------------------------------------------------ cancellation, gaps, cleanup
+def number(x):
+    """A finite non-negative number, else None: a missing, null, NaN, infinite or negative value is never 0."""
+    return x if type(x) in (int, float) and math.isfinite(x) and x >= 0 else None
+
+
+def budget_run(rec, budget):
+    """One execution judged by its own records alone (gate contract CANCEL; Session 05-7-1 C1).
+
+    Returns (reached, status, growth, parse_ms, cleanup_ms). The budget is reached if this run recorded a crossing,
+    was cancelled, or took at least the budget. The crossing is taken at the first allocation (allocator build) or
+    progress callback after the budget, whichever comes first (probe.c); a reached budget without one leaves the
+    growth after the budget unmeasured (NOT_RUN), never 0. Values that contradict each other fail closed."""
+    pe, cl = rec["events"].get("parse") or {}, rec["events"].get("cleanup") or {}
+    parse_ms, cross, pbudget = number(pe.get("parse_ms")), pe.get("budget_cross_ms"), pe.get("budget_ms")
+    cancelled, at_callback = pe.get("cancelled"), pe.get("cross_at_callback")
+    live, peak = pe.get("live_at_budget"), pe.get("peak_after_budget")
+    tree_ms, parser_ms = cl.get("tree_delete_ms"), number(cl.get("parser_delete_ms"))
+    bad = (parse_ms is None or parser_ms is None or number(budget) is None or budget <= 0 or pbudget != budget
+           or type(cancelled) is not bool or type(at_callback) is not bool or type(live) is not int or live < 0
+           or type(peak) is not int or peak < 0 or not (tree_ms == -1 and cancelled or number(tree_ms) is not None
+                                                          and not cancelled))
+    crossed = not bad and cross != -1
+    if not bad and crossed:
+        bad = number(cross) is None or not budget <= cross <= parse_ms or peak < live
+    elif not bad:
+        bad = at_callback or live != 0 or peak != 0
+    if bad:
+        return True, "MEASUREMENT_INCONSISTENT", None, parse_ms, None
+    cleanup = (0 if cancelled else tree_ms) + parser_ms
+    reached = crossed or cancelled or parse_ms >= budget
+    if crossed:
+        status = "MEASURED_CALLBACK_CROSSING" if at_callback else "MEASURED_ALLOCATION_CROSSING"
+        return True, status, peak - live, parse_ms, cleanup
+    return reached, "NOT_RUN_BUDGET_REACHED_UNOBSERVED" if reached else "NOT_APPLICABLE_BEFORE_BUDGET", None, \
+        parse_ms, cleanup
+
+
 def cancel(r):
     points, ok = [], True
     for case in CANCEL_V3 + CANCEL_ACTUAL:
@@ -198,31 +235,40 @@ def cancel(r):
         a = r.run("cand-alloc", "PARSE", case, 200, tag="alloc")
         p = {"case": case, "registered": "v3" if case in CANCEL_V3 else "actual-cancel (pre-registered)"}
         if vals is None or not completed(a):
-            p.update(censored=True, pass_=False)
+            p.update(censored=True, post_budget_live_status="CENSORED", pass_=False)
         else:
-            ret = [v["events"]["parse"]["parse_ms"] for v in vals]
-            cleanup = [(v["events"]["cleanup"]["tree_delete_ms"] if v["events"]["cleanup"]["tree_delete_ms"] >= 0 else 0)
-                       + v["events"]["cleanup"]["parser_delete_ms"] for v in vals]
-            cancelled = [v["events"]["parse"]["cancelled"] for v in vals]
-            pa = a["events"]["parse"]
-            # The crossing is taken at the first allocation or progress callback after the budget, whichever comes
-            # first (probe.c). A budget that was reached without a recorded crossing is NOT_RUN, not a pass
-            # (gate contract CANCEL).
-            post = pa["peak_after_budget"] - pa["live_at_budget"] if pa["budget_cross_ms"] >= 0 else None
-            p.update(return_median_ms=med(ret), return_max_ms=max(ret), cleanup_max_ms=max(cleanup),
-                     cancelled_runs=sum(cancelled), runs=len(vals), post_budget_live=post,
-                     cross_at_callback=pa.get("cross_at_callback"),
-                     budget_reached=pa["budget_cross_ms"] >= 0 or pa["cancelled"] or any(cancelled))
-            live_ok = post < 64 * MIB if post is not None else not p["budget_reached"]
-            p["post_budget_live_status"] = ("MEASURED" if post is not None else
-                                            "NOT_APPLICABLE: parse returned before the budget" if not p["budget_reached"]
-                                            else "NOT_RUN: no budget crossing recorded")
+            # Return, cleanup and cancellation from the uninstrumented runs; growth after the budget from the
+            # allocator run; each run's budget, time and crossing from its own records, never from another run's.
+            plain = [budget_run(v, 200) for v in vals]
+            reached, status, post, alloc_ms, _ = budget_run(a, 200)
+            cancelled = [(v["events"].get("parse") or {}).get("cancelled") is True for v in vals]
+            inconsistent = sum(s == "MEASUREMENT_INCONSISTENT" for _, s, *_ in plain) + (status == "MEASUREMENT_INCONSISTENT")
+            ret, cleanup = [x[3] for x in plain], [x[4] for x in plain]
+            plain_reached = sum(x[0] for x in plain)
+            if inconsistent:
+                point_status, live_ok = "MEASUREMENT_INCONSISTENT", False
+            elif status.startswith("MEASURED"):
+                point_status, live_ok = status, post < 64 * MIB
+            elif status == "NOT_APPLICABLE_BEFORE_BUDGET" and plain_reached:
+                # The allocator run finished before the budget but uninstrumented runs reached it: their growth
+                # after the budget is unmeasured, and the allocator run's N/A is not borrowed for them.
+                point_status, live_ok = "NOT_RUN_BUDGET_REACHED_UNOBSERVED", False
+            else:
+                point_status, live_ok = status, status == "NOT_APPLICABLE_BEFORE_BUDGET"
+            p.update(return_median_ms=None if inconsistent else med(ret), return_max_ms=None if inconsistent else max(ret),
+                     cleanup_max_ms=None if inconsistent else max(cleanup), cancelled_runs=sum(cancelled),
+                     runs=len(vals), runs_reached_budget=plain_reached, inconsistent_runs=inconsistent,
+                     alloc_parse_ms=alloc_ms, alloc_memory_status=status, post_budget_live=post,
+                     cross_at_callback=(a["events"].get("parse") or {}).get("cross_at_callback"),
+                     budget_reached=reached or plain_reached > 0, post_budget_live_status=point_status)
             must_cancel = case in CANCEL_ACTUAL
-            p["pass_"] = max(ret) <= 300 and max(cleanup) <= 100 and live_ok and (not must_cancel or all(cancelled))
+            p["pass_"] = (not inconsistent and max(ret) <= 300 and max(cleanup) <= 100 and live_ok
+                          and (not must_cancel or all(cancelled)))
         p["pass"] = p.pop("pass_")
         ok &= p["pass"]
         points.append(p)
-    return result("CANCEL", ok, points, ["return and cleanup over 1 warmup + 5 runs; post-budget live from the allocator build"])
+    return result("CANCEL", ok, points, ["return and cleanup over 1 warmup + 5 runs; post-budget live from the allocator build",
+                                         "each run judged by its own budget, time and crossing (Session 05-7-1 C1)"])
 
 
 def overshoot(r):
