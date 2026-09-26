@@ -24,7 +24,7 @@ link to it rather than restate it.
 | [reports/0.1.0-release.md](reports/0.1.0-release.md) | Final 0.1.0 release record: identity, gates, dispositions, limitations, verdict | Consuming or auditing the 0.1.0 release |
 | [reports/0.1.0-structural-recovery-safety.md](reports/0.1.0-structural-recovery-safety.md) | Causes of the open 0.1.0 hold findings, candidates compared, stricter checks and the Gate A decision | Deciding how to remediate the 0.1.0 hold |
 | [reports/session-05-3-repository-owned-hardening.md](reports/session-05-3-repository-owned-hardening.md) | The Session 05-3 query change, its role and time comparison, what stays open | Changing the highlight query |
-| [reports/0.1.0-integrated-qualification.md](reports/0.1.0-integrated-qualification.md) | The re-frozen 0.1.0 candidate of Session 05-7: identity, closure of the seven blocking findings, lane and highlight results, limitations | Checking the current 0.1.0 candidate |
+| [reports/0.1.0-integrated-qualification.md](reports/0.1.0-integrated-qualification.md) | The re-frozen 0.1.0 candidate of Session 05-7: identity, closure status of the seven blocking findings, lane and highlight results, limitations | Checking the current 0.1.0 candidate |
 | [reports/session-05-4-grammar-schema-stock-runtime.md](reports/session-05-4-grammar-schema-stock-runtime.md) | Grammar and schema redesigns screened on the stock runtime, why none qualified, what stays open | Considering a grammar or public-tree change for the 0.1.0 hold |
 
 Repository-wide operating rules for contributors and coding agents are in

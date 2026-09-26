@@ -15,10 +15,13 @@ Sessions 05-2 and 07 found four more material findings and Session 05-3
 fixed part of one (member and attribute chains in the highlight query); all
 seven stayed open ([reports/0.1.0-structural-recovery-safety.md](reports/0.1.0-structural-recovery-safety.md)).
 Session 05-7 re-froze the public schema before the first release
-(ADR-0007), added the error-recovery scanner (ADR-0008) and qualified one
-candidate that closes all seven and retires KL-002 on the stock runtime
+(ADR-0007), added the error-recovery scanner (ADR-0008) and built one
+candidate meant to close all seven and retire KL-002 on the stock runtime;
+four closures and the KL-002 retirement are established, and three (A5-01,
+S07-M01, S08-M01) wait for a passing confirmation of the release
+qualification lane
 ([reports/0.1.0-integrated-qualification.md](reports/0.1.0-integrated-qualification.md));
-its release awaits the owner's decision.
+its release awaits that and the owner's decision.
 The 0.1.0 release will be the commit identified by the `v0.1.0` tag and its
 GitHub Release once they are published; no package is published.
 Phases 1–5 have their exit evidence in
