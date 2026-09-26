@@ -493,9 +493,19 @@ def resume_and_two(r):
         p = {"input": text, "chunk": chunk, "trigger": trigger,
              "chunked_equals_whole": bool(fresh) and fresh["chunked_equals_whole"], "cases": resumed,
              "cancel_observed": sum(1 for c in resumed if c["cancel_observed"])}
-        p["pass"] = p["chunked_equals_whole"] and len(resumed) == 3 and all(c.get("equals_fresh", True) for c in resumed)
+        triggered = [c for c in resumed if c["cancel_observed"]]
+        if len(resumed) == 3 and not triggered:
+            # The parse ended before the trigger: no resume or reset happened, so this input is no evidence.
+            p["status"] = "NOT_TRIGGERED"
+            p["pass"] = p["chunked_equals_whole"]
+        else:
+            p["pass"] = (p["chunked_equals_whole"] and len(resumed) == 3 and len(triggered) == 3
+                         and all(c["equals_fresh"] for c in triggered))
         ok &= p["pass"]
         points.append(p)
+    exercised = [p for p in points if p.get("status") != "NOT_TRIGGERED"]
+    if not exercised:
+        ok = False
     two = r.probe_final("cand", ["TWO", r.input("VALID-flat-assign-004k"), r.input("A5-01-k01000")], "two")
     points.append({"check": "two parsers", "result": two, "pass": bool(two) and two["two_parser_independent"]})
     ok &= points[-1]["pass"]
