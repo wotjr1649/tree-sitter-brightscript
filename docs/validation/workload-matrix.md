@@ -161,7 +161,8 @@ the exponent, time and memory (validation.md "Recovery scaling guards").
 ## Automation
 
 Every command runs from the repository root; hosted CI (`.github/workflows/ci.yml`)
-runs all of them except W12 and W14 on Windows and Ubuntu.
+runs all of them except W12, W14 and the release qualification lane on Windows
+and Ubuntu.
 
 | Set | Command |
 |---|---|
@@ -172,6 +173,7 @@ runs all of them except W12 and W14 on Windows and Ubuntu.
 | W09 (C4), W10 (C5 included) | `python scripts/check_spike.py`, `python scripts/check_incremental.py` |
 | W12 | `python scripts/record_oracle.py` (clean tree; output under `artifacts/oracle/`) |
 | W14 | in `go-treesitter`, from the W12 inputs and W10 edits of the same identity |
+| Release qualification lane (validation.md) | `python scripts/qualify/run.py --cc <gcc.exe> --runtime <root> --out <new dir> --support 0.25.1=<root> --support 0.26.13=<root>` (local Windows host) |
 
 ## Corpus fixture catalogue
 

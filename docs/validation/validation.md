@@ -83,6 +83,7 @@ every row below is `PASS`. Workload sets are defined in
 | Incremental | W10 passes (and the spike's E1–E6 when it passed). |
 | Native oracle | W12 is recorded for the candidate identity. |
 | Robustness | W06, W07 and W13 show no crash, hang or runaway memory. |
+| Release qualification | Every gate of the release qualification lane passes for the candidate identity. |
 | Level 1 refresh | A new dated snapshot of the ten Level 1 pages is taken before the candidate and stored beside `roku-docs-2026-09-23` (source-policy refresh rules); for every page whose content-region SHA-256 changed, each citing requirement is reviewed and the outcome recorded in `upstream-sources.md`. |
 | Provenance | Generator identity, Level 1 snapshot identity and SHA-256 of every generated file are recorded. |
 | Hosted CI | The workflow `.github/workflows/ci.yml` passes on Windows and Ubuntu for the candidate commit, pushed to the session branch; a local run does not substitute. |
@@ -143,6 +144,11 @@ module or with `**` keywords, `sys.modules`, `ctypes`, `_winapi`,
 modules outside `scripts/`, YAML keys escaped other than `\x72un` and `\u0072un`, a custom
 step `shell:`, local actions, `binding.gyp` and `.npmrc` settings (Session 05-1
 delta re-audit C4-01, C4-02).
+One file under `scripts/` is exempt: `scripts/qualify/run.py`, the release
+qualification runner ("Release qualification lane" below), which is not a
+check script, is run by no workflow and reaches the CLI only through
+`tscli.py`; it starts git, the C compiler it is given and the programs that
+compiler built. `scripts/test_tscli.py` checks that it is the only exemption.
 Once per process `tscli.py` copies the installed binary into a private
 directory, compares the copy's SHA-256 with its record in
 [upstream-sources.md](../provenance/upstream-sources.md) and its version with
@@ -228,20 +234,92 @@ growth below it is invisible there; the Windows job sees it:
 | KL-002 exponent | `x = ` + `2^*`, k = 500 and 2,000 | ≤ 2.5 | ≤ 5 s | ≤ 24 MiB | as above, and a regression test of the `_pow_left` memory fix (before it: 69–84 MiB growth) |
 | KL-002 PRINT across lines | `print ` + `,+⏎`, k = 125 and 500 | ≤ 2.5 | ≤ 5 s | ≤ 32 MiB | as the first row |
 | R-A-01 | `x = ` + `f(*`, k = 500 and 2,000 | ≤ 1.5 | ≤ 300 ms | ≤ 24 MiB | regression test of the Session 05-1 fix (before it: exponent 1.7–2.1, 3 s, 1.24 GiB) |
-| B4-01 PRINT items | `print ` + `f([)`, k = 1,000 and 4,000 | ≤ 1.5 | ≤ 300 ms | ≤ 24 MiB | regression test of the `_print_items` memory fix (before it: 386 MiB at 16 KB through the CLI) |
+| B4-01/B5-02 PRINT unclosed calls | `print ` + `f([)`, k = 1,000 and 16,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | regression test of the `_print_items` memory fix (before it: 386 MiB at 16 KB through the CLI) and of the Session 05-7 recovery scanner (before it: the CLI overflowed its stack at k = 16,000, B5-02) |
+| B5-02 PRINT separators | `print ` + `,+*`, k = 1,000 and 16,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | regression test of the recovery scanner (before it: stack overflow at k = 16,000) |
+| B5-02 minus and unclosed calls | `x = ` + `-f(-)`, k = 1,000 and 16,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | the same outside PRINT (before it: stack overflow at k = 16,000) |
+| B5-01 prefix and unclosed calls | `x = ` + `+f([)`, k = 250 and 1,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | regression test of the recovery scanner (before it: exponent 2.00, 1.8 s, 778 MiB growth) |
+| B5-01 minus statements | `-f(-)` with no prefix, k = 250 and 1,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | the same (before it: 1.95, 1.8 s, 773 MiB) |
+| B5-01 associative arrays | `x = ` + `{a:@*}<`, k = 250 and 1,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | the same (before it: 1.92, 912 ms, 315 MiB; 5.2 GiB at k = 4,000) |
 
 Query scaling guards. The same script runs one guard per row of its
-`QUERY_GUARDS` table: the full highlight query over a valid chain at two
+`QUERY_GUARDS` table: the full highlight query over a witness at two
 sizes through `tree-sitter query -c --quiet --time` (every capture with its
 predicates; parsing excluded), the minimum of three runs for each. A guard
 fails if the local exponent of the two times or the larger time exceeds the
-row's bound. Chains with method calls stay quadratic (S07-M03, open), so no
-guard covers them.
+row's bound, or if a run times out or prints no time (so does a recovery
+guard).
 
-| Row | Chain, sizes | Exponent | Larger run | Kind |
+| Row | Witness, sizes | Exponent | Larger run | Kind |
 |---|---|---|---|---|
 | member chain | `x = a` + `.b`, k = 2,000 and 16,000 | ≤ 1.5 | ≤ 500 ms | regression test of the Session 05-3 member pattern (before it: exponent 2.06, 2.2 s at k = 16,000) |
 | member and attribute chain | `x = a` + `.b@c`, k = 1,000 and 8,000 | ≤ 1.5 | ≤ 500 ms | the same for the attribute pattern (before it: 2.03, 2.1 s) |
+| method chain | `x = a` + `.b(1)`, k = 2,000 and 16,000 | ≤ 1.5 | ≤ 500 ms | regression test of the flat method call (tree-schema.md "Re-freeze of 0.1.0"; before it: 2.04, 9.4 s) |
+| statement method chain | `a` + `.b(1)`, k = 2,000 and 16,000 | ≤ 1.5 | ≤ 500 ms | the same as a statement (before it: 2.01, 8.5 s) |
+| mixed chain | `x = a` + `.b(1)[2]`, k = 1,000 and 8,000 | ≤ 1.5 | ≤ 500 ms | the same with index expressions (before it: 2.00, 3.4 s) |
+| optional chain | `x = a` + `?.b?(1)?[2]`, k = 1,000 and 8,000 | ≤ 1.5 | ≤ 500 ms | the same with optional chaining (before it: 1.98, 3.3 s) |
+| PRINT items | `print ` + `a;`, k = 2,000 and 16,000 | ≤ 1.5 | ≤ 500 ms | regression test of the flat PRINT item list (A5-01; before it: 2.13, 9.0 s) |
+| malformed minus, parenthesis, bracket | `x = ` + `-(-[`, k = 1,000 and 16,000 | ≤ 1.5 | ≤ 500 ms | regression test of the error-only tokens in a flat `ERROR` (QUERY-MALFORMED; before it: 1.80, 5.7 s) |
+| malformed parenthesis and minus | `x = ` + `(-`, k = 1,000 and 16,000 | ≤ 1.5 | ≤ 500 ms | the same (before it: 1.98, 1.7 s) |
+| malformed parentheses | `x = ` + `(`, k = 1,000 and 16,000 | ≤ 1.5 | ≤ 500 ms | the same (before it: 1.92, 413 ms) |
+| malformed brackets | `x = ` + `[`, k = 1,000 and 16,000 | ≤ 1.5 | ≤ 500 ms | the same (before it: 1.91, 369 ms) |
+| unclosed TRY blocks | `try⏎` with no prefix, k = 1,000 and 16,000 | ≤ 1.5 | ≤ 500 ms | the same (before it: 1.90, 701 ms) |
+
+The "before it" values of the rows added in Session 05-7 are these guards
+run on the grammar, parser and query of `47d4047` through the pinned CLI on
+the local Windows host (the live known-bad check of Session 05-7); every one
+of those rows fails there, and the older rows pass there as before. The same
+check on the candidate with a scanner that produces no token fails every B5
+row, and with the method-call pattern in parent form (`(call_expression
+property: (identifier) @function)`) every method, mixed and optional chain row.
+
+## Release qualification lane
+
+The CLI guards above run in hosted CI but cannot measure cancellation,
+callback gaps, tree deletion, allocator memory or the stock runtime without
+the CLI. The release qualification lane measures them on the local Windows
+host for one candidate identity:
+
+    python scripts/qualify/run.py --cc <gcc.exe> --runtime <tree-sitter 0.27.0 source root> --out <new dir>
+        --support 0.25.1=<source root> --support 0.26.13=<source root>
+
+It verifies each runtime source root against `scripts/qualify/runtime-<version>.sha256`
+(the blob list of the upstream tag), regenerates every generated input and
+compares it with `recorded-inputs.json`, builds the Job-object supervisor
+(`supervisor.c`) and passes its six-mode self-test (memory cap, watchdog,
+output cap, descendant termination, private environment), then builds, inside
+that supervisor, the stock runtime, the candidate parser and scanner and the
+native probe (`probe.c`: parse, query, navigation, cancellation, incremental
+edits and parser reuse through the public C API; a second build counts
+allocations), and regenerates the references H (`47d4047`, parser `2711f7cc…`)
+and BEFORE_PRINT (`8e2ad7c`, parser `3f3eafd1…`) from their commits. Every run
+is limited to 512 MiB of commit, 15 s and 8 MiB of output, one child at a time,
+with a private environment. It writes `identity.json`, every run
+(`runs.jsonl`) and the gate results (`gates.json`); its exit status is 0 only
+if every selected gate passes. A censored run (cap, watchdog, crash) fails its
+point. The bounds are those of protocol v3 (Session 05-2) and are not relaxed
+by the lane:
+
+| Gate | Inputs | Pass condition |
+|---|---|---|
+| B5-01-MEMORY | `x = ` + `+f([)` and `-f(-)` k ≤ 800, `x = ` + `{a:@*}<` k ≤ 600 | allocator peak live and working-set growth < 64 MiB; live-memory exponent of the two largest sizes ≤ 1.5 |
+| B5-02-LIFECYCLE | `print ` + `f([)` and `,+*`, k 1,000–20,000; `x = ` + `-f(-)` k ≤ 20,000 | parse, tree and parser deletion complete; call exponent 1,000 → 4,000 ≤ 1.5 |
+| A5-01-COST | PRINT items `a;`, `1;` k ≤ 32,000 and `a ` k ≤ 8,000 | query and cursor, field and index navigation, paired with BEFORE_PRINT: same work, ratio ≤ 1.5; exponents ≤ 1.5 |
+| CANCEL | the v3 cases and seven 1 MiB inputs registered to run past the budget | 200 ms budget: return ≤ 300 ms, deletion ≤ 100 ms, live memory after the budget < 64 MiB; the registered inputs are cancelled |
+| CANCEL-OVERSHOOT | cancellation and 1 MiB malformed inputs, budgets 25 ms–4 s | overshoot ≤ 100 ms |
+| MAX-CALLBACK-GAP, CLEANUP-ALL | the same and six 1 MiB valid inputs | progress-callback gap ≤ 100 ms; tree and parser deletion ≤ 100 ms |
+| LARGE-INPUT | 1 MiB malformed and valid inputs | completes, peak commit ≤ 256 MiB, parse ≤ 10 s (the PRINT-separator input time-exempt as in v3) |
+| QUERY-MALFORMED | six unclosed-group families, k 2,000 and 20,000 | full highlight query exponent ≤ 1.5 |
+| VALID-PARSE | PRINT items, six valid families 4–256 KiB, W03 | paired with H: ratio ≤ 1.5; exponent of the largest pairs ≤ 1.2 |
+| SEM-PUBLIC | the 2,811 inputs of the tree comparison | projection of the re-frozen schema onto H's (tree-schema.md "Re-freeze of 0.1.0") equal on every valid input; error presence equal; every mutant of the projection detected |
+| INCREMENTAL-REPAIR | 28 edit scripts | incremental parse equals a fresh parse; inverse edits restore the original; both comparators detect a planted difference |
+| RESUME-RESET | six registered inputs | resume after cancellation, reset and a new source each equal a fresh parse; two parsers are independent |
+| SUPPORT | B5 and A5-01 points on runtimes 0.25.1 and 0.26.13 | complete within the caps (the product runtime is 0.27.0) |
+| REGRESSION-SWEEP | 270 context × unit × line-end families, k 100, 400, 20,000 | no crash; memory growth < 64 MiB; exponent 400 → 20,000 ≤ 1.5 except the KL-002 units |
+| ABS-MEMORY | every registered B5, A5-01 and cancellation point | peak commit ≤ 128 MiB |
+
+The lane's result supports only the identity it names (`identity.json`:
+compiler, supervisor, candidate files, probe images, git HEAD). The CLI guards
+are its hosted subset; a lane gate is never inferred from a CLI guard.
 
 ## Highlight query changes
 

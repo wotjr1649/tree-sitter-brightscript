@@ -39,6 +39,8 @@ import tscli
 from corpus import read_corpus
 
 SCRIPTS = Path(__file__).resolve().parent
+# The release qualification runner (validation.md) is the one other file that starts programs.
+QUALIFY_RUNNER = SCRIPTS / "qualify" / "run.py"
 # Commands a CI run step may execute: the installer, the check scripts (which reach the CLI only through tscli)
 # and git. Anything else, for example `npm test` or `npx tree-sitter`, fails the structural test.
 # Arguments are limited to characters without shell meaning, so nothing can be chained after an allowed command.
@@ -235,7 +237,7 @@ class VerifiedCli(unittest.TestCase):
 
     def test_no_direct_cli_run(self):
         for path in sorted(SCRIPTS.rglob("*.py")):
-            if path.name not in ("tscli.py", "test_tscli.py"):
+            if path.name not in ("tscli.py", "test_tscli.py") and path != QUALIFY_RUNNER:
                 self.assertEqual(launches(path.read_text(encoding="utf-8")), [], path.name)
         for mutant in ('subprocess.run(["npx", "tree-sitter", "test"])', "BIN = 'node_modules/tree-sitter-cli/tree-sitter.exe'",
                        "subprocess.run(['npm', 'test'])", 'p = f"{ROOT}/node_modules/.bin/tree-sitter"',
@@ -269,6 +271,21 @@ class VerifiedCli(unittest.TestCase):
                        '      - "run": npx tree-sitter test\n', "      - run : npx tree-sitter test\n"):
             with self.assertRaises(ValueError, msg=unread):
                 ci_commands(unread)
+
+    def test_only_the_qualification_runner_is_exempt(self):
+        # validation.md "Release qualification lane": exactly one more file may start programs, it does (the
+        # exemption is not vacuous), it reaches the CLI only through tscli, and no workflow runs it.
+        source = QUALIFY_RUNNER.read_text(encoding="utf-8")
+        self.assertNotEqual(launches(source), [])
+        self.assertEqual([m.group(0) for m in LAUNCHERS.finditer(source)], [])
+        self.assertIn("import tscli", source)
+        exempt = [p for p in SCRIPTS.rglob("*.py") if p.name not in ("tscli.py", "test_tscli.py")
+                  and launches(p.read_text(encoding="utf-8"))]
+        self.assertEqual(exempt, [QUALIFY_RUNNER])
+        commands = [c for wf in sorted((SCRIPTS.parent / ".github/workflows").glob("*.y*ml"))
+                    for c in ci_commands(wf.read_text(encoding="utf-8"))]
+        self.assertFalse([c for c in commands if "qualify" in c])
+        self.assertFalse(allowed("python scripts/qualify/run.py --cc x"))
 
 
 LAUNCHERS = re.compile(r"\bEXE\b|tree-sitter-cli['\"]?\s*/|tree-sitter\.(exe|cmd)\b|['\"]tree-sitter['\"]|\.bin[/\\]"

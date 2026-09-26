@@ -21,11 +21,12 @@ Usage: python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N] 
   memory of the CLI process may grow from the smaller to the larger size by at
   most the row's bound (a growth, so that each OS's base memory cancels out).
   The exponent is printed so that a fix, or a worse regression, is visible.
-- Query scaling guards (validation.md "Query scaling guards"): each chain of
-  QUERY_GUARDS is queried at two sizes with the full highlight query
+- Query scaling guards (validation.md "Query scaling guards"): each witness
+  of QUERY_GUARDS is queried at two sizes with the full highlight query
   (`query -c --quiet --time`: every capture with its predicates, parsing
   excluded; minimum of three runs). The local exponent must not exceed the
   row's bound and the larger run must stay within the row's time.
+  A guard run that times out or prints no time fails its guard.
 Crash = a timeout, an exit status other than 0 or 1, or status 1 without the
 CLI's parse-error summary line (status 1 also reports failures to run). Error
 state is the root line of `--cst` output, read by scripts/tscli.py `has_error`
@@ -47,21 +48,39 @@ TIME_LIMIT = 10.0
 MEMORY_LIMIT = 1 << 30
 # (name, prefix, repeated unit, small k, large k, max exponent, max ms of the large parse, max MiB of memory
 # growth). The KL-002 rows are disclosed quadratic-time families; the others were fixed in Session 05-1
-# (R-A-01: time and memory; exponent and PRINT items: memory) and must stay so.
+# (R-A-01: time and memory; exponent and PRINT items: memory) or by the Session 05-7 recovery scanner (B5-01,
+# B5-02: the rest of a malformed line is one token) and must stay so.
 RECOVERY_GUARDS = [
     ("KL-002 prefix +/- (B-01)", b"x = ", b"+*", 250, 1000, 2.5, 3000, 32),
     ("KL-002 nested single-line IF", b"", b"if a\n*2", 250, 1000, 2.5, 3000, 32),
     ("KL-002 exponent, memory fixed", b"x = ", b"2^*", 500, 2000, 2.5, 5000, 24),
     ("KL-002 PRINT across lines", b"print ", b",+\n", 125, 500, 2.5, 5000, 32),
     ("R-A-01 unclosed calls (fixed)", b"x = ", b"f(*", 500, 2000, 1.5, 300, 24),
-    ("B4-01 PRINT items, memory fixed", b"print ", b"f([)", 1000, 4000, 1.5, 300, 24),
+    ("B4-01/B5-02 PRINT unclosed calls (fixed)", b"print ", b"f([)", 1000, 16000, 1.5, 50, 8),
+    ("B5-02 PRINT separators (fixed)", b"print ", b",+*", 1000, 16000, 1.5, 50, 8),
+    ("B5-02 minus and unclosed calls (fixed)", b"x = ", b"-f(-)", 1000, 16000, 1.5, 50, 8),
+    ("B5-01 prefix and unclosed calls (fixed)", b"x = ", b"+f([)", 250, 1000, 1.5, 50, 8),
+    ("B5-01 minus statements (fixed)", b"", b"-f(-)", 250, 1000, 1.5, 50, 8),
+    ("B5-01 associative arrays (fixed)", b"x = ", b"{a:@*}<", 250, 1000, 1.5, 50, 8),
 ]
 # (name, prefix, repeated unit, small k, large k, max exponent, max ms of the larger run). The highlight query on
-# valid left-deep chains (S07-M03): the member and attribute patterns match the operator and the name as siblings,
-# so no query state waits in every ancestor; with the parent form a member chain of 16,000 took 2.1 s.
+# left-deep chains (S07-M03): the member and attribute patterns match the operator and the name as siblings, so no
+# query state waits in every ancestor; with the parent form a member chain of 16,000 took 2.1 s. Method calls and
+# PRINT items are flat since Session 05-7 (tree-schema.md "Re-freeze of 0.1.0"), and so is the ERROR node of an
+# unclosed group (QUERY-MALFORMED: error-only tokens instead of nested rules).
 QUERY_GUARDS = [
     ("member chain (S07-M03)", b"x = a", b".b", 2000, 16000, 1.5, 500),
     ("member and attribute chain (S07-M03)", b"x = a", b".b@c", 1000, 8000, 1.5, 500),
+    ("method chain (S07-M03)", b"x = a", b".b(1)", 2000, 16000, 1.5, 500),
+    ("statement method chain (S07-M03)", b"a", b".b(1)", 2000, 16000, 1.5, 500),
+    ("mixed chain (S07-M03)", b"x = a", b".b(1)[2]", 1000, 8000, 1.5, 500),
+    ("optional chain (S07-M03)", b"x = a", b"?.b?(1)?[2]", 1000, 8000, 1.5, 500),
+    ("PRINT items (A5-01)", b"print ", b"a;", 2000, 16000, 1.5, 500),
+    ("malformed minus, parenthesis, bracket", b"x = ", b"-(-[", 1000, 16000, 1.5, 500),
+    ("malformed parenthesis and minus", b"x = ", b"(-", 1000, 16000, 1.5, 500),
+    ("malformed parentheses", b"x = ", b"(", 1000, 16000, 1.5, 500),
+    ("malformed brackets", b"x = ", b"[", 1000, 16000, 1.5, 500),
+    ("unclosed TRY blocks", b"", b"try\n", 1000, 16000, 1.5, 500),
 ]
 QUERY = ROOT / "queries/highlights.scm"
 
@@ -175,14 +194,19 @@ def scaling_verdict(small_bytes, small_ms, large_bytes, large_ms, growth_mib, ma
 def recovery_guards(tmp, fail):
     for name, prefix, unit, small, large, max_exponent, max_ms, max_growth in RECOVERY_GUARDS:
         sizes, problems = [], []
-        for k in (small, large):
-            path = tmp / f"guard-{k}.brs"
-            path.write_bytes(witness(unit, k, prefix))
-            ms = min(parse_ms(path) for _ in range(3))
-            code, _, peak, _ = (run if sys.platform == "win32" else run_posix)(path)
-            if code is None or peak < 0:
-                problems.append(f"k={k}: hang or memory not measured")
-            sizes.append((path.stat().st_size, ms, peak / 2**20))
+        try:
+            for k in (small, large):
+                path = tmp / f"guard-{k}.brs"
+                path.write_bytes(witness(unit, k, prefix))
+                ms = min(parse_ms(path) for _ in range(3))
+                code, _, peak, _ = (run if sys.platform == "win32" else run_posix)(path)
+                if code is None or peak < 0:
+                    problems.append(f"k={k}: hang or memory not measured")
+                sizes.append((path.stat().st_size, ms, peak / 2**20))
+        except (RuntimeError, subprocess.TimeoutExpired) as e:
+            print(f"  {name}: FAIL {e}")
+            fail.append(f"{name} guard: {e}")
+            continue
         (sb, sm, speak), (lb, lm, lpeak) = sizes
         exponent, more = scaling_verdict(sb, sm, lb, lm, lpeak - speak, max_exponent, max_ms, max_growth)
         problems += more
@@ -204,10 +228,15 @@ def query_ms(path, query=QUERY):
 def query_guards(tmp, fail, query=QUERY):
     for name, prefix, unit, small, large, max_exponent, max_ms in QUERY_GUARDS:
         sizes = []
-        for k in (small, large):
-            path = tmp / f"query-guard-{k}.brs"
-            path.write_bytes(witness(unit, k, prefix))
-            sizes.append((path.stat().st_size, min(query_ms(path, query) for _ in range(3))))
+        try:
+            for k in (small, large):
+                path = tmp / f"query-guard-{k}.brs"
+                path.write_bytes(witness(unit, k, prefix))
+                sizes.append((path.stat().st_size, min(query_ms(path, query) for _ in range(3))))
+        except (RuntimeError, subprocess.TimeoutExpired) as e:
+            print(f"  {name}: FAIL {e}")
+            fail.append(f"{name} query guard: {e}")
+            continue
         (sb, sm), (lb, lm) = sizes
         exponent, problems = scaling_verdict(sb, sm, lb, lm, 0, max_exponent, max_ms, 0)
         print(f"  {name}: k={small} {sb:,} bytes {sm:.2f} ms; k={large} {lb:,} bytes {lm:.2f} ms; exponent {exponent:.2f} "
