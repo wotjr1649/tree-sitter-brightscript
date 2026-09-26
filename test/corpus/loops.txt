@@ -75,9 +75,8 @@ end for
   (for_each_statement
     item: (identifier)
     collection: (call_expression
-      function: (member_expression
-        object: (identifier)
-        property: (identifier))
+      object: (identifier)
+      property: (identifier)
       arguments: (argument_list))
     body: (block)))
 

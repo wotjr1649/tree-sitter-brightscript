@@ -1,0 +1,54 @@
+0:0   - 14:0    •source_file
+0:0   - 10:7      •function_declaration
+0:0   - 0:3          "sub"
+0:4   - 0:8          name: identifier `main`
+0:8   - 0:10         parameters: parameter_list
+0:8   - 0:9            "("
+0:9   - 0:10           ")"
+0:10  - 10:0        body: •block
+1:2   - 4:3           •assignment_statement
+1:2   - 1:3              left: identifier `t`
+1:4   - 1:5              "="
+1:6   - 4:3             right: •associative_array_literal
+1:6   - 1:7                "{"
+2:4   - 2:8                associative_array_entry
+2:4   - 2:5                  key: identifier `a`
+2:5   - 2:6                  ":"
+2:7   - 2:8                  value: number `1`
+2:8   - 2:9               ","
+3:4   - 3:8               associative_array_entry
+3:4   - 3:5                 key: identifier `b`
+3:5   - 3:6                 ":"
+3:7   - 3:8                 value: number `2`
+3:8   - 3:9               ","
+3:10  - 3:11              •ERROR `+`
+4:2   - 4:3               "}"
+5:2   - 8:3           •assignment_statement
+5:2   - 5:3             left: identifier `v`
+5:4   - 5:5             "="
+5:6   - 8:3             right: •array_literal
+5:6   - 5:7               "["
+6:4   - 6:5               number `1`
+6:5   - 6:6               ","
+6:7   - 6:8               number `2`
+6:9   - 6:10              •ERROR
+6:9   - 6:10                open_bracket `[`
+7:4   - 7:5               number `3`
+8:2   - 8:3               "]"
+9:2   - 9:7           assignment_statement
+9:2   - 9:3             left: identifier `z`
+9:4   - 9:5             "="
+9:6   - 9:7             right: number `1`
+10:0  - 10:7        "end sub"
+11:0  - 13:7      function_declaration
+11:0  - 11:3        "sub"
+11:4  - 11:9        name: identifier `other`
+11:9  - 11:11       parameters: parameter_list
+11:9  - 11:10         "("
+11:10 - 11:11         ")"
+11:11 - 13:0        body: block
+12:2  - 12:7          assignment_statement
+12:2  - 12:3            left: identifier `y`
+12:4  - 12:5            "="
+12:6  - 12:7            right: number `2`
+13:0  - 13:7        "end sub"

@@ -33,16 +33,15 @@ jobs:
         run: python scripts/check_v0.py
       - name: Generator identity, regeneration drift and determinism
         run: python scripts/check_generated.py
+      - name: Verified CLI path self-test
+        run: python scripts/test_tscli.py
       - name: Registry, catalogue and corpus consistency
         run: python scripts/check_registry.py --complete
       - name: Schema reconciliation and catalogue
         run: python scripts/check_schema.py
       - name: Corpus
-        run: npx tree-sitter test
-        env:
-          # Private parser library and configuration (validation.md "Identity binding").
-          TREE_SITTER_LIBDIR: ${{ runner.temp }}/tree-sitter-lib
-          TREE_SITTER_DIR: ${{ runner.temp }}/tree-sitter-config
+        # Verified binary, private parser library and configuration (validation.md "Identity binding").
+        run: python scripts/tscli.py test
       - name: Composite samples (W03) and equivalent spellings (W05)
         run: |
           python scripts/check_samples.py

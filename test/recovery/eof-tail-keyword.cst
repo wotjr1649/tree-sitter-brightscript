@@ -1,0 +1,10 @@
+0:0  - 0:49   •source_file
+0:0  - 0:49     •ERROR
+0:0  - 0:1         identifier `x`
+0:2  - 0:3         "="
+0:4  - 0:5         plus_sign `+`
+0:5  - 0:6         identifier `f`
+0:6  - 0:7         open_parenthesis `(`
+0:7  - 0:8         open_bracket `[`
+0:8  - 0:9         ")"
+0:45 - 0:49        "next"

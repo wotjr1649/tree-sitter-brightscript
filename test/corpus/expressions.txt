@@ -52,14 +52,12 @@ m.f(1, 2)
         index: (number))
       arguments: (argument_list)))
   (call_expression
-    function: (member_expression
-      object: (identifier)
-      property: (identifier))
+    object: (identifier)
+    property: (identifier)
     arguments: (argument_list))
   (call_expression
-    function: (member_expression
-      object: (identifier)
-      property: (identifier))
+    object: (identifier)
+    property: (identifier)
     arguments: (argument_list
       (number)
       (number))))
@@ -74,22 +72,20 @@ y = f().a.b
 
 (source_file
   (call_expression
-    function: (member_expression
-      object: (member_expression
-        object: (identifier)
-        property: (identifier))
+    object: (member_expression
+      object: (identifier)
       property: (identifier))
+    property: (identifier)
     arguments: (argument_list
       (number)))
   (assignment_statement
     left: (identifier)
     right: (call_expression
-      function: (member_expression
-        object: (parenthesized_expression
-          (binary_expression
-            left: (number)
-            right: (number)))
-        property: (identifier))
+      object: (parenthesized_expression
+        (binary_expression
+          left: (number)
+          right: (number)))
+      property: (identifier)
       arguments: (argument_list)))
   (assignment_statement
     left: (identifier)
@@ -173,13 +169,12 @@ x = array?[3]?.foo?.bar?()
   (assignment_statement
     left: (identifier)
     right: (call_expression
-      function: (member_expression
-        object: (member_expression
-          object: (index_expression
-            object: (identifier)
-            index: (number))
-          property: (identifier))
+      object: (member_expression
+        object: (index_expression
+          object: (identifier)
+          index: (number))
         property: (identifier))
+      property: (identifier)
       arguments: (argument_list))))
 
 ================================================================================

@@ -43,6 +43,10 @@ The grammar version in `tree-sitter.json` is embedded in generated
 | Internal change only | PATCH if `node-types.json` is unchanged, otherwise MINOR | MINOR |
 | Fix with no node-type or structure change | PATCH | PATCH |
 
+Before its first publication, a frozen version's public tier may be
+re-frozen under [ADR-0007](../design/decisions/ADR-0007-pre-release-schema-refreeze.md);
+the table applies from the first publication on.
+
 From 1.0 this matches Tree-sitter's
 [publishing guidance](https://tree-sitter.github.io/tree-sitter/creating-parsers/6-publishing.html)
 (incompatible node-type or structure changes are major; new node types are
@@ -58,10 +62,13 @@ nodes are updated in the same commit.
 ## Catalogue
 
 Reconciled in Session 03 (WP17) with `src/node-types.json` of grammar
-version 0.1.0: every planned node, supertype, field (name, types, optional
-and repeated) and unnamed-children entry of the planned schema below equals
-the generated schema, and no unplanned public node exists; the planned schema
-needed no change (`scripts/check_schema.py`). One representational
+version 0.1.0 and re-frozen in Session 05-7 under
+[ADR-0007](../design/decisions/ADR-0007-pre-release-schema-refreeze.md): every
+planned node, supertype, field (name, types, optional and repeated) and
+unnamed-children entry of the planned schema below equals the generated
+schema, and no unplanned public node exists (`scripts/check_schema.py`). The
+re-freeze changed three things, listed under [Re-freeze of
+0.1.0](#re-freeze-of-010). One representational
 difference is not a schema difference: `node-types.json` never lists extras
 as children, so the `comment` children of `inactive_text` (and comments
 elsewhere) do not appear in it. The nodes below are the public tier. The
@@ -80,7 +87,7 @@ table is generated from `node-types.json` and checked by the same script;
 | `attribute_expression` | `attribute: identifier`, `object: attribute_expression \| call_expression \| identifier \| index_expression \| member_expression \| parenthesized_expression` | — |
 | `binary_expression` | `left: expression`, `operator: "*" \| "+" \| "-" \| "/" \| "<" \| "<<" \| "<=" \| "<>" \| "=" \| ">" \| ">=" \| ">>" \| "\" \| "^" \| "and" \| "mod" \| "or"`, `right: expression` | — |
 | `block` | — | `statement`* |
-| `call_expression` | `arguments: argument_list`, `function: attribute_expression \| call_expression \| identifier \| index_expression \| member_expression \| parenthesized_expression` | — |
+| `call_expression` | `arguments: argument_list`, `function?: attribute_expression \| call_expression \| identifier \| index_expression \| parenthesized_expression`, `object?: attribute_expression \| call_expression \| identifier \| index_expression \| member_expression \| number \| parenthesized_expression \| string`, `property?: identifier` | — |
 | `catch_clause` | `body: block`, `variable: identifier` | — |
 | `comment` (extra) | — | — |
 | `const_directive` | `name: identifier`, `value: false \| identifier \| true` | — |
@@ -108,18 +115,24 @@ table is generated from `node-types.json` and checked by the same script;
 | `label_statement` | `name: identifier` | — |
 | `library_statement` | `path: string` | — |
 | `member_expression` | `object: attribute_expression \| call_expression \| identifier \| index_expression \| member_expression \| number \| parenthesized_expression \| string`, `property: identifier` | — |
+| `minus_sign` | — | — |
+| `not_operator` | — | — |
 | `number` | — | — |
+| `open_bracket` | — | — |
+| `open_parenthesis` | — | — |
 | `parameter` | `default?: expression`, `name: identifier`, `type?: type` | — |
 | `parameter_list` | — | `parameter`* |
 | `parenthesized_expression` | — | `expression` |
-| `print_statement` | — | `expression`* |
+| `plus_sign` | — | — |
+| `print_statement` | — | `anonymous_function \| array_literal \| associative_array_literal \| attribute_expression \| binary_expression \| call_expression \| false \| identifier \| index_expression \| invalid \| member_expression \| number \| parenthesized_expression \| source_literal \| string \| true \| unary_expression`* |
 | `return_statement` | `value?: expression` | — |
-| `source_file` | — | `statement`* |
+| `source_file` | — | `minus_sign \| not_operator \| open_bracket \| open_parenthesis \| plus_sign \| statement \| try_keyword`* |
 | `source_literal` | — | — |
 | `stop_statement` | — | — |
 | `string` | — | — |
 | `throw_statement` | `value: expression` | — |
 | `true` | — | — |
+| `try_keyword` | — | — |
 | `try_statement` | `body: block`, `handler: catch_clause` | — |
 | `type` | — | — |
 | `unary_expression` | `operand: expression`, `operator: "+" \| "-" \| "not"` | — |
@@ -130,7 +143,23 @@ Supertype `expression`: `anonymous_function`, `array_literal`, `associative_arra
 
 Supertype `statement`: `assignment_statement`, `call_expression`, `const_directive`, `continue_statement`, `dim_statement`, `end_statement`, `error_directive`, `exit_statement`, `for_each_statement`, `for_statement`, `function_declaration`, `goto_statement`, `if_directive`, `if_statement`, `label_statement`, `library_statement`, `print_statement`, `return_statement`, `stop_statement`, `throw_statement`, `try_statement`, `update_statement`, `while_statement`.
 
-Counts: 54 named node types, 2 supertypes, 33 field names.
+Counts: 60 named node types, 2 supertypes, 33 field names.
+
+### Re-freeze of 0.1.0
+
+Made before the first publication under
+[ADR-0007](../design/decisions/ADR-0007-pre-release-schema-refreeze.md); the
+accepted language, error presence and source spans are unchanged.
+
+| Change | Before | After | Reason |
+|---|---|---|---|
+| Call of a member | `call_expression` with `function: member_expression(object, property)` | one `call_expression` with `object`, `property` and `arguments` (Placement rules) | the called name and its argument list are siblings, so the highlight query stays linear on method chains (S07-M03) |
+| PRINT items in `node-types.json` | children `expression`* | children listed as the 17 subtypes of `expression` | items are not wrapped in a hidden `expression` node, which halves the memory of long PRINT lists (S08-M01); every tree is unchanged |
+| Error-only names | the tokens `(`, `[`, `-`, `+`, `not`, `try` inside `ERROR` nodes were anonymous | inside `ERROR` nodes only, they appear as the named leaves `open_parenthesis`, `open_bracket`, `minus_sign`, `plus_sign`, `not_operator`, `try_keyword`; in every valid tree they keep their anonymous names | a long run of unclosed openers or prefix operators became an `ERROR` node of anonymous children, on which the stock query cursor is quadratic (S07-M03); `node-types.json` lists the names as possible `source_file` children only because the generator keeps a raw name only if some rule uses it unaliased ([ADR-0008](../design/decisions/ADR-0008-error-recovery-scanner.md)) |
+
+Old and new valid trees are compared by applying the first row to the old
+tree: the results are identical on every valid input of the release evidence
+(`docs/reports/0.1.0-integrated-qualification.md`).
 
 ## Planned public schema
 
@@ -166,7 +195,7 @@ or more. Unnamed children are named nodes without a field.
 
 | Node | Fields | Unnamed children | Requirements | Query use |
 |---|---|---|---|---|
-| `source_file` | — | `statement`* | BS-STMT-033, BS-LEX-008 | root |
+| `source_file` | — | `statement`, and in `node-types.json` only, the error-only `minus_sign`, `not_operator`, `open_bracket`, `open_parenthesis`, `plus_sign`, `try_keyword`* | BS-STMT-033, BS-LEX-008 | root |
 | `comment` | — | — | BS-LEX-012–014 | highlight |
 | `identifier` | — | — | BS-LEX-015, 017, 018, 024, BS-LIT-020, BS-FUNC-013 | highlight, tags |
 | `number` | — | — | BS-LIT-003, 005–012 | highlight |
@@ -178,9 +207,9 @@ or more. Unnamed children are named nodes without a field.
 | `associative_array_literal` | — | `associative_array_entry`* | BS-AA-001–004 | — |
 | `associative_array_entry` | `key: identifier or string`, `value: expression` | — | BS-AA-001, 002, BS-LEX-024 | highlight (key) |
 | `parenthesized_expression` | — | `expression` | BS-EXP-002 | — |
-| `unary_expression` | `operator: - + not`, `operand: expression` | — | BS-LIT-004, BS-EXP-012, 018, 027 | highlight (operator) |
+| `unary_expression` | `operator: - + not`, `operand: expression` | — | BS-LIT-004, BS-EXP-012, 018, 027, 028 | highlight (operator) |
 | `binary_expression` | `left: expression`, `operator: ^ * / \ mod + - << >> = <> < > <= >= and or`, `right: expression` | — | BS-EXP-011–020, 027 | highlight (operator) |
-| `call_expression` | `function: identifier, member_expression, index_expression, call_expression, attribute_expression or parenthesized_expression`, `arguments: argument_list` | — | BS-EXP-003, 007, 010, BS-STMT-005, BS-LEX-022, 032 | highlight, tags (calls) |
+| `call_expression` | a call of a member: `object: identifier, parenthesized_expression, call_expression, member_expression, index_expression, attribute_expression, number or string`?, `property: identifier`?; any other call: `function: identifier, index_expression, call_expression, attribute_expression or parenthesized_expression`?; always `arguments: argument_list` | — | BS-EXP-003, 007, 010, BS-STMT-005, BS-LEX-022, 032 | highlight, tags (calls) |
 | `argument_list` | — | `expression`* | BS-EXP-003 | — |
 | `member_expression` | `object: identifier, parenthesized_expression, call_expression, member_expression, index_expression, attribute_expression, number or string`, `property: identifier` | — | BS-EXP-004, 007, BS-LIT-014, BS-LEX-024 | highlight (property) |
 | `index_expression` | `object: identifier, parenthesized_expression, call_expression, member_expression, index_expression or attribute_expression`, `index: expression`+ | — | BS-EXP-005, 007, BS-ARRAY-007 | — |
@@ -198,7 +227,7 @@ or more. Unnamed children are named nodes without a field.
 | `exit_statement` | — | — | BS-STMT-018, 020 | highlight |
 | `continue_statement` | — | — | BS-STMT-019 | highlight |
 | `return_statement` | `value: expression`? | — | BS-STMT-023 | — |
-| `print_statement` | — | `expression`* | BS-STMT-024–026, 039, BS-LEX-031, 035 | — |
+| `print_statement` | — | the subtypes of the expression supertype, named directly: `identifier`, `number`, `string`, `true`, `false`, `invalid`, `source_literal`, `array_literal`, `associative_array_literal`, `parenthesized_expression`, `anonymous_function`, `unary_expression`, `binary_expression`, `call_expression`, `member_expression`, `index_expression`, `attribute_expression`* | BS-STMT-024–026, 039, 040, BS-LEX-031, 035 | — |
 | `dim_statement` | `name: identifier`, `dimension: expression`+ | — | BS-ARRAY-004, 005 | — |
 | `goto_statement` | `label: identifier` | — | BS-STMT-027 | tags (label reference) |
 | `label_statement` | `name: identifier` | — | BS-LEX-027, 028 | highlight, tags |
@@ -216,27 +245,33 @@ or more. Unnamed children are named nodes without a field.
 | `if_directive` | `condition: identifier, true or false`, `consequence: block or inactive_text`, `alternative: else_if_directive* else_directive?` | — | BS-COND-002, 006, 007, 012 | highlight |
 | `else_if_directive` | `condition: identifier, true or false`, `consequence: block or inactive_text` | — | BS-COND-003, 007 | highlight |
 | `else_directive` | `body: block` | — | BS-COND-003 | highlight |
-| `error_directive` | `message: error_message`? | — | BS-COND-004 | highlight |
+| `error_directive` | `message: error_message`? | — | BS-COND-004, 015 | highlight |
 | `error_message` | — | — | BS-COND-004 | highlight |
 | `inactive_text` | — | `comment`* (other text is hidden) | BS-COND-007 | highlight |
+| `open_parenthesis`, `open_bracket`, `minus_sign`, `plus_sign`, `not_operator`, `try_keyword` | — | — | none: error-only raw token names ([ADR-0008](../design/decisions/ADR-0008-error-recovery-scanner.md)) | highlight (inside `ERROR`) |
 
 `inactive_text` depended on the ADR-0004 spike
 ([grammar-design.md §11](grammar-design.md#11-conditional-compilation)); the
 spike passed with design V1, so it is part of the schema. Counts:
-53 unconditional node types (`true` and `false` counted separately) and the
-conditional `inactive_text`, 2 supertypes, 33 field names; the spike passed,
-so all 54 node types are in the catalogue.
+53 unconditional node types (`true` and `false` counted separately), the
+conditional `inactive_text` and the six error-only names, 2 supertypes, 33
+field names; all 60 node types are in the catalogue.
 
-Rules applied: every node cites at least one requirement; `block`,
-`argument_list` and `parameter_list` are public because fields point to them
-and queries match them, not for parser convenience; hidden helpers
-(`_line`, `_terminator`, `_newline`, `_block_if`, `_single_line_if`,
-`_inline_else`, `_inline_block`, `_inline_statement`, `_print_item`,
-`_try_body`, `_try_line`, `_postfix_operand`, `_assignment_target`, the
+Rules applied: every node cites at least one requirement, except the six
+error-only names, which exist for [ADR-0008](../design/decisions/ADR-0008-error-recovery-scanner.md);
+`block`, `argument_list` and `parameter_list` are public because fields point
+to them and queries match them, not for parser convenience; hidden helpers
+(`_line`, `_line_end`, `_terminator`, `_newline`, `_block_head`, `_body` (aliased
+`block`), `_body_start`, `_body_head`, `_block_if`,
+`_single_line_if`, `_inline_else`, `_inline_block`, `_inline_statement`,
+`_print_items`, `_print_item`, `_print_expression`, `_try_body`, `_try_line`,
+`_postfix_operand`, `_callee`, `_pow_left`, `_assignment_target`, the
 statement-level chain `_stmt_chain` with `_stmt_member`, `_stmt_index`,
-`_stmt_call` and `_stmt_arguments`, `_sep`, `_cc_condition`,
-`_inactive_item`, `_inactive_line`, `_inactive_if`) stay internal; punctuation, keywords and the
-single-token block terminators stay anonymous. `exit_statement` and
+`_stmt_call`, `_stmt_callee`, `_stmt_method_call` and `_stmt_arguments`, the
+block headers `_for_header`, `_for_each_header`, `_while_header` and
+`_anonymous_function_header`, `_sep`, `_cc_condition`, `_inactive_item`,
+`_inactive_line`, `_inactive_if`, `_error_token_forms`) stay internal;
+punctuation, keywords and the single-token block terminators stay anonymous. `exit_statement` and
 `continue_statement` have no field for the loop kind: it is the anonymous
 keyword token (`for`, `while` or `exitwhile`), and a field would point at
 tokens of different shapes. Every planned node and field is intended to
@@ -263,8 +298,15 @@ a parser:
   rules appear under the alias name with the planned fields: `_inline_block`
   and `_try_body` → `block`, `_single_line_if` → `if_statement`,
   `_inline_else` → `else_clause`, `_stmt_member` → `member_expression`,
-  `_stmt_index` → `index_expression`, `_stmt_call` → `call_expression`,
-  `_stmt_arguments` → `argument_list`.
+  `_stmt_index` → `index_expression`, `_stmt_call` and `_stmt_method_call` →
+  `call_expression`, `_stmt_arguments` → `argument_list`.
+- A call whose callee is a member access (`a.b(1)`, `a?.b(1)`, `m.f(1, 2)`)
+  is one `call_expression` with `object`, the `.` or `?.` token, `property` and
+  `arguments`, and no `function` field; no `member_expression` wraps the
+  called name. Every other call has `function` and `arguments`: an
+  identifier, index, call, attribute or parenthesized callee, so
+  `(a.b)(1)` keeps a `parenthesized_expression` holding the
+  `member_expression`.
 
 ### Fields
 
@@ -280,10 +322,10 @@ a parser:
 | `right` | assigned value or right operand | `assignment_statement`, `binary_expression` |
 | `operator` | operator token | `assignment_statement`, `binary_expression`, `unary_expression`, `update_statement` |
 | `operand` | operand of a prefix or update operator | `unary_expression`, `update_statement` |
-| `function` | called expression | `call_expression` |
+| `function` | called expression, when it is not a member access | `call_expression` |
 | `arguments` | argument list | `call_expression` |
-| `object` | accessed value | `member_expression`, `index_expression`, `attribute_expression` |
-| `property` | member name | `member_expression` |
+| `object` | accessed value; for a call of a member, the value whose member is called | `member_expression`, `index_expression`, `attribute_expression`, `call_expression` |
+| `property` | member name; for a call of a member, the called name | `member_expression`, `call_expression` |
 | `index` | one index expression, repeated for `a[i, j]` | `index_expression` |
 | `attribute` | XML attribute name | `attribute_expression` |
 | `key` | entry key | `associative_array_entry` |
@@ -405,6 +447,7 @@ hidden rules or anonymous children).
 | BS-EXP-020 | S | `binary_expression`, `assignment_statement` |
 | BS-EXP-021 | S | nesting of postfix nodes |
 | BS-EXP-027 | S | `unary_expression` inside `binary_expression` |
+| BS-EXP-028 | S | `unary_expression` inside `unary_expression` |
 | BS-STMT-001 | S | `assignment_statement` |
 | BS-STMT-002 | N | `assignment_statement` (`operator`) |
 | BS-STMT-003 | S | `update_statement` |
@@ -436,6 +479,7 @@ hidden rules or anonymous children).
 | BS-STMT-035 | S | `block` |
 | BS-STMT-036 | S | block-structured statement nodes |
 | BS-STMT-039 | N | `print_statement` |
+| BS-STMT-040 | N | `print_statement` |
 | BS-FUNC-001 | S | `function_declaration`, `parameter_list` |
 | BS-FUNC-002 | N | `function_declaration` |
 | BS-FUNC-003 | N | `function_declaration` |
@@ -468,9 +512,10 @@ hidden rules or anonymous children).
 | BS-COND-007 | S | `if_directive` with `inactive_text` |
 | BS-COND-008 | L | directive tokens and line terminators |
 | BS-COND-012 | S | `if_directive` inside `block` |
+| BS-COND-015 | S | `error_directive` without `message` |
 
 `invalid`, `unresolved` and `out-of-scope` rows need no shape; `tolerated` rows are listed because they are implemented. Requirements
 without a planned shape: 0 (counts in the next line are checked
 mechanically).
 
-Mapped: 130 (S 79, N 26, L 25).
+Mapped: 133 (S 81, N 27, L 25).

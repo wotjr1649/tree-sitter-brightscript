@@ -18,7 +18,14 @@ link to it rather than restate it.
 | [validation/workload-matrix.md](validation/workload-matrix.md) | Validation sets W01–W14 and the catalogue of every corpus fixture | Writing fixtures; running V2–V10 |
 | [validation/known-regressions.md](validation/known-regressions.md) | Defects of earlier grammars and the checks that prevent them | Reviewing grammar or generation changes |
 | [reports/0.1.0-release-candidate.md](reports/0.1.0-release-candidate.md) | Release-candidate evidence, gate results and verdict for 0.1.0 | Checking what the candidate proves |
-| [reports/0.1.0-release-audit.md](reports/0.1.0-release-audit.md) | Independent audit of the candidate, evidence remediation, reverification and promotion verdict | Promoting or releasing 0.1.0 |
+| [reports/0.1.0-release-audit.md](reports/0.1.0-release-audit.md) | Independent audit of the candidate, evidence remediation, reverification and promotion verdict | Checking the Session 04 audit |
+| [reports/0.1.0-performance.md](reports/0.1.0-performance.md) | Measured parse, recovery, incremental, query and memory baseline of 0.1.0 | Judging performance or a performance change |
+| [reports/0.1.0-comparative-conformance.md](reports/0.1.0-comparative-conformance.md) | 0.1.0 against the legacy grammar and BrighterScript, under official evidence | Claiming an improvement over earlier grammars |
+| [reports/0.1.0-release.md](reports/0.1.0-release.md) | Final 0.1.0 release record: identity, gates, dispositions, limitations, verdict | Consuming or auditing the 0.1.0 release |
+| [reports/0.1.0-structural-recovery-safety.md](reports/0.1.0-structural-recovery-safety.md) | Causes of the open 0.1.0 hold findings, candidates compared, stricter checks and the Gate A decision | Deciding how to remediate the 0.1.0 hold |
+| [reports/session-05-3-repository-owned-hardening.md](reports/session-05-3-repository-owned-hardening.md) | The Session 05-3 query change, its role and time comparison, what stays open | Changing the highlight query |
+| [reports/0.1.0-integrated-qualification.md](reports/0.1.0-integrated-qualification.md) | The re-frozen 0.1.0 candidate of Session 05-7: identity, closure status of the seven blocking findings, lane and highlight results, limitations | Checking the current 0.1.0 candidate |
+| [reports/session-05-4-grammar-schema-stock-runtime.md](reports/session-05-4-grammar-schema-stock-runtime.md) | Grammar and schema redesigns screened on the stock runtime, why none qualified, what stays open | Considering a grammar or public-tree change for the 0.1.0 hold |
 
 Repository-wide operating rules for contributors and coding agents are in
 `AGENTS.md` at the repository root.

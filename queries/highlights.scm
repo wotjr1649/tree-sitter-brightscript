@@ -29,28 +29,33 @@
   (#match? @variable.builtin "^[mM]$"))
 
 ; Members, keys and XML attributes
-(member_expression
-  property: (identifier) @property)
+; A member property is the identifier right after `.` or `?.`; matching the
+; sibling pair, not the parent, keeps left-deep chains linear (S07-M03).
+(["." "?."] . (identifier) @property)
 
 (associative_array_entry
   key: (identifier) @property)
 
-(attribute_expression
-  attribute: (identifier) @attribute)
+; Likewise the identifier right after `@` or `?@`.
+(["@" "?@"] . (identifier) @attribute)
 
 ; Functions
 (function_declaration
   name: (identifier) @function)
 
+; `function` is the first child of the call form it belongs to; the anchor ends
+; the pattern on a method call, whose first child is `object` (S07-M03).
 (call_expression
+  .
   function: (identifier) @function)
 
-(call_expression
-  function: (member_expression
-    property: (identifier) @function))
+; A method call: the called name comes right after `.` or `?.` and right before
+; its argument list, as siblings, which keeps method chains linear (S07-M03).
+(["." "?."] . (identifier) @function . (argument_list))
 
 ; Calls of reserved callable names, in any letter case (BS-LEX-022)
 (call_expression
+  .
   function: (identifier) @function.builtin
   (#match? @function.builtin "^([bB][oO][xX]|[cC][rR][eE][aA][tT][eE][oO][bB][jJ][eE][cC][tT]|[eE][vV][aA][lL]|[gG][eE][tT][gG][lL][oO][bB][aA][lL][aA][aA]|[gG][eE][tT][lL][aA][sS][tT][rR][uU][nN][cC][oO][mM][pP][iI][lL][eE][eE][rR][rR][oO][rR]|[gG][eE][tT][lL][aA][sS][tT][rR][uU][nN][rR][uU][nN][tT][iI][mM][eE][eE][rR][rR][oO][rR]|[pP][oO][sS]|[rR][uU][nN]|[tT][aA][bB]|[tT][yY][pP][eE])$"))
 
@@ -171,6 +176,15 @@
   "?("
 ] @operator
 
+; Error-only raw forms (tree-schema.md): the same roles inside ERROR nodes.
+[
+  (minus_sign)
+  (plus_sign)
+  (not_operator)
+] @operator
+
+(try_keyword) @keyword
+
 ; Punctuation
 [
   "("
@@ -179,6 +193,8 @@
   "]"
   "{"
   "}"
+  (open_parenthesis)
+  (open_bracket)
 ] @punctuation.bracket
 
 [

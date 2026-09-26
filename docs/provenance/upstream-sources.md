@@ -75,6 +75,34 @@ stands unchanged; the Roku OS 15.3 section still does not mention line
 continuation (BS-EXP-023). Level 1 snapshot identity of the release
 candidate: `roku-docs-2026-09-23-r2` (content equal to `roku-docs-2026-09-23`).
 
+### Level 1 refresh `roku-docs-2026-09-26`
+
+Taken 2026-09-26T03:29:09Z–03:29:25Z (Session 05-7, before the re-frozen
+release candidate) with the same `curl` command and stored beside the earlier
+snapshots in the local `_ref/normative/roku-docs-2026-09-26/`; they are
+unchanged. Every route answered HTTP 200 with no redirect; page-declared
+modification times are unchanged.
+
+| Route | Content-region SHA-256 | Region bytes | Compared with `roku-docs-2026-09-23-r2` |
+|---|---|---|---|
+| `brightscript-language-reference` | `fbf20981bd408f86d84bb3582e4e42d320cea6c5b1d9b49f1896f21755fdc9e9` | 2,811 | unchanged |
+| `statement-summary` | `8020ea7624129d2ddf45a3e1df02f4f6163fe98614da98003b958923d8dca797` | 2,472 | unchanged |
+| `program-statements` | `6fafd31136b4e00721447570ea0bfe3ac498a07af912ea25bdd424538b74dc69` | 37,874 | unchanged |
+| `expressions-variables-types` | `38bee10d10baa5a00d680f66b1e57790fc83558b5f50d8eaef1c7ba2340fabc3` | 51,174 | unchanged |
+| `reserved-words` | `32260686e464b8810c56c8fbc69a329435a3bf17736b0bb0973c97fba34f6ecf` | 1,254 | unchanged |
+| `conditional-compilation` | `631e08f6686f1edf7afacdd98767b9e42e6f5fcd1898cec83562cb7d7283c87c` | 8,436 | unchanged |
+| `error-handling` | `ad6dfc415d3a74e00d9ae2f95c3963e15a12f105480d9c818c9dcf8afaf1973b` | 32,667 | unchanged |
+| `release-notes` | `ff4a8110bcc226125f9d60587163048d328113b61d0bbb0830d38dc712ee07c1` | 311,640 | changed hash, no text change (below) |
+| `component-architecture` | `eaf5c5ca0129e292ad15e8341e4bec43a27f3799c2550202a71c04c1b1f9076f` | 47,229 | unchanged |
+| `runtime-functions` | `3541a3c20253b08330a84d853964dd474c818e6821183d999957599ef3cc4375` | 11,363 | unchanged |
+
+Review of the changed page: as in the previous refresh, the 48 differing bytes
+of the `release-notes` region all lie inside the two Cloudflare
+email-protection tokens; with both masked the regions are byte-identical. The
+requirements citing the page (listed above) stand unchanged. Level 1 snapshot
+identity of the Session 05-7 release candidate: `roku-docs-2026-09-26`
+(content equal to `roku-docs-2026-09-23`).
+
 ## Level 3 — Tree-sitter
 
 | Item | Identity (observed 2026-09-23) |
@@ -110,8 +138,10 @@ commit `6070dbfefd326bd735e5683eb128cc1b57dad0c0`; release published
 npm 12 blocks dependency install scripts unless `package.json` `allowScripts`
 lists them. The entry `tree-sitter-cli@0.27.0` (pinned to the reviewed version)
 lets the package's `install.js` run; it downloads the release asset below and
-decompresses it, nothing else. `scripts/check_generated.py` compares the
-installed binary with this table on every platform that runs it.
+decompresses it, nothing else. `scripts/tscli.py`, the only path through
+which the check scripts run the CLI, compares the installed binary with this
+table before running it, on every platform (`scripts/check_generated.py`
+reports the result).
 
 | Release asset | Asset SHA-256 (equals the release `digest`) | Decompressed binary SHA-256 |
 |---|---|---|
@@ -155,7 +185,7 @@ The runner images (`ubuntu-latest`, `windows-latest`), Node 24.x (24.20.0 or
 24.21.0 in the Session 04 runs) and Python 3.x are not pinned, and the npm
 version CI uses is not logged, so whether it enforces `allowScripts` is not
 known; either way the generator binary is compared with the table above
-before it runs (`scripts/check_generated.py`).
+before it runs (`scripts/tscli.py`).
 
 ## Level 4 — Comparative
 

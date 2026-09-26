@@ -1,0 +1,31 @@
+0:0  - 0:19   •source_file
+0:0  - 0:19     •assignment_statement
+0:0  - 0:1         left: identifier `x`
+0:2  - 0:3         "="
+0:4  - 0:19       right: •binary_expression
+0:4  - 0:14         left: •binary_expression
+0:4  - 0:9            left: •unary_expression
+0:4  - 0:5               "+"
+0:5  - 0:9              operand: •call_expression
+0:5  - 0:6                 function: identifier `f`
+0:6  - 0:9                arguments: •argument_list
+0:6  - 0:7                   "("
+0:7  - 0:8                  •ERROR
+0:7  - 0:8                     open_bracket `[`
+0:8  - 0:9                   ")"
+0:9  - 0:10            "+"
+0:10 - 0:14           right: •call_expression
+0:10 - 0:11              function: identifier `f`
+0:11 - 0:14             arguments: •argument_list
+0:11 - 0:12                "("
+0:12 - 0:13               •ERROR
+0:12 - 0:13                  open_bracket `[`
+0:13 - 0:14                ")"
+0:14 - 0:15          "+"
+0:15 - 0:19         right: •call_expression
+0:15 - 0:16            function: identifier `f`
+0:16 - 0:19           arguments: •argument_list
+0:16 - 0:17              "("
+0:17 - 0:18             •ERROR
+0:17 - 0:18                open_bracket `[`
+0:18 - 0:19              ")"

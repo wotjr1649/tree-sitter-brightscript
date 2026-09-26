@@ -90,7 +90,7 @@ If generated files change without a corresponding source change, stop and explai
 
 ## External scanner policy
 
-Do not add an external scanner unless a new ADR meeting the evidence requirements of ADR-0005 has been accepted first.
+Do not add an external scanner unless a new ADR meeting the evidence requirements of ADR-0005 has been accepted first. ADR-0008 is that ADR for the error-recovery scanner; it produces no token in a valid parse.
 
 ## Documentation model
 

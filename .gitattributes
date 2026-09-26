@@ -15,5 +15,8 @@ package-lock.json linguist-generated
 # Byte-sensitive corpus fixtures (CR bytes, byte-order mark); see docs/validation/validation.md
 test/corpus/bytes/** -text whitespace=cr-at-eol
 
+# Error-recovery cases and their golden trees (ADR-0008): CR, NUL and missing final line breaks are the point
+test/recovery/** -text -whitespace
+
 # Byte-exact CRLF copy of test/samples/program.brs (workload W03)
 test/samples/program-crlf.brs -text whitespace=cr-at-eol

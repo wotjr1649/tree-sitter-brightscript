@@ -119,22 +119,19 @@ m.top.observeField("x", "onX")
     function: (identifier)
     arguments: (argument_list
       (call_expression
-        function: (member_expression
-          object: (identifier)
-          property: (identifier))
+        object: (identifier)
+        property: (identifier)
         arguments: (argument_list))))
   (call_expression
-    function: (member_expression
-      object: (identifier)
-      property: (identifier))
+    object: (identifier)
+    property: (identifier)
     arguments: (argument_list
       (string)))
   (call_expression
-    function: (member_expression
-      object: (member_expression
-        object: (identifier)
-        property: (identifier))
+    object: (member_expression
+      object: (identifier)
       property: (identifier))
+    property: (identifier)
     arguments: (argument_list
       (string)
       (string))))
@@ -294,6 +291,29 @@ print
 
 (source_file
   (print_statement)
+  (print_statement))
+
+================================================================================
+BS-STMT-040: leading and repeated PRINT separators
+================================================================================
+print , a
+? ;a
+print a,,b
+print a;;b
+print ;
+--------------------------------------------------------------------------------
+
+(source_file
+  (print_statement
+    (identifier))
+  (print_statement
+    (identifier))
+  (print_statement
+    (identifier)
+    (identifier))
+  (print_statement
+    (identifier)
+    (identifier))
   (print_statement))
 
 ================================================================================

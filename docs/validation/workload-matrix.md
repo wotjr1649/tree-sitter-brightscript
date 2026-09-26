@@ -68,6 +68,7 @@ implementation; the files themselves are not committed.
 | block IF with ELSE IF clauses | 1,000 clauses |
 | nested IF / FOR / WHILE / TRY | depth 100 each |
 | nested parentheses | depth 500 |
+| binary-operator chain `1+1+…` (tree depth ≈ operand count; S04-H5) | 100,000 operands |
 | postfix chain `a.b.c…` with calls and indexes | 2,000 links |
 | string literal | 1 MiB |
 | file of functions | 50,000 lines |
@@ -118,6 +119,8 @@ least one instance of every row. `test/highlight/tokens.brs` additionally
 repeats the inputs of the fixtures marked **(token)** in the catalogue and
 asserts the capture of every anonymous token that carries their requirement
 (`?.`, `?@`, `?[`, `?(` as `@operator`; `?` as `@keyword`).
+`test/highlight/chains.brs` asserts the rows below on chains that mix member,
+attribute, index and call expressions, with and without optional access.
 
 | Syntax | Capture |
 |---|---|
@@ -146,23 +149,31 @@ bytes and invalid UTF-8 (BS-LEX-034); line breaks in argument lists, after
 `(` of a parameter list and after binary operators (BS-EXP-023, 024,
 BS-FUNC-007); lone `"`, `#`, `?`, `&h`; 10,000 `(`; 10,000 `:`; `#if` without
 `#end if`; directive-like region lines that end at a word boundary
-(grammar-design §11); every other unresolved form listed in the registry. Only
-the robustness criterion applies to them.
+(grammar-design §11); every other unresolved form listed in the registry; the
+witnesses of the retired KL-002 `x = ` + `+*`×1,000, `if a↵*2`×1,000, `x = -↵` +
+`-↵`×1,000, `x = ` + `2^*`×2,000 and `print ` + `,+↵`×500, the R-A-01
+witness `x = ` + `f(*`×2,000 and the PRINT witnesses `print ` + `f([)`×4,000
+and `print ` + `,+*`×4,000 (validation.md). Only the robustness criterion
+applies to them.
+The recovery scaling guards also parse each witness at two sizes and bound
+the exponent, time and memory (validation.md "Recovery scaling guards").
 
 ## Automation
 
 Every command runs from the repository root; hosted CI (`.github/workflows/ci.yml`)
-runs all of them except W12 and W14 on Windows and Ubuntu.
+runs all of them except W12, W14 and the release qualification lane on Windows
+and Ubuntu.
 
 | Set | Command |
 |---|---|
-| W01, W02, W04, W07 (valid), W09 (fixtures), W11 | `npx tree-sitter test` (with a private `TREE_SITTER_LIBDIR` or `--rebuild`, validation.md "Identity binding") and `python scripts/check_registry.py --complete` |
+| W01, W02, W04, W07 (valid), W09 (fixtures), W11 | `python scripts/tscli.py test` (verified binary, private parser library, validation.md "Identity binding") and `python scripts/check_registry.py --complete` |
 | W03 | `python scripts/check_samples.py` |
 | W05 | `python scripts/check_spellings.py` |
-| W06, W07 (invalid bytes), W08, W13 | `python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N]` |
+| W06, W07 (invalid bytes), W08, W13 (recovery scaling guards and recovery goldens included), W11 query scaling guards | `python scripts/check_robustness.py [--fuzz-iterations=N] [--fuzz-seed=N]` |
 | W09 (C4), W10 (C5 included) | `python scripts/check_spike.py`, `python scripts/check_incremental.py` |
 | W12 | `python scripts/record_oracle.py` (clean tree; output under `artifacts/oracle/`) |
 | W14 | in `go-treesitter`, from the W12 inputs and W10 edits of the same identity |
+| Release qualification lane (validation.md) | `python scripts/qualify/run.py --cc <gcc.exe> --runtime <root> --out <new dir> --support 0.25.1=<root> --support 0.26.13=<root>` (local Windows host) |
 
 ## Corpus fixture catalogue
 
@@ -219,7 +230,7 @@ token.
 | `BS-LEX-021: reserved keywords in mixed case` | `Sub Main()↵  For Each v In list↵    If v = False And Not x Or y Then↵      Print LINE_NUM↵    ElseIf v Then↵      Stop↵    Else↵      While z↵        ExitWhile↵      EndWhile↵    EndIf↵  Next↵EndSub↵Function F()↵EndFunction` | `(source_file (function_declaration name: (identifier) parameters: (parameter_list) body: (block (for_each_statement item: (identifier) collection: (identifier) body: (block (if_statement condition: (binary_expression left: (binary_expression left: (binary_expression left: (identifier) right: (false)) right: (unary_expression operand: (identifier))) right: (identifier)) consequence: (block (print_statement (source_literal))) alternative: (else_if_clause condition: (identifier) consequence: (block (stop_statement))) alternative: (else_clause body: (block (while_statement condition: (identifier) body: (block (exit_statement)))))))))) (function_declaration name: (identifier) parameters: (parameter_list) body: (block)))` |
 | `BS-LEX-022: reserved built-in function calls` | `o = CreateObject("roList")↵t = Type(o)↵b = Box(1)↵g = GetGlobalAA()↵e = GetLastRunCompileError()↵print tab(5) pos(0)` | each right side `(call_expression function: (identifier) arguments: (argument_list …))`; `print_statement` with two `call_expression`s |
 | `BS-LEX-022: Eval, Run and GetLastRunRunTimeError calls` | `r = Eval("x = 1")↵Run("pkg:/source/other.brs")↵e = GetLastRunRunTimeError()` | `(source_file (assignment_statement left: (identifier) right: (call_expression function: (identifier) arguments: (argument_list (string)))) (call_expression function: (identifier) arguments: (argument_list (string))) (assignment_statement left: (identifier) right: (call_expression function: (identifier) arguments: (argument_list))))` |
-| `BS-LEX-024: keywords as member names` | `list.next()↵player.stop()↵x = obj.end + obj.if + obj.print` | two `call_expression` statements over `member_expression property: (identifier)`; `binary_expression`s over three `member_expression`s |
+| `BS-LEX-024: keywords as member names` | `list.next()↵player.stop()↵x = obj.end + obj.if + obj.print` | two `call_expression` statements with `property: (identifier)`; `binary_expression`s over three `member_expression`s |
 | `BS-LEX-024: keywords as associative-array keys` | `aa = { function: "main()", end: 1, if: 2, next: 3 }` | four `(associative_array_entry key: (identifier) value: …)` |
 | `BS-LEX-024: function as a member name after an index` | `name = e.backtrace[i].function` | `(source_file (assignment_statement left: (identifier) right: (member_expression object: (index_expression object: (member_expression object: (identifier) property: (identifier)) index: (identifier)) property: (identifier))))` |
 | `BS-LEX-025: non-reserved keyword words as identifiers` | `mod = 3↵x = mod + in + as + integer + string↵y = a mod b` | `assignment_statement left: (identifier)`; `binary_expression`s over five `identifier`s; a `binary_expression` for `a mod b` |
@@ -255,8 +266,8 @@ The last input line, just before the divider, ends with LF alone
 | `BS-LIT-010: lowercase d exponent` | `a = 1.5d-3` | one `number` |
 | `BS-LIT-011: LongInteger literals` | `a = 9876543210& : b = &hFEDCBA9876543210&` | two `number`s |
 | `BS-LIT-012: integer suffix on a literal` | `a = 125% : b = 100%` | two `number`s |
-| `BS-LIT-014: method call on a numeric literal` | `print 5.tostr() + "th"↵if 100%.tostr() <> "100" then stop↵x = (-5).tostr()` | `call_expression function: (member_expression object: (number) property: (identifier))`; the same with `100%`; `member_expression object: (parenthesized_expression (unary_expression …))` |
-| `BS-LIT-014: method call on a string literal` | `x = "5".toint() + 5↵y = "01234567".left(3)` | `member_expression object: (string)` under `call_expression` |
+| `BS-LIT-014: method call on a numeric literal` | `print 5.tostr() + "th"↵if 100%.tostr() <> "100" then stop↵x = (-5).tostr()` | `call_expression object: (number) property: (identifier)`; the same with `100%`; `call_expression object: (parenthesized_expression (unary_expression …))` |
+| `BS-LIT-014: method call on a string literal` | `x = "5".toint() + 5↵y = "01234567".left(3)` | `call_expression object: (string) property: (identifier)` |
 | `BS-LIT-015: string literals` | `a = "this is a string" : b = "" : c = " "` | three `string`s |
 | `BS-LIT-016: doubled quotation marks` | `s = """"↵t = "say ""hi"""` | two `string`s |
 | `BS-LIT-017: backslash and non-ASCII text in strings` | `p = "C:\path\n"↵q = "naïve ✓"` | two `string`s, no child nodes |
@@ -268,11 +279,11 @@ The last input line, just before the divider, ends with LF alone
 | Fixture | Input | Expected |
 |---|---|---|
 | `BS-EXP-001: primary expressions` | `x = [a, 1, "s", true, invalid, LINE_NUM, (b), {k: 1}, function() : return 1 : end function]` | `array_literal` holding `identifier`, `number`, `string`, `true`, `invalid`, `source_literal`, `parenthesized_expression`, `associative_array_literal`, `anonymous_function` |
-| `BS-EXP-003: call forms` | `print five()↵print fivevar()↵print array[1]()↵obj.add()↵m.f(1, 2)` | `call_expression` with `function:` `identifier`, `identifier`, `index_expression`, `member_expression`, `member_expression` |
-| `BS-EXP-004: member access chains` | `i.ifInt.SetInt(5)↵x = (1+2).tostr()↵y = f().a.b` | nested `member_expression`s; `object: (parenthesized_expression …)`; `object: (call_expression …)` |
+| `BS-EXP-003: call forms` | `print five()↵print fivevar()↵print array[1]()↵obj.add()↵m.f(1, 2)` | `call_expression` with `function:` `identifier`, `identifier`, `index_expression`; then two calls of a member: `call_expression` with `object: (identifier)` and `property: (identifier)` (tree-schema.md, Placement rules) |
+| `BS-EXP-004: member access chains` | `i.ifInt.SetInt(5)↵x = (1+2).tostr()↵y = f().a.b` | a call of a member whose `object` is a `member_expression`; a call of a member with `object: (parenthesized_expression …)`; nested `member_expression`s with `object: (call_expression …)` |
 | `BS-EXP-005: index access and chained indexing` | `x = a[1]↵y = a[1][2]↵z = f()[0]↵w = a.b[i + 1]` | `index_expression`s, nested in the second, over `call_expression` and `member_expression` objects |
 | `BS-EXP-006: attribute operator` | `n = rsp.photos@perpage↵t = m.xml@title` | `(attribute_expression object: (member_expression …) attribute: (identifier))` |
-| `BS-EXP-007: optional chaining chain` | `x = array?[3]?.foo?.bar?()` | (token) `(call_expression function: (member_expression object: (member_expression object: (index_expression object: (identifier) index: (number)) property: (identifier)) property: (identifier)) arguments: (argument_list))` |
+| `BS-EXP-007: optional chaining chain` | `x = array?[3]?.foo?.bar?()` | (token) `(call_expression object: (member_expression object: (index_expression object: (identifier) index: (number)) property: (identifier)) property: (identifier) arguments: (argument_list))` |
 | `BS-EXP-007: optional call and optional index with arguments` | `x = i?(1, "String", explode())↵y = i?[explode()]` | (token) `call_expression` with an `argument_list` of three expressions; `index_expression` |
 | `BS-EXP-008: optional index as an assignment target` | `array?[12] = x` | `:error` |
 | `BS-EXP-008: optional member as an assignment target` | `a?.b = 1` | `:error` |
@@ -287,7 +298,7 @@ The last input line, just before the divider, ends with LF alone
 | Fixture | Input | Expected grouping |
 |---|---|---|
 | `BS-EXP-002: parentheses override precedence` | `x = (a + b) * c` | `(a + b) * c` |
-| `BS-EXP-011: exponentiation is right associative` | `x = 2^3^2↵y = a.b ^ 2` | `2^(3^2)`; `(a.b) ^ 2` |
+| `BS-EXP-011: exponentiation is right associative` | `x = 2^3^2↵y = a.b ^ 2↵z = a ^ b * c↵w = a * b ^ c↵v = not a ^ b↵u = a ^ b or c` | `2^(3^2)`; `(a.b) ^ 2`; `(a ^ b) * c`; `a * (b ^ c)`; `not (a ^ b)`; `(a ^ b) or c` |
 | `BS-EXP-012: unary minus against postfix and exponent` | `a = -5.tostr()↵b = -2^2` | `-(5.tostr())`; `-(2^2)` |
 | `BS-EXP-012: unary operators against multiplication` | `a = -x * y↵c = +x` | `(-x) * y`; `+x` |
 | `BS-EXP-013: multiplicative operators are left associative` | `x = a / b mod c \ d * e` | `(((a / b) mod c) \ d) * e` |
@@ -301,6 +312,7 @@ The last input line, just before the divider, ends with LF alone
 | `BS-EXP-021: mixed postfix chain` | `x = a?.b.c?[0]?(1)↵y = f(1)[2].g(3)` | (token) `(((a?.b).c)?[0])?(1)`; `((f(1))[2]).g(3)` |
 | `BS-EXP-021: attribute operator inside a member chain` | `x = e@y.z↵w = a.b@c` | `(e@y).z`; `(a.b)@c` |
 | `BS-EXP-027: prefix operators as right operands` | `a = 2^-2↵b = x * -y↵c = a < not b` | `2^(-2)`; `x * (-y)`; `a < (not b)` |
+| `BS-EXP-028: nested prefix operators` | `a = - -x↵b = +-1↵c = - not x` | `-(-x)`; `+(-1)`; `-(not x)` |
 
 ### `test/corpus/statements.txt`
 
@@ -319,6 +331,7 @@ The last input line, just before the divider, ends with LF alone
 | `BS-STMT-025: TAB and POS items` | `print tab(5)"tabbed 5";tab(25)"tabbed 25"↵print tab(40) pos(0)↵print "these" tab(pos(0)+5)"words"` | items alternate `call_expression` and `string` as written |
 | `BS-STMT-026: ambiguous adjacent PRINT items` | `print a -1↵print a (1)` | `(print_statement (binary_expression …))`; `(print_statement (call_expression …))` |
 | `BS-STMT-039: PRINT with no items` | `print↵?` | `(source_file (print_statement) (print_statement))` |
+| `BS-STMT-040: leading and repeated PRINT separators` | `print , a↵? ;a↵print a,,b↵print a;;b↵print ;` | `(source_file (print_statement (identifier)) (print_statement (identifier)) (print_statement (identifier) (identifier)) (print_statement (identifier) (identifier)) (print_statement))` |
 | `BS-STMT-027: GOTO a label` | `start:↵goto start` | `(source_file (label_statement name: (identifier)) (goto_statement label: (identifier)))` |
 | `BS-STMT-029: END statement` | `if done then end↵end` | `(if_statement condition: (identifier) consequence: (block (end_statement)))`; `(end_statement)` |
 | `BS-STMT-030: STOP statement` | `if x then stop↵stop` | `(if_statement condition: (identifier) consequence: (block (stop_statement)))`; `(stop_statement)` |
@@ -422,6 +435,7 @@ The last input line, just before the divider, ends with LF alone
 | `BS-ERR-003: CATCH with an expression` | `try↵catch a+wave↵end try` | `:error` |
 | `BS-ERR-004: THROW forms` | `throw "Cannot calculate."↵THROW {number: ERR_DIV_ZERO, message: "Division by zero"}↵throw e` | `throw_statement value:` `string`, `associative_array_literal`, `identifier` |
 | `BS-ERR-005: try and catch as identifiers` | `x = try + catch↵catch = 1↵sub f()↵  catch = 2↵  x = 0↵  catch = 3↵  if x then↵    catch = 4↵  end if↵end sub↵try↵  if y then↵    catch = 5↵  end if↵catch e↵end try` | every `catch = …` is `(assignment_statement left: (identifier) right: (number))`; the last lines form one `try_statement` whose `handler` has `variable: (identifier)` |
+| `BS-ERR-005: try as an identifier in a single-line branch` | `if a then try = 1↵if b then x = 1 else try = 2` | `(source_file (if_statement condition: (identifier) consequence: (block (assignment_statement left: (identifier) right: (number)))) (if_statement condition: (identifier) consequence: (block (assignment_statement left: (identifier) right: (number))) alternative: (else_clause body: (block (assignment_statement left: (identifier) right: (number))))))` |
 | `BS-ERR-007: label inside a TRY body is not rejected` | `try↵here:↵  x = 1↵catch e↵end try` | `try_statement` whose `body` holds a `label_statement`; no `ERROR` (guard) |
 
 ### `test/corpus/conditional-compilation.txt`
@@ -441,6 +455,7 @@ The last input line, just before the divider, ends with LF alone
 | `BS-COND-012: nested #if blocks` | `#if A↵  #if B↵    x = 1↵  #end if↵#end if` | `(if_directive condition: (identifier) consequence: (block (if_directive condition: (identifier) consequence: (block (assignment_statement …)))))` |
 | `BS-COND-013: #const with a non-boolean value` | `#const x = 5` | `:error` |
 | `BS-COND-013: #const with a string value` | `#const s = "a"` | `:error` |
+| `BS-COND-015: #error without a message` | `#error↵#if DEBUG↵  #error⇥↵#end if` | `(source_file (error_directive) (if_directive condition: (identifier) consequence: (block (error_directive))))` |
 
 ADR-0004 literal-false fixtures (grammar-design §11). The PASS column applies
 to design V1; under V2 every `(comment)` inside `inactive_text` is absent. On

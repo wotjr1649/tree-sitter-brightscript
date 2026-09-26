@@ -19,6 +19,10 @@ BS-EXP-011: exponentiation is right associative
 ================================================================================
 x = 2^3^2
 y = a.b ^ 2
+z = a ^ b * c
+w = a * b ^ c
+v = not a ^ b
+u = a ^ b or c
 --------------------------------------------------------------------------------
 
 (source_file
@@ -35,7 +39,34 @@ y = a.b ^ 2
       left: (member_expression
         object: (identifier)
         property: (identifier))
-      right: (number))))
+      right: (number)))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (identifier)
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (assignment_statement
+    left: (identifier)
+    right: (unary_expression
+      operand: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (identifier))))
 
 ================================================================================
 BS-EXP-012: unary minus against postfix and exponent
@@ -49,9 +80,8 @@ b = -2^2
     left: (identifier)
     right: (unary_expression
       operand: (call_expression
-        function: (member_expression
-          object: (number)
-          property: (identifier))
+        object: (number)
+        property: (identifier)
         arguments: (argument_list))))
   (assignment_statement
     left: (identifier)
@@ -321,14 +351,13 @@ y = f(1)[2].g(3)
   (assignment_statement
     left: (identifier)
     right: (call_expression
-      function: (member_expression
-        object: (index_expression
-          object: (call_expression
-            function: (identifier)
-            arguments: (argument_list
-              (number)))
-          index: (number))
-        property: (identifier))
+      object: (index_expression
+        object: (call_expression
+          function: (identifier)
+          arguments: (argument_list
+            (number)))
+        index: (number))
+      property: (identifier)
       arguments: (argument_list
         (number)))))
 
@@ -381,4 +410,29 @@ c = a < not b
     right: (binary_expression
       left: (identifier)
       right: (unary_expression
+        operand: (identifier)))))
+
+================================================================================
+BS-EXP-028: nested prefix operators
+================================================================================
+a = - -x
+b = +-1
+c = - not x
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (unary_expression
+      operand: (unary_expression
+        operand: (identifier))))
+  (assignment_statement
+    left: (identifier)
+    right: (unary_expression
+      operand: (unary_expression
+        operand: (number))))
+  (assignment_statement
+    left: (identifier)
+    right: (unary_expression
+      operand: (unary_expression
         operand: (identifier)))))

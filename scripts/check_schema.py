@@ -77,10 +77,12 @@ for cols in rows(section(planned, "Planned nodes")):
             multiple, required = mult(marker)
         fields[fname] = (sorted(t for t in tokens if t in known),
                          sorted(t for t in tokens if t not in known), multiple, required)
+    # Unnamed children: every backticked type in the cell, with one multiplicity marker after the last.
     children = None
-    m = re.match(r"`([a-z_]+)`([?*+]?)", cols[2])
-    if m and m.group(1) not in EXTRAS:
-        children = ([m.group(1)], *mult(m.group(2)))
+    kinds = [k for k in re.findall(r"`([a-z_]+)`", cols[2]) if k not in EXTRAS]
+    m = re.search(r"`([?*+]?)(?!.*`)", cols[2])
+    if kinds:
+        children = (sorted(kinds), *mult(m.group(1) if m else ""))
     for name in names:
         node = nodes.get(name)
         if node is None:

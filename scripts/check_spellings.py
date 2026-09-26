@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 from corpus import ROOT
-from tscli import cst, parse
+from tscli import has_error, parse
 
 PAIRS = {
     "BS-LEX-001 keyword case": ["IF x THEN PRINT 1", "if x then print 1"],
@@ -32,7 +32,7 @@ FILES = {"BS-LEX-006 LF / CRLF": ["test/samples/program.brs", "test/samples/prog
 
 
 def tree(path):
-    return parse(path, "--no-ranges"), not cst(path)[0]
+    return parse(path, "--no-ranges"), not has_error(path)
 
 
 def main():
