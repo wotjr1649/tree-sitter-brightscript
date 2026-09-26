@@ -107,7 +107,7 @@ MUTANTS = {
                                   'point_status, live_ok = status, status != "MEASUREMENT_INCONSISTENT"'),
     "uninstrumented reach ignored": ('elif status == "NOT_APPLICABLE_BEFORE_BUDGET" and plain_reached:', "elif False:"),
     "tree and cancellation not cross-checked": (
-        "not (tree_ms == -1 and cancelled or number(tree_ms) is not None\n", "not (number(tree_ms) is not None or True\n"),
+        "not (tree_ms == -1 and cancelled or number(tree_ms) is not None\n" + " " * 58 + "and not cancelled)", "False"),
     "flag types not checked": ("or type(cancelled) is not bool or type(at_callback) is not bool", ""),
 }
 
