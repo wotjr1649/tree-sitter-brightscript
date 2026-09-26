@@ -788,27 +788,32 @@ measures bound that work without changing any valid tree.
 
 1. **Recovery tokens.** `src/scanner.c` returns a token only in the runtime's
    error state (every external token is valid there, including
-   `_recovery_sentinel`, which no rule uses). At a line break it returns
-   `_recovery_newline`; otherwise it returns `_recovery_run`, malformed text up
-   to a line break, a `'` comment outside a string literal, a keyword that
-   closes or continues a block (or a `:` before one), or, on a last line of
-   16 units or more without a line break, its last unit, which it then
-   returns as `_recovery_newline` (ADR-0008 decision 3; a state byte lets the
-   runtime's normal-state re-lexing of that unit see it too, decision 5). No rule
+   `_recovery_sentinel`, which no rule uses). It returns `_recovery_run`,
+   malformed text of one line up to a line break, a `'` comment outside a
+   string literal, a keyword that closes or continues a block (or a `:` or
+   `#` before one), or the last unit of the input (a word or one character,
+   or a `:` or `#` with the word after it), and `_recovery_newline`,
+   the line break after a run of 16 units or more (a long run), a lone `CR`,
+   or the rest of a last line after a run that stopped before it (ADR-0008
+   decision 3; a state byte records the run before it and lets the runtime's
+   normal-state re-lexing of that rest see it too, decision 5). No rule
    accepts `_recovery_run`, so recovery skips it as one token;
    `_recovery_newline` is valid in `_line_end`, where a line of statements
    ends, and in `_body_start`, after the header of a loop, function, TRY,
-   CATCH or directive (item 5), so recovery resumes at the next line, not
-   inside a bracket and not after an IF header. The scanner returns nothing
-   for a malformed rest of fewer than 16 units before a line that begins
-   like a statement or at the end of input: there recovery proceeds token by
-   token, as without the scanner, because a cheap run lets a recovery version skip the line break
-   and take the next line into the malformed statement (Session 05-7 review
-   A-01). A long malformed line becomes one `ERROR` node holding the native
-   nodes of the tokens parsed before the error. The runtime looks back at
-   most 16 parse-stack entries for a state that accepts the line break;
-   below more unclosed constructs than that, the following lines are
-   absorbed into the error, as they were without the scanner.
+   CATCH or directive (item 5), so after a long malformed line recovery
+   resumes at the next line, not inside a bracket and not after an IF
+   header. At other line breaks the scanner returns nothing and the ordinary
+   line break lets recovery resume there, as without the scanner, and it
+   returns nothing for a malformed rest of fewer than 16 units before a line
+   that begins like a statement or at the end of input: there recovery
+   proceeds token by token, because a cheap run lets a recovery version skip
+   the line break and take the next line into the malformed statement
+   (Session 05-7 reviews A-01 and A2-04). A long malformed line becomes one
+   `ERROR` node holding the native nodes of the tokens parsed before the
+   error. The runtime looks back at most 16 parse-stack entries for a state
+   that accepts the line break; below more unclosed constructs than that,
+   the following lines are absorbed into the error, as they were without the
+   scanner.
 2. **Error-only names.** `(`, `[`, `-`, `+`, `not` and `try` can stay unreduced
    on the parse stack in long runs with no named node between them (unclosed
    `((((…`, `[[[[…`, `-(-(…`, `try` lines); at the end of input the runtime

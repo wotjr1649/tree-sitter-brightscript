@@ -237,9 +237,12 @@ growth below it is invisible there; the Windows job sees it:
 | B5-01 prefix, no final line break | `x = ` + `+f([)`, k = 1,000 and 16,000, no line break after the last unit | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | regression test of the end-of-input line end (before it, on `cc664de`: 1.75; 47 ms) |
 | B5-02 PRINT calls, no final line break | `print ` + `f([)`, k = 1,000 and 16,000, the same | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | the same (before it: 1.58; 23 ms; on `47d4047` the CLI overflows its stack) |
 | KL-002 NOT, no final line break | `x = ` + `(not)`, k = 1,000 and 16,000, the same | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | the same (before it: 1.72; 40 ms) |
+| B5-01 prefix before a final comment | `x = ` + `+f([)`, k = 1,000 and 16,000, then ` ' c` without a line break | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | regression test of the end-of-input rest after a long run that stops at a comment (on `b501847`: 1.75; 60 ms) |
+| B5-01 prefix before a final NEXT | the same, then ` next` | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | the same at a block keyword (on `b501847`: 1.72; 61 ms) |
 | KL-002 prefix operators across lines | `x = -⏎` + `-⏎`, k = 1,000 and 4,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | regression test of runs over consecutive malformed lines (on `47d4047`: 2.13; 11.9 s) |
 | block keywords on one malformed line | `if a then b = ) else ` repeated, k = 1,000 and 8,000 | ≤ 1.5 | ≤ 100 ms | ≤ 8 MiB | regression test of runs that stop at block keywords without re-reading the line (on `86eac11`, which called `get_column`: 1.70; 5.4 s) |
 | minified blocks after an error | `x = ) : ` + `if a then : b = 1 : end if : `, k = 1,000 and 8,000 | ≤ 1.5 | ≤ 150 ms | ≤ 8 MiB | the same with `:` before the keywords (on `86eac11`: 1.88; 13.1 s) |
+| comments on lines ended by a lone CR | `x = ) ' c` + a lone `CR`, k = 1,000 and 4,000 | ≤ 1.5 | ≤ 100 ms | ≤ 8 MiB | regression test of the lone `CR` as a recovery line end (on `b501847`, where the look-ahead after a comment read to the next `LF`: 1.97; 200 ms) |
 
 Query scaling guards. The same script runs one guard per row of its
 `QUERY_GUARDS` table: the full highlight query over a witness at two
@@ -266,16 +269,23 @@ guard).
 
 Recovery goldens. The same script parses every `test/recovery/*.brs` and
 compares the node lines of its `--cst` output with the `.cst` golden beside
-it: the scanner unit cases (line breaks, a lone `CR`, short and long inputs
-that end without a line break, NUL, UTF-8, strings with `'`, comments), the
-lines after an error and lines that begin with an operator. In the cases of its
+it: the scanner unit cases (line breaks, a lone `CR` in a run and between
+lines, short and long inputs that end without a line break, a long last line
+that ends with a block keyword or a comment, NUL, UTF-8, strings with `'`,
+comments), the lines after an error (also after a long run, in a multi-line
+literal, after an IF header and before a directive closer) and lines that
+begin with an operator. In the cases of its
 `LOCALITY` list every sub or function declaration must lie outside every
 `ERROR` node. The goldens are the recovery trees of the pinned runtime, not
 a language contract; they change only with a reviewed grammar, scanner or
 runtime change and are never regenerated to make the check pass. On
 `cc664de` (the first scanner) every golden differs and two `LOCALITY` cases
-fail; on `47d4047` the three lines-after-an-error cases give the same trees
-as the goldens.
+fail; on `b501847` (a recovery line break at every line break during
+recovery) the eight cases added or changed with the current scanner differ
+and three `LOCALITY` cases fail; on `47d4047` every declaration of the
+`LOCALITY` cases lies outside every `ERROR` node, and two of those cases
+give the same trees as the goldens (the others differ at least by the
+error-only names).
 
 The "before it" values of the rows added or tightened in Session 05-7 are
 these guards run on the grammar, parser and query of `47d4047` through the
