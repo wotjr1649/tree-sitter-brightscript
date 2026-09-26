@@ -52,13 +52,6 @@ static bool word_char(int32_t c) {
 
 static bool word_start(int32_t c) { return word_char(c) && !(c >= '0' && c <= '9'); }
 
-/* An operator that cannot begin a valid line; `+` and `-` begin one only as the sign of an
-   element on a continuation line inside brackets. */
-static bool operator_start(int32_t c) {
-  return c == '+' || c == '-' || c == '*' || c == '/' || c == '\\' || c == '^' || c == '=' || c == '<' ||
-         c == '>' || c == ';' || c == '@';
-}
-
 /* A short malformed rest of a line, before a line that may begin a statement or at the end of input,
    is recovered token by token, as without this scanner: a cheap run there lets a recovery version
    skip the line break and take the next line into the malformed statement, and at the end of input
@@ -132,7 +125,6 @@ bool tree_sitter_brightscript_external_scanner_scan(void *payload, TSLexer *lexe
   bool after_eof_run = state->eof_line_end;
   state->eof_line_end = 0;
 
-  bool line_start = lexer->get_column(lexer) == 0;
   while (blank(lexer->lookahead)) lexer->advance(lexer, true);
   if (lexer->eof(lexer)) return false;
 
@@ -149,11 +141,6 @@ bool tree_sitter_brightscript_external_scanner_scan(void *payload, TSLexer *lexe
     }
     units = 1;
   }
-
-  /* At the start of a line, a version still in error lexes the line token by token, so skipping
-     a valid line after an error costs as much as without this scanner; a line that begins with an
-     operator continues the malformed text and is one run. */
-  if (line_start && units == 0 && !operator_start(lexer->lookahead)) return false;
 
   /* A run: up to a line break, a `'` comment outside a string literal, a keyword that closes or
      continues a block (or a `:` before one), or the end of input. The token end is marked before

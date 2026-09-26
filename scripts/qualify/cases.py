@@ -71,7 +71,8 @@ VALID = {"flat-assign": ("", "x = a + 1\n", ""), "array": ("x = [", "1, ", "1]\n
          "nested-if": ("", NESTED_IF_BLOCK, "")}
 # R7 structural sweep: 9 contexts x 10 units x 3 ends.
 SWEEP_CONTEXTS = ["x = ", "print ", "return ", "if ", "while ", "y = [", "z = {k: ", "f(", "? "]
-SWEEP_UNITS = ["+f([)", "-f(-)", "{a:@*}<", "f([)", ",+*", "+*", "f(*", "2^*", "[1,", "(not)"]
+SWEEP_UNITS = ["+f([)", "-f(-)", "{a:@*}<", "f([)", ",+*", "+*", "f(*", "2^*", "[1,", "(not)",
+               ") else "]  # a block keyword after each malformed piece (Session 05-7 review B2-01)
 SWEEP_ENDS = [("\n", "nl"), (": print 1\n", "colon"), ("", "eof")]
 
 

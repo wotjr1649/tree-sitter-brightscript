@@ -93,15 +93,12 @@ def b5_01_memory(r):
         ok &= p["pass"]
         points.append(p)
     pairs = []
-    # Every consecutive pair of each family's series (Session 05-7 review B-11); a pair whose live bytes are both
-    # below 1 MiB is below the growth that matters and passes with its exponent recorded.
+    # Every consecutive pair of each family's series, without exemption (Session 05-7 reviews B-11, B2-02).
     for fam, ks in (("prefix", (100, 200, 400, 800)), ("minus", (100, 200, 400, 800)), ("aa", (150, 300, 600))):
         for k0, k1 in zip(ks, ks[1:]):
             a, b = live[f"B5-01-{fam}-k{k0:05d}"], live[f"B5-01-{fam}-k{k1:05d}"]
             e = exponent(a, b, k0, k1) if a and b else None
-            small = a is not None and b is not None and max(a, b) < MIB
-            pairs.append({"family": fam, "sizes": (k0, k1), "exponent": e,
-                          "pass": small or (e is not None and e <= 1.5)})
+            pairs.append({"family": fam, "sizes": (k0, k1), "exponent": e, "pass": e is not None and e <= 1.5})
             ok &= pairs[-1]["pass"]
     return result("B5-01-MEMORY", ok, points + pairs)
 
@@ -595,7 +592,7 @@ def sweep(r):
             p["pass"] = False
         ok &= p["pass"]
         points.append(p)
-    return result("REGRESSION-SWEEP", ok, points, ["270 families x k 100, 400, 4000, 20000, 1 warmup + 5 runs each, "
+    return result("REGRESSION-SWEEP", ok, points, [f"{len(points)} families x k 100, 400, 4000, 20000, 1 warmup + 5 runs each, "
                                                    "median; crash 0, memory growth "
                                                    "< 64 MiB; time exponents 400 -> 20000 and 4000 -> 20000, the "
                                                    "smaller time clamped to the 0.1 ms floor, <= 1.5; the retired "

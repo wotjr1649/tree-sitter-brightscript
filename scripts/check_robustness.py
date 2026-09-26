@@ -71,6 +71,8 @@ RECOVERY_GUARDS = [
     ("B5-02 PRINT calls, no final line break (fixed)", b"print ", b"f([)", 1000, 16000, 1.5, 50, 8, b""),
     ("KL-002 NOT, no final line break (fixed)", b"x = ", b"(not)", 1000, 16000, 1.5, 50, 8, b""),
     ("KL-002 prefix operators across lines (fixed)", b"x = -\n", b"-\n", 1000, 4000, 1.5, 50, 8),
+    ("block keywords on one malformed line (fixed)", b"", b"if a then b = ) else ", 1000, 8000, 1.5, 100, 8),
+    ("minified blocks after an error (fixed)", b"x = ) : ", b"if a then : b = 1 : end if : ", 1000, 8000, 1.5, 150, 8),
 ]
 # (name, prefix, repeated unit, small k, large k, max exponent, max ms of the larger run). The highlight query on
 # left-deep chains (S07-M03): the member and attribute patterns match the operator and the name as siblings, so no

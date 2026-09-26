@@ -57,8 +57,7 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
      (a single-line IF with an error would become a block IF) and not inside
      brackets.
    It returns nothing, so that recovery proceeds token by token as without
-   the scanner, at the start of a line unless the line begins with an
-   operator, and for a malformed rest of fewer than 16 units before a line
+   the scanner, for a malformed rest of fewer than 16 units before a line
    that begins like a statement or at the end of input: a cheap run there
    lets a recovery version skip the line break and take the next line into
    the malformed statement, and at the end of input the unit that ends the
@@ -82,10 +81,11 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
    returns it as the recovery line break there too (a valid parse has no
    run, so the byte is never set in one). `create` allocates the byte with
    the runtime's `ts_calloc`; `serialize` writes it only when set. The
-   scanner calls `get_column` only in the error state, to recognise the
-   start of a line; it does not recurse, and each successful scan advances
-   at least one character; a scan is bounded by one line plus the blank
-   lines and first character after it.
+   scanner does not call `get_column` (in runtime 0.27.0 it re-reads the
+   line from its start, which made a line with many block keywords after an
+   error quadratic; Session 05-7 review B2-01), does not recurse, and each
+   successful scan advances at least one character; a scan is bounded by one
+   line plus the blank lines and first character after it.
 6. `src/scanner.c` is hand-written canonical source under the MIT license
    (public `TSLexer` API only, no private runtime structures, no debug output
    or environment dependence in normal builds). It is not a generated file:
@@ -140,8 +140,7 @@ Supersedes in part: [ADR-0005](ADR-0005-external-scanner-policy.md) (see Decisio
 - `go-treesitter` needs a Go port of the scanner. It carries hand-written Go
   scanners for other grammars (`Scan(payload, lexer, validSymbols)`), and
   `ts2go` converts only `parser.c`. This scanner uses `lookahead`, `advance`,
-  `mark_end`, `eof`, `get_column` and `result_symbol` and serializes one
-  byte; input and output golden cases for the port are kept in
+  `mark_end`, `eof` and `result_symbol` and serializes one byte; input and output golden cases for the port are kept in
   `test/recovery/`. The port and its V9 evidence belong to `go-treesitter`.
 
 ## Validation / enforcement

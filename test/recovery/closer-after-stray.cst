@@ -25,8 +25,7 @@
 3:6  - 3:13                  print_statement
 3:6  - 3:11                    "print"
 3:12 - 3:13                    identifier `j`
-4:4  - 4:5                •ERROR
-4:4  - 4:5                  ")"
+4:4  - 4:6                •ERROR `) `
 4:6  - 4:13               "end for"
 5:2  - 5:6            "next"
 6:0  - 6:7        "end sub"

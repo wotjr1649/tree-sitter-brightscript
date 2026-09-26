@@ -11,9 +11,10 @@ Usage: python scripts/check_generated.py [--no-regenerate]
    src/scanner.c, which exists exactly when grammar.js declares `externals` and
    ADR-0008 (the error-recovery scanner) is accepted. The scanner includes only
    tree_sitter/parser.h and tree_sitter/alloc.h (its one-byte state is allocated
-   with the runtime's `ts_calloc`) and calls no other allocator and no printing,
-   environment or file function (ADR-0008 decisions 5 and 6; a guard against
-   regressions, not a proof).
+   with the runtime's `ts_calloc`) and calls no other allocator, no printing,
+   environment or file function and not `get_column`, which re-reads the line
+   in runtime 0.27.0 (ADR-0008 decisions 5 and 6; Session 05-7 review B2-01; a
+   guard against regressions, not a proof).
 4. Unless --no-regenerate: `tree-sitter generate --abi 15` run twice reproduces
    every generated file under src/ byte for byte (drift and determinism); the
    scanner is not generated and is hashed separately.
@@ -60,7 +61,8 @@ if SCANNER.exists():
     if set(re.findall(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]', code, re.M)) - {"tree_sitter/parser.h",
                                                                          "tree_sitter/alloc.h"}:
         fail.append("src/scanner.c includes something other than tree_sitter/parser.h and tree_sitter/alloc.h")
-    if found := sorted(set(re.findall(r"\b(malloc|calloc|realloc|free|printf|fprintf|puts|getenv|fopen)\b", code))):
+    if found := sorted(set(re.findall(r"\b(malloc|calloc|realloc|free|printf|fprintf|puts|getenv|fopen|get_column)\b",
+                                      code))):
         fail.append(f"src/scanner.c calls functions ADR-0008 excludes: {found}")
 allowed = GENERATED | ({"scanner.c"} if SCANNER.exists() else set())
 if stray := sorted({p.relative_to(SRC).as_posix() for p in SRC.rglob("*") if p.is_file()} - allowed):

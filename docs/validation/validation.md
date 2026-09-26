@@ -237,7 +237,9 @@ growth below it is invisible there; the Windows job sees it:
 | B5-01 prefix, no final line break | `x = ` + `+f([)`, k = 1,000 and 16,000, no line break after the last unit | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | regression test of the end-of-input line end (before it, on `cc664de`: 1.75; 47 ms) |
 | B5-02 PRINT calls, no final line break | `print ` + `f([)`, k = 1,000 and 16,000, the same | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | the same (before it: 1.58; 23 ms; on `47d4047` the CLI overflows its stack) |
 | KL-002 NOT, no final line break | `x = ` + `(not)`, k = 1,000 and 16,000, the same | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | the same (before it: 1.72; 40 ms) |
-| KL-002 prefix operators across lines | `x = -⏎` + `-⏎`, k = 1,000 and 4,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | regression test of runs on lines that begin with an operator (on `47d4047`: 2.13; 11.9 s) |
+| KL-002 prefix operators across lines | `x = -⏎` + `-⏎`, k = 1,000 and 4,000 | ≤ 1.5 | ≤ 50 ms | ≤ 8 MiB | regression test of runs over consecutive malformed lines (on `47d4047`: 2.13; 11.9 s) |
+| block keywords on one malformed line | `if a then b = ) else ` repeated, k = 1,000 and 8,000 | ≤ 1.5 | ≤ 100 ms | ≤ 8 MiB | regression test of runs that stop at block keywords without re-reading the line (on `86eac11`, which called `get_column`: 1.70; 5.4 s) |
+| minified blocks after an error | `x = ) : ` + `if a then : b = 1 : end if : `, k = 1,000 and 8,000 | ≤ 1.5 | ≤ 150 ms | ≤ 8 MiB | the same with `:` before the keywords (on `86eac11`: 1.88; 13.1 s) |
 
 Query scaling guards. The same script runs one guard per row of its
 `QUERY_GUARDS` table: the full highlight query over a witness at two
@@ -317,7 +319,7 @@ by the lane:
 
 | Gate | Inputs | Pass condition |
 |---|---|---|
-| B5-01-MEMORY | `x = ` + `+f([)` and `-f(-)` k ≤ 800, `x = ` + `{a:@*}<` k ≤ 600 | allocator peak live and working-set growth < 64 MiB; live-memory exponent of every consecutive pair ≤ 1.5 (a pair below 1 MiB of live bytes passes) |
+| B5-01-MEMORY | `x = ` + `+f([)` and `-f(-)` k ≤ 800, `x = ` + `{a:@*}<` k ≤ 600 | allocator peak live and working-set growth < 64 MiB; live-memory exponent of every consecutive pair ≤ 1.5 |
 | B5-02-LIFECYCLE | `print ` + `f([)` and `,+*`, k 1,000–20,000; `x = ` + `-f(-)` k ≤ 20,000 | parse, tree and parser deletion complete; call exponent 1,000 → 4,000 ≤ 1.5 |
 | A5-01-COST | PRINT items `a;`, `1;` k ≤ 32,000 and `a ` k ≤ 8,000 | query and cursor, field and index navigation, paired with BEFORE_PRINT: same work (and the query match limit never exceeded), ratio ≤ 1.5; exponents ≤ 1.5 |
 | CANCEL | the v3 cases and seven 1 MiB inputs registered to run past the budget | 200 ms budget: return ≤ 300 ms, deletion ≤ 100 ms, live memory after the budget < 64 MiB, measured from the first allocation or progress callback after the budget (a reached budget without a recorded crossing is `NOT_RUN`, not a pass); the registered inputs are cancelled |
@@ -330,7 +332,7 @@ by the lane:
 | INCREMENTAL-REPAIR | 28 edit scripts | incremental parse equals a fresh parse; inverse edits restore the original; both comparators detect a planted difference |
 | RESUME-RESET | six registered inputs | resume after cancellation, reset and a new source each equal a fresh parse; an input whose parse ends before the trigger is `NOT_TRIGGERED` and gives no evidence, and at least one must be triggered; two parsers are independent |
 | SUPPORT | B5 and A5-01 points on runtimes 0.25.1 and 0.26.13 | complete within the caps (the product runtime is 0.27.0) |
-| REGRESSION-SWEEP | 270 context × unit × line-end families (line ends: a line break, `:` and a statement, none), k 100, 400, 4,000, 20,000, 1 warmup and 5 runs each (median) | no crash; memory growth < 64 MiB; exponents 400 → 20,000 and 4,000 → 20,000 ≤ 1.5 with the smaller time clamped to the 0.1 ms floor, the units of the retired KL-002 included |
+| REGRESSION-SWEEP | 297 context × unit × line-end families (eleven units, the last a block keyword after each malformed piece) (line ends: a line break, `:` and a statement, none), k 100, 400, 4,000, 20,000, 1 warmup and 5 runs each (median) | no crash; memory growth < 64 MiB; exponents 400 → 20,000 and 4,000 → 20,000 ≤ 1.5 with the smaller time clamped to the 0.1 ms floor, the units of the retired KL-002 included |
 | ABS-MEMORY | every registered B5, A5-01 and cancellation point | peak commit ≤ 128 MiB |
 | RECOVERY-LOCALITY | the 1,699 single-line mutants of `program.brs`, `compact.brs` and `highlights.brs` (ten mutations per line) | rows under `ERROR` or `MISSING` apart from the mutated one, through the pinned CLI: the candidate hides rows that H keeps, by five and by twenty rows or more, in no more mutants than the reverse |
 
@@ -341,7 +343,11 @@ hosted subset; a lane gate is never inferred from a CLI guard. After the
 Session 05-7 review the lane gained the RECOVERY-LOCALITY gate, the 4,000
 sweep point and floor clamp, every B5-01 pair, the match-limit checks, the
 callback crossing of CANCEL and two RESUME-RESET inputs that are long enough
-to trigger; each makes a gate stricter or measures what it could not.
+to trigger; after the delta review it also gained a sweep unit with a block
+keyword after each malformed piece (B2-01). Each change makes a gate stricter
+or measures what it could not. RECOVERY-LOCALITY and the regeneration of
+the references run the pinned CLI outside the supervisor, with the `--cc`
+compiler and a private parser-library directory per checkout.
 
 ## Highlight query changes
 

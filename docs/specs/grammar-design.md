@@ -800,10 +800,9 @@ measures bound that work without changing any valid tree.
    ends, and in `_body_start`, after the header of a loop, function, TRY,
    CATCH or directive (item 5), so recovery resumes at the next line, not
    inside a bracket and not after an IF header. The scanner returns nothing
-   at the start of a line that does not begin with an operator, and for a
-   malformed rest of fewer than 16 units before a line that begins like a
-   statement or at the end of input: there recovery proceeds token by token,
-   as without the scanner, because a cheap run lets a recovery version skip the line break
+   for a malformed rest of fewer than 16 units before a line that begins
+   like a statement or at the end of input: there recovery proceeds token by
+   token, as without the scanner, because a cheap run lets a recovery version skip the line break
    and take the next line into the malformed statement (Session 05-7 review
    A-01). A long malformed line becomes one `ERROR` node holding the native
    nodes of the tokens parsed before the error. The runtime looks back at

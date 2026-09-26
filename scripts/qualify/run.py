@@ -5,9 +5,13 @@
 
 This file and scripts/tscli.py are the only files under scripts/ that start programs (scripts/test_tscli.py
 checks it). It starts git (to read the reference grammars), the pinned CLI through tscli (generate), the C
-compiler named by --cc, and programs that compiler built under --out; every parser run and every build after the
+compiler named by --cc, and programs that compiler built under --out; every probe run and every build after the
 supervisor's own happens inside the Job-object supervisor that is built and self-tested first (limits: 512 MiB
-commit, 15 s, 8 MiB output, one child at a time). A runtime source root is used only if every file listed in runtime-<version>.sha256 matches.
+commit, 15 s, 8 MiB output, one child at a time). Two steps use the pinned CLI through tscli outside the supervisor,
+with its own time limits: regenerating the reference grammars, and RECOVERY-LOCALITY, which parses each mutant with
+`parse --cst` in the candidate and the H checkout (the CLI compiles each grammar once with the --cc compiler into a
+private library directory per checkout). A runtime source root is used only if every file listed in
+runtime-<version>.sha256 matches.
 Results: <out>/runs.jsonl (every run) and <out>/gates.json; the exit status is 0 only if every selected gate
 passes.
 """
@@ -183,7 +187,7 @@ class Runner:
         libdir = self.lab.out / "env" / f"libdir-{build}"
         libdir.mkdir(parents=True, exist_ok=True)
         code, out, err = tscli.cli("parse", "--cst", str(path), cwd=self.roots[build], timeout=120,
-                                   env={"TREE_SITTER_LIBDIR": str(libdir)})
+                                   env={"TREE_SITTER_LIBDIR": str(libdir), "CC": str(self.lab.cc)})
         if code not in (0, 1) or not tscli.CST_LINE.search(out):
             raise RuntimeError(f"{build}: parse --cst {path} printed no tree (exit {code}): {err[-300:]}")
         rows = set()
@@ -266,7 +270,8 @@ def main():
     if mismatches:
         raise SystemExit(f"generated inputs differ from the recorded ones: {mismatches}")
     lab.supervisor = lab.out / "build/supervisor.exe"
-    lab.compile("supervisor", ["-O2", "-Wall", "-Wextra", "-Werror", "-municode", HERE / "supervisor.c", "-lpsapi"],
+    lab.compile("supervisor", ["-O2", "-Wall", "-Wextra", "-Werror", "-municode", HERE / "supervisor.c", "-lpsapi",
+                               "-Wl,--no-insert-timestamp"],
                 lab.supervisor)
     selftest = self_test(lab)
     lab.supervised_builds = True
@@ -315,11 +320,15 @@ def main():
     lane_files = ["run.py", "gates.py", "cases.py", "probe.c", "supervisor.c", "benign.c", "recorded-inputs.json",
                   "runtime-0.27.0.sha256", "runtime-0.25.1.sha256", "runtime-0.26.13.sha256"]
     status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, timeout=60)
+    other_files = ["scripts/tscli.py", "scripts/corpus.py", "docs/provenance/upstream-sources.md", "package.json",
+                   "package-lock.json", "tree-sitter.json"]
     identity = {"cc": str(lab.cc), "cc_sha256": sha(lab.cc), "supervisor_sha256": sha(lab.supervisor),
-                "lane_sources": {f: sha(HERE / f) for f in lane_files},
+                "lane_sources": {**{f: sha(HERE / f) for f in lane_files}, **{f: sha(ROOT / f) for f in other_files}},
                 "git_clean": status.returncode == 0 and not status.stdout.strip(),
-                "selftest": selftest, "candidate": {f: sha(ROOT / f) for f in ("grammar.js", "src/parser.c", "src/scanner.c",
-                                                                          "src/node-types.json", "queries/highlights.scm")},
+                "selftest": selftest, "candidate": {f: sha(ROOT / f) for f in (
+                    "grammar.js", "src/parser.c", "src/scanner.c", "src/grammar.json", "src/node-types.json",
+                    "src/tree_sitter/alloc.h", "src/tree_sitter/array.h", "src/tree_sitter/parser.h",
+                    "queries/highlights.scm")},
                 "probes": {n: sha(p) for n, (p, _) in probes.items()},
                 "git_head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True,
                                            timeout=60).stdout.strip(),
