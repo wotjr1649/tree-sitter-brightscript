@@ -90,7 +90,9 @@ MATRIX = [
     ("C03", rec(pe(250.0), 1.0), rec(pe(250.0)), S, 200, False, "NOT_RUN_BUDGET_REACHED_UNOBSERVED"),
     ("C04", rec(CANCELLED), rec(ALLOC_X), D, 200, True, "MEASURED_ALLOCATION_CROSSING"),
     ("C05", rec(CANCELLED), rec(ALLOC_CB), D, 200, True, "MEASURED_CALLBACK_CROSSING"),
-    ("C06", rec(CANCELLED), rec(pe(250.0, True)), D, 200, False, "NOT_RUN_BUDGET_REACHED_UNOBSERVED"),
+    # A cancelled run without a crossing contradicts probe.c (a cancelling callback records one): S572 review.
+    ("C06", rec(CANCELLED), rec(pe(250.0, True)), D, 200, False, "MEASUREMENT_INCONSISTENT"),
+    ("C06-alloc-late-natural", rec(CANCELLED), rec(pe(230.0)), D, 200, False, "NOT_RUN_BUDGET_REACHED_UNOBSERVED"),
     ("C07", rec(pe(230.0)), rec(pe(230.0)), S, 200, False, "NOT_RUN_BUDGET_REACHED_UNOBSERVED"),
     ("C08-nan-last", [rec(pe(180.0))] * 5 + [rec(pe(NAN))], rec(pe(180.0)), S, 200, False, "MEASUREMENT_INCONSISTENT"),
     ("C08-inf", rec(pe(INF)), rec(pe(180.0)), S, 200, False, "MEASUREMENT_INCONSISTENT"),
@@ -158,6 +160,15 @@ MATRIX = [
     ("X15-error-erased", rec(pe(170.0), has_error=0), rec(pe(170.0)), S, 200, False, "NOT_APPLICABLE_BEFORE_BUDGET"),
     ("X16-callback-ignored-slow", rec(pe(400.0)), rec(pe(420.0, False, 200.0, False, 10, 20)), D, 200, False,
      "MEASURED_ALLOCATION_CROSSING"),
+    ("X09-last-measured-over", [rec(CANCELLED)] * 5 + [rec(pe(301.0, True, 200.4, True))], rec(ALLOC_X), D, 200,
+     False, "MEASURED_ALLOCATION_CROSSING"),
+    ("X11-cancelled-without-crossing", rec(pe(150.0, True)), rec(ALLOC_X), D, 200, False, "MEASUREMENT_INCONSISTENT"),
+    ("X15-allocator-error-erased", rec(pe(180.0)), rec(pe(180.0), has_error=0), S, 200, False,
+     "NOT_APPLICABLE_BEFORE_BUDGET"),
+    ("X15-warmup-error-erased", [rec(pe(180.0), has_error=0)] + [rec(pe(180.0))] * 5, rec(pe(180.0)), S, 200, False,
+     "NOT_APPLICABLE_BEFORE_BUDGET"),
+    ("X19-uninstrumented-allocation-crossing", rec(pe(250.0, True, 200.2, False, 1000, 2000)), rec(ALLOC_X), D, 200,
+     False, "MEASUREMENT_INCONSISTENT"),
     ("X19-warmup-nan", [rec(pe(NAN))] + [rec(pe(180.0))] * 5, rec(pe(180.0)), S, 200, False,
      "MEASUREMENT_INCONSISTENT"),
     ("X19-warmup-counter", [rec(pe(180.0, live=3))] + [rec(pe(180.0))] * 5, rec(pe(180.0)), S, 200, False,
@@ -168,7 +179,8 @@ FIELDS = {"X01-early-dual": ("PASS", "NOT_TRIGGERED"), "X01-early-safety": ("PAS
           "X03-foreach-100": ("PASS", "TRIGGERED"), "X04-no-borrowed-cancel": ("PASS", "NOT_TRIGGERED"),
           "X08-one-natural": ("PASS", "NOT_ALL_CANCELLED"), "X08-warmup-natural": ("PASS", "TRIGGERED"),
           "X14-valid-with-error": ("FAIL", "NOT_TRIGGERED"), "C04": ("PASS", "TRIGGERED"),
-          "C06": ("FAIL", "ALLOCATOR_GROWTH_UNOBSERVED"), "X16-callback-ignored-slow": ("FAIL", "NOT_ALL_CANCELLED")}
+          "C06": ("FAIL", "MEASUREMENT_INCONSISTENT"), "C06-alloc-late-natural": ("FAIL", "ALLOCATOR_GROWTH_UNOBSERVED"),
+          "X16-callback-ignored-slow": ("FAIL", "NOT_ALL_CANCELLED")}
 
 
 def gate_points(over=None):
@@ -195,6 +207,10 @@ GATE = [
     ("X13-family-duplicated", gate_points(), lambda p: p + [p[-1]], "FAIL"),
     ("X13-family-replaced", gate_points({("V-FLAT-1MiB", 100): (rec(C100), rec(A100))}),
      lambda p: p[:-1] + [("V-FLAT-1MiB", 100, A)], "FAIL"),
+    ("X13-actual-budget-moved", gate_points({(c, 25): (rec(pe(25.2, True, 25.1, True, budget=25.0)),
+                                                       rec(pe(26.0, True, 25.05, False, 1000, 2000, budget=25.0)))
+                                             for c in gates.ACTUAL_AT_100}),
+     lambda p: p[:-2] + [(c, 25, A) for c in gates.ACTUAL_AT_100], "FAIL"),
 ]
 
 
@@ -257,12 +273,24 @@ MUTANTS = {
     "flag types not checked": ("or type(cancelled) is not bool or type(at_callback) is not bool", ""),
     "coverage not required": ('pass_=safety and coverage in ("TRIGGERED", "NOT_REQUIRED"))', "pass_=safety)"),
     "return bound fixed at 300 ms": ("max(ret) <= budget + 100", "max(ret) <= 300"),
-    "warmup not checked": ("for j, c in zip(judged, checks))", "for j, c in zip(judged[1:], checks[1:]))"),
+    "warmup not checked": ("for j, c, m in zip(judged, checks, mixed))",
+                           "for j, c, m in zip(judged[1:], checks[1:], mixed[1:]))"),
     "result state not checked": ('wrong = checks.count("WRONG_RESULT")', "wrong = 0"),
     "bytes and final cancellation not checked": (
         'if f.get("bytes") != length or type(f.get("cancelled")) is not bool or f.get("cancelled") != pe.get('
         '"cancelled"):', "if False:"),
     "point set not checked": ('return result("CANCEL", registered and all(', 'return result("CANCEL", all('),
+    "measured runs shifted onto the warmup": ("plain = judged[1:6]", "plain = judged[0:5]"),
+    "allocator result not checked": ("checks = [result_check(x, case, length) for x in recs + [a]]",
+                                     'checks = [result_check(x, case, length) for x in recs] + ["OK"]'),
+    "warmup result not checked": ('wrong = checks.count("WRONG_RESULT")', 'wrong = checks[1:].count("WRONG_RESULT")'),
+    "cancelled without crossing accepted": ("bad = at_callback or live != 0 or peak != 0 or cancelled",
+                                            "bad = at_callback or live != 0 or peak != 0"),
+    "uninstrumented counters not checked": ("mixed = [not uninstrumented(x) for x in recs] + [False]",
+                                            "mixed = [False] * 7"),
+    "ACTUAL budgets not registered": (
+        "and actual == sorted((c, 100 if c in ACTUAL_AT_100 else 200) for c in CANCEL_ACTUAL))",
+        "and sorted(c for c, _ in actual) == sorted(CANCEL_ACTUAL))"),
     "allocator growth not required for coverage": (
         'coverage = "TRIGGERED" if point_status.startswith("MEASURED") else "ALLOCATOR_GROWTH_UNOBSERVED"',
         'coverage = "TRIGGERED"'),

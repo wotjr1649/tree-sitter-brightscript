@@ -222,7 +222,8 @@ def budget_run(rec, budget):
     if not bad and crossed:
         bad = number(cross) is None or not budget <= cross <= parse_ms or peak < live
     elif not bad:
-        bad = at_callback or live != 0 or peak != 0
+        # A cancellation is requested only by a callback after the budget, which records a crossing (probe.c).
+        bad = at_callback or live != 0 or peak != 0 or cancelled
     if bad:
         return True, "MEASUREMENT_INCONSISTENT", None, parse_ms, None
     cleanup = (0 if cancelled else tree_ms) + parser_ms
@@ -237,6 +238,13 @@ def budget_run(rec, budget):
 def run_id(rec):
     """One native execution: the supervisor's process id and creation time."""
     return f"{rec['report'].get('pid')}@{rec['report'].get('creation_filetime')}"
+
+
+def uninstrumented(rec):
+    """An uninstrumented run counts no allocations: no allocator counters, and a crossing only at the callback."""
+    pe = rec["events"].get("parse") or {}
+    return pe.get("live_at_budget") == 0 and pe.get("peak_after_budget") == 0 and (
+        pe.get("budget_cross_ms") == -1 or pe.get("cross_at_callback") is True)
 
 
 def result_check(rec, case, length):
@@ -272,8 +280,9 @@ def cancel_point(r, case, budget, roles):
         length = len(cases.generate(case))
         judged = [budget_run(x, budget) for x in recs + [a]]          # warmup, 5 measured, allocator
         checks = [result_check(x, case, length) for x in recs + [a]]
-        inconsistent = sum(j[1] == "MEASUREMENT_INCONSISTENT" or c == "MEASUREMENT_INCONSISTENT"
-                           for j, c in zip(judged, checks))
+        mixed = [not uninstrumented(x) for x in recs] + [False]    # allocator evidence in an uninstrumented run
+        inconsistent = sum(j[1] == "MEASUREMENT_INCONSISTENT" or c == "MEASUREMENT_INCONSISTENT" or m
+                           for j, c, m in zip(judged, checks, mixed))
         wrong = checks.count("WRONG_RESULT")
         plain = judged[1:6]
         reached, status, post, alloc_ms, _ = judged[6]
@@ -317,8 +326,9 @@ def cancel_point(r, case, budget, roles):
 def cancel(r):
     points = [cancel_point(r, case, budget, roles) for case, budget, roles in CANCEL_POINTS]
     safety = [(c, b) for c, b, roles in CANCEL_POINTS if "SAFETY" in roles]
-    actual = sorted(c for c, _, roles in CANCEL_POINTS if "ACTUAL" in roles)
-    registered = safety == [(c, 200) for c in CANCEL_V3 + CANCEL_ACTUAL] and actual == sorted(CANCEL_ACTUAL)
+    actual = sorted((c, b) for c, b, roles in CANCEL_POINTS if "ACTUAL" in roles)
+    registered = (safety == [(c, 200) for c in CANCEL_V3 + CANCEL_ACTUAL]
+                  and actual == sorted((c, 100 if c in ACTUAL_AT_100 else 200) for c in CANCEL_ACTUAL))
     return result("CANCEL", registered and all(p["pass"] for p in points), points,
                   ["return and cleanup over 5 runs after 1 warmup; growth after the budget from the allocator build",
                    "each run judged by its own budget, time and crossing (Session 05-7-1 C1)",
