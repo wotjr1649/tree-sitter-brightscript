@@ -411,7 +411,9 @@ job from running. The full record and known FAILs are in
 The POSIX supervisor uses a private environment, a process group, a watchdog
 and bounded output, with a preflight that exercises a descendant which keeps
 the pipe open and one which closes it. Ubuntu applies `RLIMIT_AS` to each
-child and measures peak RSS. macOS could not apply `RLIMIT_AS` on the hosted
+child and measures peak RSS. The supervisor observes the group leader with
+`waitid(..., WNOWAIT)` and reaps it only after checking live group members;
+an unavailable group-status observation fails the lane. macOS could not apply `RLIMIT_AS` on the hosted
 runner, so it samples the process group's physical footprint using Apple's
 [`libproc` interfaces](https://github.com/apple-oss-distributions/xnu/blob/main/libsyscall/wrappers/libproc/libproc.h)
 and kills the group when the cap is exceeded; a child-memory control checks

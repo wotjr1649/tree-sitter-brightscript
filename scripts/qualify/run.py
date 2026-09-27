@@ -47,6 +47,16 @@ if sys.platform == "darwin":
     _libproc.proc_pid_rusage.restype = ctypes.c_int
     _libproc.proc_listpgrppids.argtypes = (ctypes.c_int, ctypes.c_void_p, ctypes.c_int)
     _libproc.proc_listpgrppids.restype = ctypes.c_int
+    _libproc.proc_pidinfo.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_int)
+    _libproc.proc_pidinfo.restype = ctypes.c_int
+
+    def darwin_group_pids(pgid):
+        pids = (ctypes.c_int * 4096)()
+        ctypes.set_errno(0)
+        count = _libproc.proc_listpgrppids(pgid, pids, ctypes.sizeof(pids))
+        if count < 0 or count >= len(pids) or count == 0 and ctypes.get_errno():
+            raise OSError(ctypes.get_errno(), "proc_listpgrppids failed or overflowed")
+        return pids[:count]
 
     def darwin_footprint(pid):
         usage = DarwinUsage()
@@ -55,19 +65,52 @@ if sys.platform == "darwin":
         return usage.phys_footprint
 
     def darwin_group_footprint(pgid):
-        pids = (ctypes.c_int * 4096)()
-        ctypes.set_errno(0)
-        count = _libproc.proc_listpgrppids(pgid, pids, ctypes.sizeof(pids))
-        if count < 0 or count >= len(pids) or count == 0 and ctypes.get_errno():
-            raise OSError(ctypes.get_errno(), "proc_listpgrppids failed or overflowed")
         total = 0
-        for pid in pids[:count]:
+        for pid in darwin_group_pids(pgid):
             try:
                 total += darwin_footprint(pid)
             except OSError as error:
                 if error.errno != errno.ESRCH:
                     raise
         return total
+
+    def darwin_live_group_pids(pgid, leader, leader_exited):
+        live = []
+        for pid in darwin_group_pids(pgid):
+            if pid == leader and leader_exited:
+                continue
+            info = (ctypes.c_uint8 * 256)()
+            ctypes.set_errno(0)
+            size = _libproc.proc_pidinfo(pid, 13, 0, info, ctypes.sizeof(info))  # PROC_PIDT_SHORTBSDINFO
+            if not size and ctypes.get_errno() == errno.ESRCH:
+                continue
+            if size < 16:
+                raise OSError(ctypes.get_errno(), "proc_pidinfo status unavailable")
+            status = ctypes.c_uint32.from_buffer(info, 12).value  # pbsi_status; SZOMB == 5
+            if status != 5:
+                live.append(pid)
+        return live
+
+
+def posix_live_group_pids(pgid, leader, leader_exited):
+    if sys.platform == "darwin":
+        return darwin_live_group_pids(pgid, leader, leader_exited)
+    live = []
+    for path in Path("/proc").iterdir():
+        if not path.name.isdecimal():
+            continue
+        try:
+            pid = int(path.name)
+            if os.getpgid(pid) != pgid:
+                continue
+            fields = (path / "stat").read_text(encoding="utf-8", errors="replace").rsplit(") ", 1)[1].split()
+        except (FileNotFoundError, ProcessLookupError):
+            continue
+        if int(fields[2]) != pgid:
+            raise RuntimeError("POSIX process group changed during inspection")
+        if fields[0] not in ("Z", "X") and (pid != leader or not leader_exited):
+            live.append(pid)
+    return live
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -205,18 +248,17 @@ class Lab:
                                     start_new_session=True, preexec_fn=limits)
             selector = selectors.DefaultSelector()
             selector.register(proc.stdout, selectors.EVENT_READ)
-            status, usage, reason, stored, pipe_open, reaped = None, None, "COMPLETED", 0, True, False
+            status, usage, reason, stored, pipe_open, exited, waited = None, None, "COMPLETED", 0, True, False, False
             descendant_pipe = False
-            peak_sampled, last_sample, max_sample_gap, samples_after_reap = 0, start, 0, 0
+            peak_sampled, last_sample, max_sample_gap, samples_after_exit = 0, start, 0, 0
             group_cleared = False
             try:
-                while pipe_open or not reaped:
+                while pipe_open or not exited:
                     if time.monotonic() - start > ms / 1000 + 2:
-                        raise RuntimeError(f"POSIX supervisor could not drain or reap {cid}")
-                    if not reaped:
-                        pid, got, used = os.wait4(proc.pid, os.WNOHANG)
-                        if pid:
-                            status, usage, reaped = got, used, True
+                        raise RuntimeError(f"POSIX supervisor could not drain or observe exit for {cid}")
+                    if not exited:
+                        # WNOWAIT retains the group leader PID until descendants are inspected and signalled.
+                        exited = os.waitid(os.P_PID, proc.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT) is not None
                     if sys.platform == "darwin":
                         now = time.monotonic()
                         max_sample_gap = max(max_sample_gap, now - last_sample)
@@ -224,15 +266,16 @@ class Lab:
                         try:
                             footprint = darwin_group_footprint(proc.pid)
                             peak_sampled = max(peak_sampled, footprint)
-                            if reaped:
-                                samples_after_reap += 1
-                        except OSError:
-                            if reaped:
+                            if exited:
+                                samples_after_exit += 1
+                        except OSError as error:
+                            if error.errno != errno.ESRCH:
                                 raise
-                            pid, got, used = os.wait4(proc.pid, os.WNOHANG)
-                            if not pid:
+                            if exited:
                                 raise
-                            status, usage, reaped = got, used, True
+                            if os.waitid(os.P_PID, proc.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT) is None:
+                                raise
+                            exited = True
                         if peak_sampled > cap and reason == "COMPLETED":
                             reason = "MEMORY_LIMIT_REACHED"
                             try:
@@ -261,39 +304,43 @@ class Lab:
                                 os.killpg(proc.pid, signal.SIGKILL)
                             except ProcessLookupError:
                                 pass
-                    if reaped and pipe_open and not events and reason == "COMPLETED":
+                    if exited and pipe_open and not events and reason == "COMPLETED":
                         descendant_pipe = True
                         reason = "DESCENDANTS_TERMINATED"
                         try:
                             os.killpg(proc.pid, signal.SIGKILL)
                         except ProcessLookupError:
                             pass
-                try:
-                    os.killpg(proc.pid, 0)
-                except ProcessLookupError:
-                    pass
-                else:
-                    if reason == "COMPLETED":
-                        reason = "DESCENDANTS_TERMINATED"
-                    os.killpg(proc.pid, signal.SIGKILL)
+                if posix_live_group_pids(proc.pid, proc.pid, exited):
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except (ProcessLookupError, PermissionError):
+                        if posix_live_group_pids(proc.pid, proc.pid, exited):
+                            raise
+                    else:
+                        if reason == "COMPLETED":
+                            reason = "DESCENDANTS_TERMINATED"
                     deadline = time.monotonic() + 2
                     while time.monotonic() < deadline:
-                        try:
-                            os.killpg(proc.pid, 0)
-                        except ProcessLookupError:
+                        if not posix_live_group_pids(proc.pid, proc.pid, exited):
                             break
                         time.sleep(0.01)
                     else:
                         raise RuntimeError(f"POSIX process group did not exit for {cid}")
                 group_cleared = True
+                _, status, usage = os.wait4(proc.pid, 0)
+                waited = True
                 proc.returncode = os.waitstatus_to_exitcode(status)
             finally:
-                if not group_cleared:
+                if not group_cleared and not waited:
                     try:
                         os.killpg(proc.pid, signal.SIGKILL)
+                    except (ProcessLookupError, PermissionError):
+                        pass
+                    try:
+                        os.kill(proc.pid, signal.SIGKILL)
                     except ProcessLookupError:
                         pass
-                if not reaped:
                     os.wait4(proc.pid, 0)
                 selector.close()
                 proc.stdout.close()
@@ -304,13 +351,13 @@ class Lab:
                   "memory_metric": "group_sampled_phys_footprint_bytes" if sys.platform == "darwin" else "peak_rss_bytes",
                   "memory_limit_mode": "group_sampled_kill" if sys.platform == "darwin" else "kernel_rlimit_as",
                   "max_sample_gap_ms": max_sample_gap * 1000, "configured_job_memory_limit_bytes": cap,
-                  "samples_after_reap": samples_after_reap if sys.platform == "darwin" else None,
-                  "image_path": str(Path(argv[0]).resolve()), "exit_confirmed": reaped,
+                  "samples_after_exit": samples_after_exit if sys.platform == "darwin" else None,
+                  "image_path": str(Path(argv[0]).resolve()), "exit_confirmed": waited,
                   "active_processes": 0 if not pipe_open else None,
                   "descendant_pipe_observed": descendant_pipe,
                   "elapsed_ms": (time.monotonic() - start) * 1000}
         (raw / "supervisor.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
-        guard = reaped and report["active_processes"] == 0 and report["configured_job_memory_limit_bytes"] == cap
+        guard = waited and report["active_processes"] == 0 and report["configured_job_memory_limit_bytes"] == cap
         self.record(kind="supervised", command_id=cid, argv=argv, image_sha256=sha(argv[0]), report=report,
                     guard=guard)
         if not guard:
@@ -452,7 +499,7 @@ def self_test(lab):
                                report.get("max_sample_gap_ms", float("inf")) <= 100),
               "memory-child-orphan": (report["termination_reason"] in ("MEMORY_LIMIT_REACHED", "DESCENDANTS_TERMINATED") and
                                       "MEMORY_CHILD_ALIVE" in text and
-                                      report["samples_after_reap"] > 0 and
+                                      report["samples_after_exit"] > 0 and
                                       report["peak_working_set_bytes"] <= 96 * 2**20 and
                                       report.get("max_sample_gap_ms", float("inf")) <= 100),
               "private-env": report["termination_reason"] == "COMPLETED" and "PRIVATE_ENV_COMPLETED" in text}[mode]
