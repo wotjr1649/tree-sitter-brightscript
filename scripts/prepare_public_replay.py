@@ -51,6 +51,7 @@ def unzip(archive, prefix, out):
                     or not stat.S_ISREG(row.external_attr >> 16) or row.filename.casefold() in names):
                 raise ValueError("unsafe/duplicate archive member")
             names.add(row.filename.casefold())
+        out = out.resolve()
         out.mkdir(parents=True, exist_ok=False)
         for row in rows:
             path = out / row.filename[len(prefix) + 1:]
