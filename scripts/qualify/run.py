@@ -154,7 +154,8 @@ class Lab:
             try:
                 resource.setrlimit(resource.RLIMIT_AS, (cap, cap))
             except (OSError, ValueError) as error:
-                os.write(2, f"RLIMIT_AS_FAILED {type(error).__name__} {getattr(error, 'errno', None)}\n".encode())
+                current = resource.getrlimit(resource.RLIMIT_AS)
+                os.write(2, f"RLIMIT_AS_FAILED {type(error).__name__} {error} current={current}\n".encode())
                 os._exit(92)
 
         start = time.monotonic()
