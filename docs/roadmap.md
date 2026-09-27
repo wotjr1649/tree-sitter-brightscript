@@ -2,36 +2,14 @@
 
 ## Current maturity
 
-Grammar version 0.1.0: released 2026-09-26 (tag `v0.1.0`,
-[reports/0.1.0-release.md](reports/0.1.0-release.md#release-v010)). Release candidate (Session 03), independently
-audited in Session 04 ([reports/0.1.0-release-audit.md](reports/0.1.0-release-audit.md)),
-release-frozen in Session 05 ([reports/0.1.0-release.md](reports/0.1.0-release.md));
-Session 05-1 isolated the final-review finding B-01, fixed the
-unclosed-call recovery family and the recovery memory of two others (`^` and
-PRINT items) found by its re-audits, and disclosed the remaining
-quadratic-time recovery behaviour as the class KL-002. Its round-5 re-audit
-found three release-blocking findings, and Session 05-1 ended on hold
-([reports/0.1.0-release.md](reports/0.1.0-release.md#status-hold)).
-Sessions 05-2 and 07 found four more material findings and Session 05-3
-fixed part of one (member and attribute chains in the highlight query); all
-seven stayed open ([reports/0.1.0-structural-recovery-safety.md](reports/0.1.0-structural-recovery-safety.md)).
-Session 05-7 re-froze the public schema before the first release
-(ADR-0007), added the error-recovery scanner (ADR-0008) and built one
-candidate meant to close all seven and retire KL-002 on the stock runtime;
-the KL-002 retirement is established; the Session 05-7-1 confirmation
-failed its first run on the lane's actual-cancellation registration, and
-Session 05-7-2 revised that check (P572-SEP) and confirmed all seven
-closures in three passing runs of the release qualification lane on the
-local Windows host
-([reports/0.1.0-integrated-qualification.md](reports/0.1.0-integrated-qualification.md));
-the owner approved its release. The 0.1.0 release is the commit identified
-by the `v0.1.0` tag and its GitHub Release; no package is published.
-Phases 1–5 have their exit evidence in
-[reports/0.1.0-release-candidate.md](reports/0.1.0-release-candidate.md) and
-the release record. Phase 6 was tried on a local `go-treesitter` branch that
-is neither merged nor pushed; it did not pass V9 (recovery-tree differences in
-the Go runtime), so no pin change is proposed there, and it is the next piece
-of work, in that repository, on the released identity. Phase 7 is later work.
+v0.1.0 was released on 2026-09-26 ([release record](reports/0.1.0-release.md#release-v010)).
+The [0.1.1 maintenance candidate](reports/0.1.1-maintenance-release.md) preserves product behaviour
+and separates new validation from historical performance evidence. Publication is not complete.
+After verified publication, [maintenance freeze](maintenance.md) begins; only its concrete triggers reopen triage.
+
+The phases below record the original development roadmap, not automatic next tasks.
+Past holds and failed campaigns remain in [qualification history](reports/0.1.0-integrated-qualification.md).
+Go integration, device evidence and 1.0 features are not follow-up obligations of this maintenance patch.
 
 ## Phases
 
@@ -48,7 +26,6 @@ of work, in that repository, on the released identity. Phase 7 is later work.
 ## Not planned
 
 - Level 2 device campaign: no Roku device is available or planned. Level
-  2-dependent requirements stay `provisional` or `unresolved`. Revisit if a
-  device becomes available.
+  2-dependent requirements stay `provisional` or `unresolved`. Any device work needs separate scope and authority.
 - Language bindings and WASM artifacts: added only for a named consumer.
 - Roku OS compatibility checking: outside this repository's scope.

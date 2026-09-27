@@ -8,6 +8,8 @@ This file contains stable operating constraints. Volatile session instructions, 
 
 1. `docs/README.md` — map of canonical documents and when to read each.
 2. The latest local handoff under `artifacts/handoff/`, if one exists.
+3. For maintenance or freeze work, `docs/maintenance.md`; the narrow 0.1.1
+   evidence exception is ADR-0009, linked by `docs/validation/validation.md`.
 
 If this file and a canonical document disagree, stop and report the conflict instead of choosing one.
 

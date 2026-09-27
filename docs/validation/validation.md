@@ -83,7 +83,7 @@ every row below is `PASS`. Workload sets are defined in
 | Incremental | W10 passes (and the spike's E1–E6 when it passed). |
 | Native oracle | W12 is recorded for the candidate identity. |
 | Robustness | W06, W07 and W13 show no crash, hang or runaway memory. |
-| Release qualification | Every gate of the release qualification lane passes for the candidate identity. |
+| Release qualification | Every gate of the release qualification lane passes for the candidate identity, except the explicit, conditional 0.1.1 maintenance route in ADR-0009 below. |
 | Level 1 refresh | A new dated snapshot of the ten Level 1 pages is taken before the candidate and stored beside `roku-docs-2026-09-23` (source-policy refresh rules); for every page whose content-region SHA-256 changed, each citing requirement is reviewed and the outcome recorded in `upstream-sources.md`. |
 | Provenance | Generator identity, Level 1 snapshot identity and SHA-256 of every generated file are recorded. |
 | Hosted CI | The workflow `.github/workflows/ci.yml` passes on Windows and Ubuntu for the candidate commit, pushed to the session branch; a local run does not substitute. |
@@ -128,7 +128,12 @@ downstream results if run; review findings and their disposition; the verdict.
 
 Every recorded result names: grammar commit, generator version, ABI,
 SHA-256 of the generated files, runtime version (V5, V6, V9), Level 1 snapshot
-ID (V3), and date. A result for one identity is never reused for another.
+ID (V3), and date. A result for one identity is never reused for another,
+except the explicit performance-evidence applicability review for the version-only
+0.1.1 patch in [ADR-0009](../design/decisions/ADR-0009-maintenance-evidence-carry-forward.md).
+That route preserves the measured 0.1.0 result and records `CARRIED_FORWARD`
+separately from execution status; it never labels historical timing as a new run.
+All new correctness, safety, packaging and CI obligations in that ADR remain required.
 
 Every check script runs the CLI only through `scripts/tscli.py` (so the check
 does not depend on the order of CI steps) and starts no other program but git,

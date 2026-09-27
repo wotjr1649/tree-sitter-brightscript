@@ -6,6 +6,8 @@ link to it rather than restate it.
 | Document | Purpose | Read when |
 |---|---|---|
 | [roadmap.md](roadmap.md) | Current maturity and planned phases | Orienting; planning a session |
+| [maintenance.md](maintenance.md) | Maintenance scope, security boundary and freeze triggers | Maintaining or reopening a frozen release |
+| [reports/0.1.1-maintenance-release.md](reports/0.1.1-maintenance-release.md) | Current maintenance candidate; new and inherited evidence kept separate | Checking 0.1.1 readiness or publication |
 | [design/architecture.md](design/architecture.md) | Pipeline, ownership, layout, principles, decision index | Starting any work |
 | [design/decisions/](design/decisions/) | ADRs: why each architectural decision was made | Changing or questioning a decision |
 | [specs/grammar-contract.md](specs/grammar-contract.md) | What the grammar promises; acceptance policy; non-goals | Designing or reviewing grammar rules |
@@ -29,6 +31,13 @@ link to it rather than restate it.
 
 Repository-wide operating rules for contributors and coding agents are in
 `AGENTS.md` at the repository root.
+
+Current contracts are the specifications, validation, provenance and maintenance
+documents. Versioned reports record their named identity and date; earlier HOLD,
+FAIL, schema and performance tables remain historical evidence. The 0.1.0
+publication record is `reports/0.1.0-release.md` (Release v0.1.0), with its final
+qualification in `reports/0.1.0-integrated-qualification.md`. Security reporting
+and version changes are in [SECURITY.md](../SECURITY.md) and [CHANGELOG.md](../CHANGELOG.md).
 
 ## Canonical and local material
 
