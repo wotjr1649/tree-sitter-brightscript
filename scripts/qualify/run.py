@@ -152,7 +152,8 @@ class Lab:
 
         def limits():
             try:
-                resource.setrlimit(resource.RLIMIT_AS, (cap, cap))
+                _, hard = resource.getrlimit(resource.RLIMIT_AS)
+                resource.setrlimit(resource.RLIMIT_AS, (cap, hard if sys.platform == "darwin" else cap))
             except (OSError, ValueError) as error:
                 current = resource.getrlimit(resource.RLIMIT_AS)
                 os.write(2, f"RLIMIT_AS_FAILED {type(error).__name__} {error} current={current}\n".encode())
