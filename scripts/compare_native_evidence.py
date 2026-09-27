@@ -1,7 +1,22 @@
 """Fail closed unless the three supported OS report the same normalized native behavior."""
 import argparse
 import json
+import re
 from pathlib import Path
+
+from build_native_evidence import REQUIRED_GATES
+
+SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+SHA1 = re.compile(r"[0-9a-f]{40}\Z")
+COMMON_KEYS = {"commit", "candidate", "lane_sources", "runtime", "support", "seed", "gate_statuses",
+               "oracle_cases", "oracle_workload", "oracle_content_sha256", "native_trees", "native_runs",
+               "incremental"}
+ARCHITECTURES = {"win32": {"amd64", "x86_64"}, "linux": {"x86_64", "amd64"},
+                 "darwin": {"arm64", "aarch64"}}
+
+
+def digest(value):
+    return isinstance(value, str) and SHA256.fullmatch(value) is not None
 
 
 def load(path):
@@ -9,8 +24,39 @@ def load(path):
     if not path.is_file() or path.is_symlink() or path.stat().st_size > 16 * 2**20:
         raise ValueError(f"missing or oversized evidence: {path.name}")
     result = json.loads(path.read_text(encoding="utf-8"))
-    if set(result) != {"common", "host"} or len(result["common"]["gate_statuses"]) != 17:
+    if set(result) != {"common", "host"} or not isinstance(result["common"], dict):
         raise ValueError("incomplete native evidence")
+    common, host = result["common"], result["host"]
+    if set(common) != COMMON_KEYS or not isinstance(host, dict) or host.get("platform") not in ARCHITECTURES:
+        raise ValueError("incomplete native evidence")
+    if host.get("architecture") not in ARCHITECTURES[host["platform"]]:
+        raise ValueError("unsupported host architecture")
+    if (not isinstance(common["commit"], str) or not SHA1.fullmatch(common["commit"])
+            or common["gate_statuses"] != list(REQUIRED_GATES)
+            or common["runtime"] != "0.27.0" or common["support"] != ["0.25.1", "0.26.13"]
+            or common["seed"] != 5707 or common["oracle_cases"] != 231
+            or common["oracle_workload"].get("cases") != 231
+            or not digest(common["oracle_workload"].get("sha256"))
+            or not digest(common["oracle_content_sha256"])):
+        raise ValueError("incomplete native identity")
+    for key in ("candidate", "lane_sources"):
+        if not isinstance(common[key], dict) or not common[key] or not all(digest(v) for v in common[key].values()):
+            raise ValueError(f"incomplete {key} identity")
+    trees = common["native_trees"]
+    if (not isinstance(trees, list) or len(trees) != 2811
+            or any(not isinstance(t, dict) or set(t) != {"name", "input_sha256", "tree_sha256"}
+                   or not isinstance(t["name"], str) or not digest(t["input_sha256"])
+                   or not digest(t["tree_sha256"]) for t in trees)
+            or len({t["name"] for t in trees}) != len(trees)):
+        raise ValueError("incomplete native tree results")
+    if not isinstance(common["native_runs"], dict) or len(common["native_runs"]) != 1533:
+        raise ValueError("incomplete native run results")
+    incremental = common["incremental"]
+    if (not isinstance(incremental, list) or len(incremental) != 30
+            or any(not isinstance(p, dict) or p.get("pass") is not True for p in incremental)
+            or [p.get("case") for p in incremental if "detected" in p] != [
+                "comparator self-test 1", "comparator self-test 2"]):
+        raise ValueError("incomplete incremental results")
     return result
 
 

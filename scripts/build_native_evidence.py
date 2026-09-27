@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import platform
 from pathlib import Path
 
 from check_oracle_pair import compare, stable_files
@@ -49,6 +50,24 @@ def signatures(path):
     return out
 
 
+def incremental_signatures(points):
+    out = []
+    for point in points:
+        if not point["pass"]:
+            raise ValueError("incremental point failed")
+        if "result" in point:
+            out.append({"case": point["case"], "pass": True,
+                        "result": {k: v for k, v in point["result"].items() if not k.endswith("_ms")}})
+        elif point["case"] in ("comparator self-test 1", "comparator self-test 2") and point.get("detected") is True:
+            out.append({"case": point["case"], "pass": True, "detected": True})
+        else:
+            raise ValueError("unknown incremental evidence shape")
+    if len(out) != 30 or [p["case"] for p in out if "detected" in p] != [
+            "comparator self-test 1", "comparator self-test 2"]:
+        raise ValueError("incremental evidence is incomplete")
+    return out
+
+
 def build(qualification, oracle_a, oracle_b):
     q = Path(qualification)
     identity = read_json(q / "identity.json", 2**20)
@@ -71,11 +90,7 @@ def build(qualification, oracle_a, oracle_b):
     if not isinstance(trees, list) or len(trees) != 2811:
         raise ValueError("native SEM-PUBLIC tree digest set is incomplete")
     incremental = gates[REQUIRED_GATES.index("INCREMENTAL-REPAIR")]["points"]
-    edits = [{"case": p["case"], "pass": p["pass"],
-              "result": {k: v for k, v in p["result"].items() if not k.endswith("_ms")}}
-             for p in incremental]
-    if any(not p["pass"] for p in edits):
-        raise ValueError("incremental point failed")
+    edits = incremental_signatures(incremental)
     with (q / "runs.jsonl").open(encoding="utf-8") as runs_file:
         first_run = json.loads(runs_file.readline())
     return {
@@ -89,7 +104,8 @@ def build(qualification, oracle_a, oracle_b):
             "native_runs": signatures(q / "runs.jsonl"), "incremental": edits,
         },
         "host": {
-            "platform": oracle_id["platform"], "cc_sha256": identity["cc_sha256"],
+            "platform": oracle_id["platform"], "architecture": platform.machine().lower(),
+            "cc_sha256": identity["cc_sha256"],
             "cli_binary_sha256": oracle_id["cli_binary_sha256"],
             "supervisor_kind": identity["supervisor_kind"],
             "probe_sha256": identity["probes"],
