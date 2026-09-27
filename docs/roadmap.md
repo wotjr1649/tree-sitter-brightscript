@@ -2,9 +2,10 @@
 
 ## Current maturity
 
-v0.1.0 was released on 2026-09-26 ([release record](reports/0.1.0-release.md#release-v010)).
-The [0.1.1 maintenance release](reports/0.1.1-maintenance-release.md) was published and publicly verified on 2026-09-27.
+v0.1.2 was released on 2026-09-27 ([release record](reports/0.1.2-maintenance-candidate.md)).
 It preserves product behaviour and separates new validation from historical performance evidence.
+The [Session 08 source-platform candidate](reports/session-08-cross-platform-source-validation.md)
+adds Windows x64, Ubuntu x64 and macOS ARM64 CI evidence without changing that release identity.
 The [maintenance freeze](maintenance.md) is active; only its concrete triggers reopen triage.
 
 The phases below record the original development roadmap, not automatic next tasks.

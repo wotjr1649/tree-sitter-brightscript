@@ -1,5 +1,12 @@
 # 변경 이력
 
+## 0.1.3 — release candidate
+
+- Windows x64, Ubuntu x64, macOS 15 Apple Silicon ARM64의 소스 빌드와 공통 기능 CI를 추가한다.
+- macOS의 `ru_maxrss` 단위와 `/var` 경로 정규화에 따른 공개 자료 추출 오류를 수정한다.
+- 문법, scanner, query, public tree는 유지한다. 배포는 소스 전용이며 OS별 바이너리는 제공하지 않는다.
+- [후보 검증 기록](docs/reports/0.1.3-release-candidate.md)에 검증 범위와 출하 조건을 둔다.
+
 ## 0.1.2 — 2026-09-27
 
 [v0.1.2](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.2)를

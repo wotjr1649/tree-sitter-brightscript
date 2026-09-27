@@ -22,6 +22,7 @@ ASSETS = {"tree-sitter-brightscript-v0.1.1-source.zip":
           "tree-sitter-brightscript-v0.1.1-verification.zip":
           (17195587, "5df890ab9ed9ef2786ba82acd42146f25eb69fc1741f18866d1b474a44ee2486")}
 K1 = "ebe8c4ce2c5bbe21a1b1e90d1c6a8b9824aca4931074015b6de20ccb35a19f2e"
+HISTORICAL_012 = "6724e03dd9b998b58b4e3525d60dc1e6ce3925e3"
 
 
 def digest(data):
@@ -51,6 +52,7 @@ def unzip(archive, prefix, out):
                     or not stat.S_ISREG(row.external_attr >> 16) or row.filename.casefold() in names):
                 raise ValueError("unsafe/duplicate archive member")
             names.add(row.filename.casefold())
+        out = out.resolve()
         out.mkdir(parents=True, exist_ok=False)
         for row in rows:
             path = out / row.filename[len(prefix) + 1:]
@@ -72,7 +74,7 @@ def deterministic_zip(path, files, prefix):
             z.writestr(info, data)
 
 
-def prepare(out, baseline_assets=None):
+def prepare(out, baseline_assets=None, historical_v012=False):
     out = Path(out).resolve()
     if not out.is_relative_to(ROOT / ".work") or out.exists():
         raise ValueError("output must be a new directory under .work")
@@ -98,7 +100,8 @@ def prepare(out, baseline_assets=None):
     source = out / "source"
     source.mkdir()
     files, modes, packed = {}, {}, []
-    for entry in git("ls-tree", "-rz", "--full-tree", "HEAD").split(b"\0"):
+    source_ref = HISTORICAL_012 if historical_v012 else "HEAD"
+    for entry in git("ls-tree", "-rz", "--full-tree", source_ref).split(b"\0"):
         if not entry:
             continue
         meta, encoded_name = entry.split(b"\t", 1)
@@ -118,9 +121,9 @@ def prepare(out, baseline_assets=None):
     version = json.loads((source / "package.json").read_text(encoding="utf-8"))["version"]
     if version != "0.1.2":
         raise ValueError("this packaging contract is only for 0.1.2")
-    registration = {"schema": "S07-CANDIDATE-r1", "commit": git("rev-parse", "HEAD").decode().strip(),
-                    "commit_object": git("cat-file", "commit", "HEAD").decode("utf-8"),
-                    "tree": git("rev-parse", "HEAD^{tree}").decode().strip(), "baseline_K1": K1,
+    registration = {"schema": "S07-CANDIDATE-r1", "commit": git("rev-parse", source_ref).decode().strip(),
+                    "commit_object": git("cat-file", "commit", source_ref).decode("utf-8"),
+                    "tree": git("rev-parse", source_ref + "^{tree}").decode().strip(), "baseline_K1": K1,
                     "files": files, "modes": modes}
     (q / "candidate-registration.json").write_bytes(json_bytes(registration))
     proof = compare({n: (q / "baseline-source" / n).read_bytes() for n in COMPONENTS},
@@ -167,5 +170,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", required=True)
     parser.add_argument("--baseline-assets")
+    parser.add_argument("--historical-v012", action="store_true")
     args = parser.parse_args()
-    print(json.dumps(prepare(args.out, args.baseline_assets), indent=2))
+    print(json.dumps(prepare(args.out, args.baseline_assets, args.historical_v012), indent=2))

@@ -6,14 +6,13 @@ import tempfile
 import unittest
 import zipfile
 
-from check_maintenance import ROOT
 import check_maintenance_012 as maintenance
 import prepare_public_replay as package
 
 
 class Maintenance012(unittest.TestCase):
     def test_exact_delta_and_rejected_mutations(self):
-        old = {n: (ROOT / n).read_bytes() for n in maintenance.COMPONENTS}
+        old = {n: package.git("show", f"{package.HISTORICAL_012}:{n}") for n in maintenance.COMPONENTS}
         old["src/parser.c"] = old["src/parser.c"].replace(
             maintenance.METADATA_011.replace(b".patch_version = 1", b".patch_version = 2"), maintenance.METADATA_011)
         for name in maintenance.POINTERS:

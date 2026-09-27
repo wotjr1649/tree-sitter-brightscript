@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -21,6 +21,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # Historical v0.1.2 replay needs its exact commit.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
@@ -36,6 +37,7 @@ jobs:
       - name: Verified CLI path self-test
         run: python scripts/test_tscli.py
       - name: Offline replay and maintenance controls
+        shell: bash
         run: |
           python scripts/test_replay_compare.py
           python scripts/test_public_verifier.py
@@ -50,17 +52,22 @@ jobs:
         # Verified binary, private parser library and configuration (validation.md "Identity binding").
         run: python scripts/tscli.py test
       - name: Composite samples (W03) and equivalent spellings (W05)
+        shell: bash
         run: |
           python scripts/check_samples.py
           python scripts/check_spellings.py
       - name: Robustness (W06, W07, W08, W13 with fuzzing)
-        run: python scripts/check_robustness.py
+        shell: bash
+        run: |
+          python scripts/test_robustness_units.py
+          python scripts/check_robustness.py
       - name: Incremental edits (W10) and literal-false spike criteria C4, C5
+        shell: bash
         run: |
           python scripts/check_incremental.py
           python scripts/check_spike.py
-      - name: Prepare frozen source and historical public replay inputs
-        run: python scripts/prepare_public_replay.py --out=.work/public-replay
+      - name: Prepare historical v0.1.2 public replay inputs
+        run: python scripts/prepare_public_replay.py --out=.work/public-replay --historical-v012
       - name: Offline public replay from exported candidate source
         run: python -I -B -X utf8 scripts/verify_public.py --bundle .work/public-replay/verification/baseline --baseline-source .work/public-replay/verification/baseline-source --candidate-source .work/public-replay/source --candidate-registration .work/public-replay/verification/candidate-registration.json
       - name: No tracked changes

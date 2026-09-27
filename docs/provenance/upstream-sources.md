@@ -123,6 +123,34 @@ L1 근거·분류는 유지한다. 원문 전체는 Git/공개 verification asse
 | `component-architecture` | `eaf5c5ca0129e292ad15e8341e4bec43a27f3799c2550202a71c04c1b1f9076f` | 47229 |
 | `runtime-functions` | `3541a3c20253b08330a84d853964dd474c818e6821183d999957599ef3cc4375` | 11363 |
 
+### Level 1 refresh `roku-docs-2026-09-28-v013`
+
+Retrieved 2026-09-27T17:04:54Z–17:05:31Z (2026-09-28 KST), before the v0.1.3
+candidate. The ten fixed official routes returned HTTP 200 without redirects.
+Raw HTML and the comparison manifest are local under
+`_ref/normative/roku-docs-2026-09-28-v013/`, beside the prior snapshot; neither
+is committed. Each page-declared modification time is unchanged from the
+2026-09-27 snapshot. The content region uses the definition above.
+
+| Route | Content-region SHA-256 | Bytes | Comparison with 2026-09-27 |
+|---|---|---:|---|
+| `brightscript-language-reference` | `fbf20981bd408f86d84bb3582e4e42d320cea6c5b1d9b49f1896f21755fdc9e9` | 2,811 | identical |
+| `statement-summary` | `8020ea7624129d2ddf45a3e1df02f4f6163fe98614da98003b958923d8dca797` | 2,472 | identical |
+| `program-statements` | `6fafd31136b4e00721447570ea0bfe3ac498a07af912ea25bdd424538b74dc69` | 37,874 | identical |
+| `expressions-variables-types` | `38bee10d10baa5a00d680f66b1e57790fc83558b5f50d8eaef1c7ba2340fabc3` | 51,174 | identical |
+| `reserved-words` | `32260686e464b8810c56c8fbc69a329435a3bf17736b0bb0973c97fba34f6ecf` | 1,254 | identical |
+| `conditional-compilation` | `631e08f6686f1edf7afacdd98767b9e42e6f5fcd1898cec83562cb7d7283c87c` | 8,436 | identical |
+| `error-handling` | `ad6dfc415d3a74e00d9ae2f95c3963e15a12f105480d9c818c9dcf8afaf1973b` | 32,667 | identical |
+| `release-notes` | `a56d81bef6bdbf7853a98b19592c1a2fe0dbdfd3eb0131232a19a41692c2c4bb` | 311,640 | Cloudflare email-protection tokens only |
+| `component-architecture` | `eaf5c5ca0129e292ad15e8341e4bec43a27f3799c2550202a71c04c1b1f9076f` | 47,229 | identical |
+| `runtime-functions` | `3541a3c20253b08330a84d853964dd474c818e6821183d999957599ef3cc4375` | 11,363 | identical |
+
+For `release-notes`, masking only the `/cdn-cgi/l/email-protection#…` and
+`data-cfemail` token values makes the old and new content regions byte-equal.
+All other bytes match. The requirements citing this route, listed in the
+2026-09-23-r2 refresh above, retain their existing evidence and status; no
+syntax or release-note text changed. The other nine routes are byte-equal.
+
 ## Level 3 — Tree-sitter
 
 | Item | Identity (observed 2026-09-23) |
@@ -167,6 +195,12 @@ reports the result).
 |---|---|---|
 | `tree-sitter-windows-x64.gz` | `2d6c014b4e91d3d302ba7b30b3b625914027c3861ae7817e068a273e3f034550` | `9fbc4f285c876b1a38c7e9d5223a51fb7842255285cdd7db3ffb0ba3934f2662` |
 | `tree-sitter-linux-x64.gz` | `20a1f39ec1c45f2211492dcb8881c802b643b554bb196869a29ac3778277fa77` | `5a228811cdb3a01b7e4dd493c5fc5e05b0040a49ffede94e866c4c58ff2605db` |
+| `tree-sitter-macos-arm64.gz` | `70f7573b2b2e5371a5b58cc5227d2ad981fd5374596b9874e770af486060774e` | `f0e7b6b81e4faad74cd935c3536ea061d61b402f0ccaf3829300c70c8fe9fcb6` |
+
+The macOS ARM64 asset was added on 2026-09-28: the downloaded v0.27.0 gzip
+matched the official GitHub release digest, then its decompressed bytes were
+hashed locally. Execution on macOS is established by that platform's CI job,
+not by this Windows-side hash check.
 
 ### Precedents and references cited by decisions
 

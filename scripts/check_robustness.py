@@ -319,6 +319,13 @@ def peak_memory(proc):
     return -1  # measured by wait4 in run_posix
 
 
+def maxrss_bytes(value, system):
+    """Convert wait4's peak RSS to bytes; Linux reports KiB, macOS reports bytes."""
+    if system not in ("linux", "darwin"):
+        raise RuntimeError(f"unsupported ru_maxrss units on {system}")
+    return value * (1024 if system == "linux" else 1)
+
+
 def run_posix(path):
     start = time.monotonic()
     proc = popen("parse", "--quiet", path, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
@@ -327,7 +334,7 @@ def run_posix(path):
         pid, status, usage = os.wait4(proc.pid, os.WNOHANG)
         if pid:
             proc.returncode = os.waitstatus_to_exitcode(status)
-            return proc.returncode, time.monotonic() - start, usage.ru_maxrss * 1024, proc.stdout.read()
+            return proc.returncode, time.monotonic() - start, maxrss_bytes(usage.ru_maxrss, sys.platform), proc.stdout.read()
         if time.monotonic() > deadline:
             proc.kill()
             os.wait4(proc.pid, 0)

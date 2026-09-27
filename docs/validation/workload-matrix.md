@@ -162,7 +162,8 @@ the exponent, time and memory (validation.md "Recovery scaling guards").
 
 Every command runs from the repository root; hosted CI (`.github/workflows/ci.yml`)
 runs all of them except W12, W14 and the release qualification lane on Windows
-and Ubuntu.
+x64, Ubuntu x64 and macOS 15 ARM64. Before W06–W13 it checks the Linux/macOS
+peak-memory unit conversion with `scripts/test_robustness_units.py`.
 
 | Set | Command |
 |---|---|
