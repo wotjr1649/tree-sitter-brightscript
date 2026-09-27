@@ -17,6 +17,17 @@
 #include <string.h>
 #include <wchar.h>
 
+/* The separately approved instrumentation profile is never used by the stock lane. */
+#ifdef TSQ_SAFETY_PROFILE
+#define TSQ_MAX_COMMIT (2ULL * 1024 * 1024 * 1024)
+#define TSQ_MAX_WATCHDOG 360000
+#define TSQ_MAX_OUTPUT (64 * 1024 * 1024)
+#else
+#define TSQ_MAX_COMMIT (1024ULL * 1024 * 1024)
+#define TSQ_MAX_WATCHDOG 15000
+#define TSQ_MAX_OUTPUT (8 * 1024 * 1024)
+#endif
+
 /* Local diagnostic supervisor. Only its CreateProcess handle and private job are controlled. */
 static double milliseconds(void) {
   LARGE_INTEGER count, frequency;
@@ -43,8 +54,8 @@ int wmain(int argc, wchar_t **argv) {
   SIZE_T cap = _wcstoui64(argv[3], NULL, 10);
   DWORD deadline = wcstoul(argv[4], NULL, 10);
   uint64_t output_cap = _wcstoui64(argv[5], NULL, 10);
-  if (cap < 16 * 1024 * 1024 || cap > 1024ULL * 1024 * 1024 ||
-      deadline < 10 || deadline > 15000 || !output_cap || output_cap > 8 * 1024 * 1024) return 64;
+  if (cap < 16 * 1024 * 1024 || cap > TSQ_MAX_COMMIT ||
+      deadline < 10 || deadline > TSQ_MAX_WATCHDOG || !output_cap || output_cap > TSQ_MAX_OUTPUT) return 64;
 
   HANDLE job = NULL, port = NULL, read_pipe = NULL, write_pipe = NULL, input = NULL;
   PROCESS_INFORMATION process = {0};

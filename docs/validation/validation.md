@@ -154,6 +154,8 @@ qualification runner ("Release qualification lane" below), which is not a
 check script, is run by no workflow and reaches the CLI only through
 `tscli.py`; it starts git, the C compiler it is given and the programs that
 compiler built. `scripts/test_tscli.py` checks that it is the only exemption.
+The same entrypoint has an explicit `--safety-profile` test route described
+below; its helper has no direct process-launch exemption.
 Once per process `tscli.py` copies the installed binary into a private
 directory, compares the copy's SHA-256 with its record in
 [upstream-sources.md](../provenance/upstream-sources.md) and its version with
@@ -377,6 +379,53 @@ points stay as SAFETY points and their cancellation moved to 100 ms points
 chosen after that result; this is a policy revision, not the earlier check. RECOVERY-LOCALITY and the regeneration of
 the references run the pinned CLI outside the supervisor, with the `--cc`
 compiler and a private parser-library directory per checkout.
+
+## Maintenance native safety profile (0.1.1)
+
+The explicitly approved test route is:
+
+    python scripts/qualify/run.py --safety-profile capability --cc <verified gcc> --safety-cc <approved clang> --out <new .work dir>
+    python scripts/qualify/run.py --safety-profile native --cc <verified gcc> --safety-cc <approved clang> --runtime <stock 0.27.0 source> --out <new .work dir>
+
+`--safety-profile checks --check <registered name>` runs only the enumerated repository
+check scripts through the same supervisor. The helper `qualify/safety.py` has no
+direct launcher exemption: `test_tscli.py` still admits only `qualify/run.py`.
+Executable hashes, exact fixed check arguments, new task-contained output and the
+private child environment are checked; `qualify/test_safety.py` exercises rejection.
+
+The default supervisor remains byte-identical to S572 (SHA-256 `000ce1db84540d2195a352bf6c49f19bcd859d4e9f726b3d0f17d23477ef56f5`).
+Only a separate `TSQ_SAFETY_PROFILE` build admits the test-only upper bounds:
+2 GiB process/job commit, 360 s watchdog and 64 MiB output. Both profiles
+must pass normal, timeout, memory, output, descendant and private-environment
+controls; the stock profile rejects the extended cap and the extended profile
+rejects arguments beyond its own bounds. The returned record must establish
+PID/creation/image/job identity, completed cleanup and no active descendants.
+
+The approved LLVM MinGW package and hashes are in `upstream-sources.md`.
+Its MinGW driver does not support the combined `-fsanitize=fuzzer` switch;
+the tested route uses its supported SanitizerCoverage instrumentation and links
+the same package's libFuzzer archive. A genuine OOB diagnostic and increasing
+coverage counters are required controls, not inferred from filenames.
+The entire stock runtime, generated parser, scanner and harness are instrumented.
+The ASan library is private and the target records and verifies the loaded image.
+Instrumentation is not used as production performance evidence.
+
+Before candidate execution the finite input list and source/build protocol are
+fixed. `safety_target.c` checks byte bounds, full raw-query consumption without
+match overflow, tree copy/edit/delete, valid repair against fresh parsing,
+two-parser isolation, cancellation/resume/reset and cleanup. Error trees need not
+have identical recovery shape; arbitrary bytes need not be valid syntax.
+Native capture traversal does not evaluate text predicates: the CLI query and
+highlight checks remain required. Leak detection is not claimed on this Windows path.
+
+After one finite replay, libFuzzer seeds 6, 106 and 206 run sequentially from
+identical initial corpora. Each stops at 10,000 invocations or 300 s, max generated
+input 65,536 bytes, input timeout 5 s, with the outer limits above. Corpus admission
+reserves one maximum input before the 32 MiB stored-corpus bound. Crashes, sanitizer
+reports, incomplete/overflow query, cap or watchdog stop the remaining campaign.
+Normal budget completion is `BOUNDED_COMPLETE`; it is not universal safety.
+Initial/final corpus identities, exact arguments, every finding and raw records
+are preserved. Current edit fuzz and this coverage-guided run are separate evidence.
 
 ## Highlight query changes
 
