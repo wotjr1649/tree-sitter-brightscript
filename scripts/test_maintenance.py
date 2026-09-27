@@ -8,8 +8,10 @@ import check_maintenance as m
 def main():
     old = {n:(m.ROOT/n).read_bytes() for n in m.COMPONENTS}
     # The same controls work before and after the metadata bump.
-    if b".patch_version = 1" in old["src/parser.c"]:
-        old["src/parser.c"] = old["src/parser.c"].replace(b".patch_version = 1", b".patch_version = 0")
+    for patch in (1, 2):
+        marker = m.METADATA.replace(b".patch_version = 0", f".patch_version = {patch}".encode())
+        if marker in old["src/parser.c"]:
+            old["src/parser.c"] = old["src/parser.c"].replace(marker, m.METADATA, 1)
     for n, pointers in m.POINTERS.items():
         value = m.unique_json(old[n])
         for pointer in pointers:

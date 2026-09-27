@@ -8,6 +8,7 @@ link to it rather than restate it.
 | [roadmap.md](roadmap.md) | Current maturity and planned phases | Orienting; planning a session |
 | [maintenance.md](maintenance.md) | Maintenance scope, security boundary and freeze triggers | Maintaining or reopening a frozen release |
 | [reports/0.1.1-maintenance-release.md](reports/0.1.1-maintenance-release.md) | Verified 0.1.1 release and active freeze; new and inherited evidence kept separate | Checking 0.1.1 publication or maintenance |
+| [reports/0.1.2-maintenance-candidate.md](reports/0.1.2-maintenance-candidate.md) | 51개 처분·한정 조사·verifier 수정과 v0.1.2 후보 상태 | v0.1.2 유지보수 적격성을 검토할 때 |
 | [design/architecture.md](design/architecture.md) | Pipeline, ownership, layout, principles, decision index | Starting any work |
 | [design/decisions/](design/decisions/) | ADRs: why each architectural decision was made | Changing or questioning a decision |
 | [specs/grammar-contract.md](specs/grammar-contract.md) | What the grammar promises; acceptance policy; non-goals | Designing or reviewing grammar rules |
@@ -17,6 +18,7 @@ link to it rather than restate it.
 | [provenance/source-policy.md](provenance/source-policy.md) | Source levels (L1–L5), citation, promotion, refresh | Using any source |
 | [provenance/upstream-sources.md](provenance/upstream-sources.md) | Dated identities of sources and toolchain | Citing a source; refreshing; selecting the generator |
 | [validation/validation.md](validation/validation.md) | Validation levels (V0–V10), gates, V0 checklist, failure handling, Level 2 policy | Claiming anything; closing a session; preparing a release |
+| [validation/public-replay.md](validation/public-replay.md) | v0.1.2의 offline raw 재판정과 candidate identity 검사 | 공개 verifier를 실행하거나 결과를 해석할 때 |
 | [validation/workload-matrix.md](validation/workload-matrix.md) | Validation sets W01–W14 and the catalogue of every corpus fixture | Writing fixtures; running V2–V10 |
 | [validation/known-regressions.md](validation/known-regressions.md) | Defects of earlier grammars and the checks that prevent them | Reviewing grammar or generation changes |
 | [reports/0.1.0-release-candidate.md](reports/0.1.0-release-candidate.md) | Release-candidate evidence, gate results and verdict for 0.1.0 | Checking what the candidate proves |

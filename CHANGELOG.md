@@ -1,5 +1,14 @@
 # 변경 이력
 
+## 0.1.2 — 후보, 미출하
+
+- 공개 raw verifier의 지정된 log 파생값에만 엄격한 2 ULP 비교를 적용한다.
+  원시 값·판정·threshold·source identity는 완화하지 않는다.
+- 혼합된 근거의 범위와 51개 미확정 요구사항을 재검토하고 한정 boundary 검사를 추가한다.
+- grammar/scanner/query/public tree는 유지한다. version metadata만 고정 generator로 재생성한다.
+- [P07-MAINT](docs/design/decisions/ADR-0010-patch012-evidence-carry-forward.md)의
+  적격성, exact CI·자산과 새 출하 승인 확인은 별도다. 성능 개선을 주장하지 않는다.
+
 ## 0.1.1 — 2026-09-27
 
 [v0.1.1](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.1)을 공개하고

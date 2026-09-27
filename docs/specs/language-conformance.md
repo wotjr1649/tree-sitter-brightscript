@@ -179,7 +179,7 @@ limitation.
 | BS-LIT-003 | Decimal integer literal: one or more digits. | EVT §Numeric literals | baseline | documented | `number` | `BS-LIT-003: decimal integers` | n/a | covered | — | LIT-03 |
 | BS-LIT-004 | There is no signed literal; `-5` is unary negation applied to `5`. | EVT §Negation operator, §Numeric literals | baseline | documented | `unary_expression` | `BS-LIT-004: negative number is unary negation` | n/a | covered | — | LIT-03, AMB-10 |
 | BS-LIT-005 | Hex integer: `&H` or `&h` followed by hex digits (`&HFF`, `&hFF`, `&h28`). | EVT §Numeric literals; EH; RF | baseline | documented | `number` | `BS-LIT-005: hex integers with either prefix case` | n/a | covered | — | LIT-04 |
-| BS-LIT-006 | Lowercase hex digits (`&hff`, `&hFe`). | L1 examples use uppercase digits only | unknown | provisional | `number` | `BS-LIT-006: lowercase hex digits` | n/a | covered | — | LIT-04, AMB-10 |
+| BS-LIT-006 | Lowercase hex digits (`&hff`, `&hFe`). | ifSGScreen §Starting Scene Graph Applications uses `&hff0000ff`, `&h00ff00ff`, `&h0000ffff`; other lowercase digits and mixed case remain unconfirmed | unknown | provisional | `number` | `BS-LIT-006: lowercase hex digits` | n/a | covered | — | LIT-04, AMB-10. See the evidence-scope distinctions below; the parent status and existing fixture are unchanged. |
 | BS-LIT-007 | Float forms: decimal point (`2.01`), `E` exponent with optional sign (`1.23456E+30`), `!` suffix (`2!`, `125!`). | EVT §Numeric literals, §Type declaration characters | baseline | documented | `number` | `BS-LIT-007: float literal forms` | n/a | covered | — | LIT-05, LIT-08 |
 | BS-LIT-008 | Lowercase `e`, unsigned exponent (`1e1000000`) and leading-dot fraction (`.1`). | EH §Miscellaneous examples; EVT §Optional chaining operators › Support details (`?.1`) | baseline | documented | `number` | `BS-LIT-008: lowercase unsigned exponent and leading-dot fraction` | n/a | covered | — | LIT-05, AMB-10 |
 | BS-LIT-009 | Double forms: `D` exponent (`1.23456789D-12`), `#` suffix (`2.3#`, `125#`). | EVT §Numeric literals, §Type declaration characters | baseline | documented | `number` | `BS-LIT-009: double literal forms` | n/a | covered | — | LIT-06 |
@@ -649,3 +649,23 @@ return "a different type than specified in the function declaration" may have
 run in v2.0, so declared types existed before 3.0; the `AS` syntax therefore has
 no established boundary (`baseline`) and VER-01 is a semantic change. All other
 entries agree with the snapshot.
+
+## 근거가 혼합된 요구사항의 하위 범위
+
+아래 구분은 부모 ID·status·fixture·수용 동작을 보존한다. 한 하위 사례의 L1 근거가
+행 전체를 공식 지원으로 승격하지 않는다. source identity와 조회 기록은
+[upstream-sources](../provenance/upstream-sources.md)의 Session 07 항목에 있다.
+
+| 부모 ID | 직접 확인한 근거 | 별도로 남는 범위 |
+|---|---|---|
+| `BS-LEX-024` | EH의 `.function` 멤버와 `function` AA key는 명시된 L1 사례다. | 전체 keyword 집합·다른 접근 위치는 공개된 provisional 선택이다. `rem` 예외도 유지한다. |
+| `BS-LEX-033` | Tree-sitter 0.27.0의 선두 BOM 처리는 L3다. UTF-8과 문자열·주석의 비ASCII 수용은 제품 입력 정책과 fixture로 확인한다. | CA의 XML 인코딩 설명은 모든 `.brs` 소스 인코딩의 L1 규정이 아니다. UTF-16·잘못된 byte의 Roku 수용은 미확정이다. |
+| `BS-STMT-008` | EVT의 comment/newline 예제는 block IF 분기를 뒷받침한다. | colon으로 block을 선택하는 동작은 provisional이다. newline/comment 사례를 colon의 공식 근거로 사용하지 않는다. |
+| `BS-STMT-033` | 파일 수준의 statement sequence는 편집기 fragment를 포함하는 제품 정책이다. | 모든 fragment가 완성된 Roku compiler input이라는 주장은 하지 않는다. semantic 배치 검사는 이 parser의 소유 범위가 아니다. |
+| `BS-COND-008` | CC의 들여쓴 `#error` 예제는 indentation의 L1 근거다. | trailing comment·단어 사이 space/tab은 공개된 선택이다. statement와 같은 줄의 배치는 여전히 비계약적이다. |
+| `BS-LIT-006` | ifSGScreen의 BrightScript 예제에서 `&hff0000ff`, `&h00ff00ff`, `&h0000ffff`를 직접 확인했다. | 다른 a–f 조합·mixed case·suffix 전체와 기기 실행은 이 근거로 확정하지 않는다. 부모 status는 provisional이다. |
+
+L4 비교는 Lexer token, Parser AST, 각 단계 diagnostics와 Program validation을
+구분한다. BrighterScript mode의 수용은 plain BrightScript 수용이 아니다.
+`LongInteger`/`Interface`/`Invalid`, expression·argument 줄바꿈, compact loop 철자,
+SUB의 AS, directive 변형은 별도 기능 검토 대상으로 남으며 이 근거 정리로 채택하지 않는다.

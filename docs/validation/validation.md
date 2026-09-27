@@ -83,7 +83,7 @@ every row below is `PASS`. Workload sets are defined in
 | Incremental | W10 passes (and the spike's E1–E6 when it passed). |
 | Native oracle | W12 is recorded for the candidate identity. |
 | Robustness | W06, W07 and W13 show no crash, hang or runaway memory. |
-| Release qualification | Every gate of the release qualification lane passes for the candidate identity, except the explicit, conditional 0.1.1 maintenance route in ADR-0009 below. |
+| Release qualification | Every gate of the release qualification lane passes for the candidate identity, except the explicit conditional version-only routes: 0.1.1 in ADR-0009 and 0.1.2 in ADR-0010 below. |
 | Level 1 refresh | A new dated snapshot of the ten Level 1 pages is taken before the candidate and stored beside `roku-docs-2026-09-23` (source-policy refresh rules); for every page whose content-region SHA-256 changed, each citing requirement is reviewed and the outcome recorded in `upstream-sources.md`. |
 | Provenance | Generator identity, Level 1 snapshot identity and SHA-256 of every generated file are recorded. |
 | Hosted CI | The workflow `.github/workflows/ci.yml` passes on Windows and Ubuntu for the candidate commit, pushed to the session branch; a local run does not substitute. |
@@ -134,6 +134,13 @@ except the explicit performance-evidence applicability review for the version-on
 That route preserves the measured 0.1.0 result and records `CARRIED_FORWARD`
 separately from execution status; it never labels historical timing as a new run.
 All new correctness, safety, packaging and CI obligations in that ADR remain required.
+
+v0.1.2만의 조건부 승계는 별도로 승인된
+[ADR-0010](../design/decisions/ADR-0010-patch012-evidence-carry-forward.md)에 따른다.
+과거 performance와 새 correctness·ASan 한정 replay를 분리하며, 새 동작에는 적용하지 않는다.
+공개 offline verifier 정책은 [public-replay.md](public-replay.md)에 둔다.
+CI guard는 이 verifier의 고정된 `python -I -B -X utf8` 명령만 추가로 허용한다.
+임의 Python flags나 새로운 native launcher 예외는 허용하지 않는다.
 
 Every check script runs the CLI only through `scripts/tscli.py` (so the check
 does not depend on the order of CI steps) and starts no other program but git,

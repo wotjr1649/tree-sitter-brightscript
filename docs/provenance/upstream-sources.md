@@ -246,3 +246,36 @@ The separately approved Windows safety tool is portable LLVM MinGW 20260922, tes
 SHA-256 `e3ad77d117a4bea19a7a3b333341824d79a5a371004a10e25b8504e7b3047666`.
 Acquisition is not sanitizer or coverage evidence; capability tests and the fixed profile are required.
 The production Tree-sitter/GCC pins and default qualification guards stay unchanged.
+
+## Session 07 근거 갱신 (2026-09-27)
+
+UTC 10:14:07–10:14:22에 기존 필수 L1 10페이지와 ifSGScreen을 직접 조회했다.
+아래 SHA-256은 수신한 HTML 전체의 hash다. 본문 영역을 비교하고 동적 cfemail token만
+제외했을 때 기존 10페이지의 규범 내용 변화는 관찰되지 않았다. 이는 언어 전반의 완전성 검사가 아니다.
+
+| L1 문서 | 수신 HTML SHA-256 |
+|---|---|
+| [brightscript-language-reference](https://developer.roku.com/dev/docs/brightscript-language-reference) | `d09d27ff31297e02b6d0bc00cfa12e6823a7ae2d456a31a00a049135437a1ca9` |
+| [statement-summary](https://developer.roku.com/dev/docs/statement-summary) | `dd3f3ce585d0c8385d4af9403608234c7dfc1f388f63a75187b405e566322aa8` |
+| [program-statements](https://developer.roku.com/dev/docs/program-statements) | `39d757eb33e1e06ef91d97c1ba41f1445b8d26c06ca8d2a95cdf4f940a3b4740` |
+| [expressions-variables-types](https://developer.roku.com/dev/docs/expressions-variables-types) | `5b7b94c7750fecd2aee621546c5f505f87126ff4fe168004145f9539e5ddb5dc` |
+| [reserved-words](https://developer.roku.com/dev/docs/reserved-words) | `d92f59496c92a4ee238de7c769540ff8f59179dfa90d1cf21492c7fb4ffd32d5` |
+| [conditional-compilation](https://developer.roku.com/dev/docs/conditional-compilation) | `6d4363a45d2821e75696f8d616a71c6db3be9642c7726ffb4879d5d7e27ac26e` |
+| [error-handling](https://developer.roku.com/dev/docs/error-handling) | `113268923a8da738bb73732ae3b8e1a06fa26d8179e92ab8c88e2db915e07ae2` |
+| [release-notes](https://developer.roku.com/dev/docs/release-notes) | `036d155628e4014fa775d818fc7eb5d70df9d0d267b60324aa17cdae9cad748e` |
+| [component-architecture](https://developer.roku.com/dev/docs/component-architecture) | `881c67514fdfb11d80356ff36ddf64ddd7181b28e1f0bc90ebcecc94c3a0da0f` |
+| [runtime-functions](https://developer.roku.com/dev/docs/runtime-functions) | `d5c3ef5d3287ffbc63c91c4fcf5ae28ae66259ddabe89d8b11f72b5f15f72ed3` |
+| [ifsgscreen](https://developer.roku.com/dev/docs/ifsgscreen) | `0e55b9151bb8881230b5d01f06841ad17386d534d09fcb4a48d3a8ce4f3e2e1f` |
+
+ifSGScreen의 Starting Scene Graph Applications 예제에서 0xAARRGGBB 형태의
+세 색상 literal을 확인했다. 이는 BS-LIT-006의 좁은 하위 근거다. 폭·부호·overflow·suffix
+전반을 규정하거나 parent의 provisional 상태를 해제하지 않는다. 공식 원문은 공개 자산에 복사하지 않는다.
+
+동일 날짜 공식 GitHub API에서 Tree-sitter v0.27.0이 latest stable, #5910과 #5925가 open,
+PR #5614는 closed·unmerged임을 확인했다. 소형 nested-AA와 lexer 검사는 한정된 영향 조사다.
+BrighterScript v0.73.5 commit은 위 L4 identity와 같았다. 설치된 dependencies가 없어 동적 비교는
+실행하지 않았다. Lexer→Preprocessor→Parser→type conversion→Program validation source를
+구분해 읽었으며 AST 수·진단 수는 미관측이다. firmware 15.3와 기본 15.0을 합치지 않는다.
+
+Session 07부터 CI Python은 3.14 계열을 선택한다. 정확한 patch/platform/libc는 각 실행 결과에
+기록한다. action commit, Node 24, generator pin과 binary hash 검증은 유지한다.
