@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 int main(int argc, char **argv) {
@@ -15,12 +16,23 @@ int main(int argc, char **argv) {
   if (!strcmp(argv[1], "normal")) { puts("NORMAL_COMPLETED"); return 0; }
   if (!strcmp(argv[1], "sleep")) { puts("SLEEP_BEGIN"); sleep(2); return 0; }
   if (!strcmp(argv[1], "memory")) {
+#ifdef __APPLE__
+    /* Fault pages in gradually so the parent's physical-footprint guard can observe them. */
+    const struct timespec pause = {0, 2000000};
+    for (int i = 0; i < 256; ++i) {
+      volatile char *p = malloc(1024 * 1024);
+      if (!p) { printf("ALLOCATION_DENIED %d %d\n", i, errno); return 73; }
+      for (size_t j = 0; j < 1024 * 1024; j += 4096) p[j] = 1;
+      nanosleep(&pause, NULL);
+    }
+#else
     /* Reserve virtual address space without faulting pages into the runner. */
     for (int i = 0; i < 64; ++i) {
       void *p = mmap(NULL, 128 * 1024 * 1024, PROT_READ | PROT_WRITE,
                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
       if (p == MAP_FAILED) { printf("ALLOCATION_DENIED %d %d\n", i, errno); return 73; }
     }
+#endif
     puts("MEMORY_GUARD_DID_NOT_LIMIT"); return 74;
   }
   if (!strcmp(argv[1], "output")) {

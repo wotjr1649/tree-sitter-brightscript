@@ -31,6 +31,24 @@ from pathlib import Path
 
 if sys.platform != "win32":
     import resource
+if sys.platform == "darwin":
+    import ctypes
+
+    class DarwinUsage(ctypes.Structure):
+        _fields_ = [("uuid", ctypes.c_uint8 * 16),
+                    *[(name, ctypes.c_uint64) for name in (
+                        "user_time", "system_time", "idle_wakeups", "interrupt_wakeups", "pageins",
+                        "wired_size", "resident_size", "phys_footprint", "start", "exit")]]
+
+    _libproc = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
+    _libproc.proc_pid_rusage.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_void_p)
+    _libproc.proc_pid_rusage.restype = ctypes.c_int
+
+    def darwin_footprint(pid):
+        usage = DarwinUsage()
+        if _libproc.proc_pid_rusage(pid, 0, ctypes.byref(usage)):
+            raise OSError(ctypes.get_errno(), "proc_pid_rusage failed")
+        return usage.phys_footprint
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -151,9 +169,11 @@ class Lab:
             raise ValueError("POSIX supervised image must be an existing absolute path")
 
         def limits():
+            if sys.platform == "darwin":
+                return  # The hosted macOS kernel rejected RLIMIT_AS; the parent enforces a sampled footprint limit.
             try:
                 _, hard = resource.getrlimit(resource.RLIMIT_AS)
-                resource.setrlimit(resource.RLIMIT_AS, (cap, hard if sys.platform == "darwin" else cap))
+                resource.setrlimit(resource.RLIMIT_AS, (cap, cap))
             except (OSError, ValueError) as error:
                 current = resource.getrlimit(resource.RLIMIT_AS)
                 os.write(2, f"RLIMIT_AS_FAILED {type(error).__name__} {error} current={current}\n".encode())
@@ -167,6 +187,7 @@ class Lab:
             selector.register(proc.stdout, selectors.EVENT_READ)
             status, usage, reason, stored, pipe_open, reaped = None, None, "COMPLETED", 0, True, False
             descendant_pipe = False
+            peak_sampled, last_sample, max_sample_gap = 0, start, 0
             try:
                 while pipe_open or not reaped:
                     if time.monotonic() - start > ms / 1000 + 2:
@@ -175,6 +196,23 @@ class Lab:
                         pid, got, used = os.wait4(proc.pid, os.WNOHANG)
                         if pid:
                             status, usage, reaped = got, used, True
+                    if sys.platform == "darwin" and not reaped:
+                        now = time.monotonic()
+                        max_sample_gap = max(max_sample_gap, now - last_sample)
+                        last_sample = now
+                        try:
+                            peak_sampled = max(peak_sampled, darwin_footprint(proc.pid))
+                        except OSError:
+                            pid, got, used = os.wait4(proc.pid, os.WNOHANG)
+                            if not pid:
+                                raise
+                            status, usage, reaped = got, used, True
+                        if peak_sampled > cap and reason == "COMPLETED":
+                            reason = "MEMORY_LIMIT_REACHED"
+                            try:
+                                os.killpg(proc.pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
                     if time.monotonic() - start > ms / 1000 and reason == "COMPLETED":
                         reason = "WATCHDOG_TERMINATED"
                         try:
@@ -214,10 +252,12 @@ class Lab:
                     os.wait4(proc.pid, 0)
                 selector.close()
                 proc.stdout.close()
-        peak = (usage.ru_maxrss if sys.platform == "darwin" else usage.ru_maxrss * 1024)
+        peak = max(peak_sampled, usage.ru_maxrss if sys.platform == "darwin" else usage.ru_maxrss * 1024)
         report = {"termination_reason": reason, "exit_code_raw": proc.returncode,
                   "peak_working_set_bytes": peak, "peak_commit_bytes": peak,
-                  "memory_metric": "peak_rss_bytes", "configured_job_memory_limit_bytes": cap,
+                  "memory_metric": "sampled_phys_footprint_bytes" if sys.platform == "darwin" else "peak_rss_bytes",
+                  "memory_limit_mode": "sampled_kill" if sys.platform == "darwin" else "kernel_rlimit_as",
+                  "max_sample_gap_ms": max_sample_gap * 1000, "configured_job_memory_limit_bytes": cap,
                   "image_path": str(Path(argv[0]).resolve()), "exit_confirmed": reaped,
                   "active_processes": 0 if not pipe_open else None,
                   "descendant_pipe_observed": descendant_pipe,
@@ -343,11 +383,13 @@ def self_test(lab):
     os.environ["S05_PRIVATE_CANARY"] = "must-not-reach-child"  # the child must not see the parent's variables
     results = []
     for mode in ("normal", "sleep", "memory", "output", "descendant", "private-env"):
-        report, text = lab.supervise(f"selftest-{mode}", [exe, mode], cap=(512 if posix else 64) * 2**20,
+        report, text = lab.supervise(f"selftest-{mode}", [exe, mode], cap=(64 if sys.platform == "darwin" else 512 if posix else 64) * 2**20,
                                      ms=200 if mode == "sleep" else 3000, output_cap=64 * 2**10)
         ok = {"normal": report["termination_reason"] == "COMPLETED" and "NORMAL_COMPLETED" in text,
               "sleep": report["termination_reason"] == "WATCHDOG_TERMINATED",
-              "memory": report["exit_code_raw"] == 73 and "ALLOCATION_DENIED" in text,
+              "memory": (report["termination_reason"] == "MEMORY_LIMIT_REACHED" and
+                         report["peak_working_set_bytes"] <= 96 * 2**20 and report["max_sample_gap_ms"] <= 100)
+                        if sys.platform == "darwin" else report["exit_code_raw"] == 73 and "ALLOCATION_DENIED" in text,
               "output": report["termination_reason"] == "OUTPUT_LIMIT_REACHED",
               "descendant": report["termination_reason"] == "DESCENDANTS_TERMINATED" and (
                   report["descendant_pipe_observed"] if posix else report["total_processes"] == 2),
