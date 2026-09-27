@@ -26,7 +26,7 @@ jobs:
           node-version: 24
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.x"
+          python-version: "3.14"
       - name: Install the pinned generator
         run: npm ci
       - name: V0 static checks
@@ -35,6 +35,13 @@ jobs:
         run: python scripts/check_generated.py
       - name: Verified CLI path self-test
         run: python scripts/test_tscli.py
+      - name: Offline replay and maintenance controls
+        run: |
+          python scripts/test_replay_compare.py
+          python scripts/test_public_verifier.py
+          python scripts/test_maintenance.py
+          python scripts/test_maintenance_012.py
+          python scripts/test_maintenance_screen.py
       - name: Registry, catalogue and corpus consistency
         run: python scripts/check_registry.py --complete
       - name: Schema reconciliation and catalogue
@@ -52,6 +59,10 @@ jobs:
         run: |
           python scripts/check_incremental.py
           python scripts/check_spike.py
+      - name: Prepare frozen source and historical public replay inputs
+        run: python scripts/prepare_public_replay.py --out=.work/public-replay
+      - name: Offline public replay from exported candidate source
+        run: python -I -B -X utf8 scripts/verify_public.py --bundle .work/public-replay/verification/baseline --baseline-source .work/public-replay/verification/baseline-source --candidate-source .work/public-replay/source --candidate-registration .work/public-replay/verification/candidate-registration.json
       - name: No tracked changes
         shell: bash
         run: |

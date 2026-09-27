@@ -46,6 +46,11 @@ QUALIFY_RUNNER = SCRIPTS / "qualify" / "run.py"
 # Arguments are limited to characters without shell meaning, so nothing can be chained after an allowed command.
 CI_ALLOWED = (r'npm ci|python scripts/[a-z0-9_]+\.py( [A-Za-z0-9_./=-]+)*|git [a-z-]+( --?[a-z-]+)*'
               r'|test -z "\$\(git status --porcelain\)"')
+PUBLIC_REPLAY_COMMAND = ("python -I -B -X utf8 scripts/verify_public.py --bundle .work/public-replay/verification/baseline "
+                         "--baseline-source .work/public-replay/verification/baseline-source "
+                         "--candidate-source .work/public-replay/source "
+                         "--candidate-registration .work/public-replay/verification/candidate-registration.json")
+CI_ALLOWED += "|" + re.escape(PUBLIC_REPLAY_COMMAND)
 # `run` keys in the spellings recognised here (flow mapping, quoted key, extra spaces, `\x72un`, `\u0072un`);
 # each must be one the parser read. Other escapes are not recognised (validation.md "Identity binding").
 ANY_RUN_KEY = re.compile(r"""(?:^|[\s{,])["']?(?:run|\\x72un|\\u0072un)["']?\s*:""", re.M)
@@ -263,6 +268,11 @@ class VerifiedCli(unittest.TestCase):
                        "tree-sitter test", 'python -c "import os"', "python scripts/check_v0.py && npx tree-sitter test",
                        "python scripts/check_v0.py; npm test", "python scripts/check_v0.py | sh",
                        "python scripts/check_v0.py $(npx tree-sitter test)"):
+            self.assertFalse(allowed(mutant), mutant)
+        self.assertTrue(allowed(PUBLIC_REPLAY_COMMAND))
+        for mutant in (PUBLIC_REPLAY_COMMAND.replace("-I", "-O"), PUBLIC_REPLAY_COMMAND + "; whoami",
+                       PUBLIC_REPLAY_COMMAND.replace("verify_public.py", "qualify/run.py"),
+                       PUBLIC_REPLAY_COMMAND.replace(".work/public-replay/source", "../source")):
             self.assertFalse(allowed(mutant), mutant)
         self.assertEqual(ci_commands("    steps:\n      - run: npx tree-sitter test\n"), ["npx tree-sitter test"])
         self.assertEqual(ci_commands("      - run: python scripts/check_v0.py\n          && npx tree-sitter test\n"),
