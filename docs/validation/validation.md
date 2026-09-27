@@ -42,8 +42,8 @@ does not prove either tree is right.
 | V9 | — | only for integration claims | only for integration claims |
 | V10 | — | pathological inputs and a bounded fuzz run (workload W13) | fuzzing |
 
-Hosted CI (`.github/workflows/ci.yml`, Windows and Ubuntu) runs on every push
-V0, generation drift (V1), the self-test of the verified CLI path
+Hosted CI (`.github/workflows/ci.yml`, Windows x64, Ubuntu x64 and macOS 15
+ARM64) runs on every push and pull request: V0, generation drift (V1), the self-test of the verified CLI path
 (`scripts/test_tscli.py`), the registry, schema and corpus checks (V2, V3), V4,
 the W03 and W05 checks, V5 (W10) and V10 (W06–W08, W13 with fuzzing, and the
 query scaling guards); the commands are in
@@ -86,7 +86,7 @@ every row below is `PASS`. Workload sets are defined in
 | Release qualification | Every gate of the release qualification lane passes for the candidate identity, except the explicit conditional version-only routes: 0.1.1 in ADR-0009 and 0.1.2 in ADR-0010 below. |
 | Level 1 refresh | A new dated snapshot of the ten Level 1 pages is taken before the candidate and stored beside `roku-docs-2026-09-23` (source-policy refresh rules); for every page whose content-region SHA-256 changed, each citing requirement is reviewed and the outcome recorded in `upstream-sources.md`. |
 | Provenance | Generator identity, Level 1 snapshot identity and SHA-256 of every generated file are recorded. |
-| Hosted CI | The workflow `.github/workflows/ci.yml` passes on Windows and Ubuntu for the candidate commit, pushed to the session branch; a local run does not substitute. |
+| Hosted CI | The workflow `.github/workflows/ci.yml` passes on Windows x64, Ubuntu x64 and macOS 15 ARM64 for the candidate commit, pushed to the session branch; a local run does not substitute. This new platform requirement does not retroactively change the v0.1.2 release evidence. |
 | Downstream | V9 is not required; it is run only when the work in `go-treesitter` is authorized, and then must pass before a pin change is proposed there. |
 | Review | An independent adversarial review is complete; every material finding is fixed or disclosed as a `KL-NNN` or `provisional` row, and the affected gates were rerun. |
 

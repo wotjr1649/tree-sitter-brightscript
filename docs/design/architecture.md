@@ -54,7 +54,7 @@ test/samples/                     composite programs (workload W03)
 queries/highlights.scm            highlighting query (workload W11)
 test/highlight/                   highlight assertions
 scripts/                          V0, drift, registry, schema and workload checks
-.github/workflows/ci.yml          hosted CI (Windows, Ubuntu)
+.github/workflows/ci.yml          hosted CI (Windows x64, Ubuntu x64, macOS ARM64)
 docs/README.md  docs/roadmap.md
 docs/specs/        grammar-contract, language-conformance, grammar-design, tree-schema
 docs/design/       architecture, decisions/ (ADRs)

@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -54,7 +54,9 @@ jobs:
           python scripts/check_samples.py
           python scripts/check_spellings.py
       - name: Robustness (W06, W07, W08, W13 with fuzzing)
-        run: python scripts/check_robustness.py
+        run: |
+          python scripts/test_robustness_units.py
+          python scripts/check_robustness.py
       - name: Incremental edits (W10) and literal-false spike criteria C4, C5
         run: |
           python scripts/check_incremental.py

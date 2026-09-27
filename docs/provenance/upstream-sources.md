@@ -167,6 +167,12 @@ reports the result).
 |---|---|---|
 | `tree-sitter-windows-x64.gz` | `2d6c014b4e91d3d302ba7b30b3b625914027c3861ae7817e068a273e3f034550` | `9fbc4f285c876b1a38c7e9d5223a51fb7842255285cdd7db3ffb0ba3934f2662` |
 | `tree-sitter-linux-x64.gz` | `20a1f39ec1c45f2211492dcb8881c802b643b554bb196869a29ac3778277fa77` | `5a228811cdb3a01b7e4dd493c5fc5e05b0040a49ffede94e866c4c58ff2605db` |
+| `tree-sitter-macos-arm64.gz` | `70f7573b2b2e5371a5b58cc5227d2ad981fd5374596b9874e770af486060774e` | `f0e7b6b81e4faad74cd935c3536ea061d61b402f0ccaf3829300c70c8fe9fcb6` |
+
+The macOS ARM64 asset was added on 2026-09-28: the downloaded v0.27.0 gzip
+matched the official GitHub release digest, then its decompressed bytes were
+hashed locally. Execution on macOS is established by that platform's CI job,
+not by this Windows-side hash check.
 
 ### Precedents and references cited by decisions
 
