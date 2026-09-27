@@ -144,9 +144,11 @@ CI guard는 이 verifier의 고정된 `python -I -B -X utf8` 명령만 추가로
 `native-preflight.yml`에서 실행하는 고정된
 `python scripts/qualify/run.py --preflight --cc /usr/bin/cc --out .work/posix-preflight`
 명령과 같은 workflow의 `--gates B5-01-MEMORY` 단일 native smoke 명령,
-수동 `native-qualification.yml`의 고정된 전체 게이트 명령이다. `test_tscli.py`는
+`native-qualification.yml`의 고정된 전체 게이트 명령이다. 해당 workflow는
+기본 브랜치 등록 전에는 작업 브랜치에서 이 파일이 바뀌는 push에만 반응한다.
+`test_tscli.py`는
 workflow 이름과 정확한 세 명령을 확인하고 변형된 인수·경로와 다른 native 실행
-명령을 거부한다. 수동 workflow는 v0.1.4 엔지니어링 시험용이며 결과를 확인하기
+명령을 거부한다. 이 workflow는 v0.1.4 엔지니어링 시험용이며 결과를 확인하기
 전에는 출하 증거가 아니다.
 
 Every check script runs the CLI only through `scripts/tscli.py` (so the check

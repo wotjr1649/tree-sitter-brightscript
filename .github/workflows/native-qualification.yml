@@ -2,6 +2,9 @@ name: Native qualification trial
 
 on:
   workflow_dispatch:
+  push:
+    branches: [session/10-v014-native-parity]
+    paths: [.github/workflows/native-qualification.yml]
 
 permissions:
   contents: read
