@@ -151,7 +151,11 @@ class Lab:
             raise ValueError("POSIX supervised image must be an existing absolute path")
 
         def limits():
-            resource.setrlimit(resource.RLIMIT_AS, (cap, cap))
+            try:
+                resource.setrlimit(resource.RLIMIT_AS, (cap, cap))
+            except (OSError, ValueError) as error:
+                os.write(2, f"RLIMIT_AS_FAILED {type(error).__name__} {getattr(error, 'errno', None)}\n".encode())
+                os._exit(92)
 
         start = time.monotonic()
         with (raw / "child.out").open("xb") as output:
@@ -346,7 +350,7 @@ def self_test(lab):
               "descendant": report["termination_reason"] == "DESCENDANTS_TERMINATED" and (
                   report["descendant_pipe_observed"] if posix else report["total_processes"] == 2),
               "private-env": report["termination_reason"] == "COMPLETED" and "PRIVATE_ENV_COMPLETED" in text}[mode]
-        results.append({"mode": mode, "pass": ok})
+        results.append({"mode": mode, "pass": ok, "detail": text[-120:] if not ok else ""})
     if env_before is None:
         os.environ.pop("S05_PRIVATE_CANARY")
     else:
