@@ -5,6 +5,8 @@ of a runner that measures one (build, op, case, budget) under the supervisor and
 it returns {"gate", "status" (PASS, FAIL, NOT_RUN), "points", "notes"}. Censored points (memory cap, watchdog,
 crash, harness failure) count as failures. Stdlib only; starts no program.
 """
+import hashlib
+import json
 import math
 import random
 import statistics
@@ -540,18 +542,21 @@ def sem_public(r, seed):
     rng = random.Random(seed)
     counts = {"valid_equal": 0, "valid_raw_equal": 0, "valid_different": 0, "error_presence_equal": 0,
               "error_presence_mismatch": 0, "incomplete": 0}
-    different, mismatch, mutant_total, mutant_rejected = [], [], 0, 0
+    different, mismatch, mutant_total, mutant_rejected, native_tree_digests = [], [], 0, 0, []
     for i in range(0, len(items), 150):
         chunk = items[i:i + 150]
         paths = [r.write_input(f"tree-compare/{i + j:05d}.brs", data) for j, (_, data, _) in enumerate(chunk)]
         listing = r.write_list(f"tree-compare/list-{i:05d}.txt", paths)
         old = parse_dump(r.probe("h", ["DUMPLIST", listing], f"sem-h-{i:05d}"))
         new = parse_dump(r.probe("cand", ["DUMPLIST", listing], f"sem-c-{i:05d}"))
-        for (name, _, _), path in zip(chunk, paths):
+        for (name, data, _), path in zip(chunk, paths):
             a, b = old.get(str(path)), new.get(str(path))
             if not a or not b or not a["complete"] or not b["complete"]:
                 counts["incomplete"] += 1
                 continue
+            tree_bytes = json.dumps(b["root"], ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            native_tree_digests.append({"name": name, "input_sha256": hashlib.sha256(data).hexdigest(),
+                                        "tree_sha256": hashlib.sha256(tree_bytes).hexdigest()})
             ea, eb = bool(a["root"][4] & 16), bool(b["root"][4] & 16)
             if ea or eb:
                 counts["error_presence_equal" if ea == eb else "error_presence_mismatch"] += 1
@@ -572,6 +577,7 @@ def sem_public(r, seed):
     ok = (counts["valid_different"] == 0 and counts["error_presence_mismatch"] == 0 and counts["incomplete"] == 0
           and mutant_total > 0 and mutant_rejected == mutant_total)
     return result("SEM-PUBLIC", ok, [{"counts": counts, "different": different[:50], "error_presence_mismatch": mismatch[:50],
+                                      "native_tree_digests": native_tree_digests,
                                       "mutants": {"total": mutant_total, "rejected": mutant_rejected}}],
                   ["corpus 228/228 and W03-W05, W07, W09 are checked by the repository scripts (tscli.py test and others)"])
 
