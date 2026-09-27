@@ -9,6 +9,7 @@ link to it rather than restate it.
 | [maintenance.md](maintenance.md) | Maintenance scope, security boundary and freeze triggers | Maintaining or reopening a frozen release |
 | [reports/0.1.1-maintenance-release.md](reports/0.1.1-maintenance-release.md) | 보존된 0.1.1 출하·당시 동결 기록; 새 근거와 승계 근거 구분 | 0.1.1 출하 이력을 확인할 때 |
 | [reports/0.1.2-maintenance-candidate.md](reports/0.1.2-maintenance-candidate.md) | 검증된 0.1.2 출하·51개 처분·한정 조사·verifier 수정 | 현재 출하 identity와 유지보수 근거를 확인할 때 |
+| [reports/session-08-cross-platform-source-validation.md](reports/session-08-cross-platform-source-validation.md) | 출하 후 Windows·Ubuntu·macOS ARM64 소스 검증 후보와 한계 | OS별 CI 근거를 확인할 때 |
 | [design/architecture.md](design/architecture.md) | Pipeline, ownership, layout, principles, decision index | Starting any work |
 | [design/decisions/](design/decisions/) | ADRs: why each architectural decision was made | Changing or questioning a decision |
 | [specs/grammar-contract.md](specs/grammar-contract.md) | What the grammar promises; acceptance policy; non-goals | Designing or reviewing grammar rules |

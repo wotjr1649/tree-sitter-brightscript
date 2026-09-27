@@ -23,6 +23,14 @@ Roku syntax or device compatibility. The [0.1.0 release record](docs/reports/0.1
 and [qualification history](docs/reports/0.1.0-integrated-qualification.md) preserve earlier failures and their disposition.
 No npm package, language binding or WASM artifact is shipped.
 
+Post-release source validation on the
+[`session/08-cross-platform-ci`](docs/reports/session-08-cross-platform-source-validation.md)
+branch passed native CI on Windows x64, Ubuntu x64 and macOS 15 Apple Silicon
+ARM64. It has not changed the published v0.1.2 assets. macOS Intel is outside
+this validation scope. CI checks the registered parsing and robustness
+workloads on each OS; equal absolute latency across different machines is not
+claimed.
+
 ## Use and verification
 
 Consumers use `src/parser.c`, `src/scanner.c` and `src/tree_sitter/`, with
