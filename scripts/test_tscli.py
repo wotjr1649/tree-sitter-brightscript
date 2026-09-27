@@ -56,6 +56,10 @@ CI_ALLOWED += "|" + re.escape(POSIX_PREFLIGHT_COMMAND)
 NATIVE_SMOKE_COMMAND = ("python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 "
                         "--out .work/native-smoke --gates B5-01-MEMORY")
 CI_ALLOWED += "|" + re.escape(NATIVE_SMOKE_COMMAND)
+NATIVE_FULL_COMMAND = ("python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 "
+                       "--support 0.25.1=.work/runtime-025 --support 0.26.13=.work/runtime-026 "
+                       "--out .work/native-full")
+CI_ALLOWED += "|" + re.escape(NATIVE_FULL_COMMAND)
 # `run` keys in the spellings recognised here (flow mapping, quoted key, extra spaces, `\x72un`, `\u0072un`);
 # each must be one the parser read. Other escapes are not recognised (validation.md "Identity binding").
 ANY_RUN_KEY = re.compile(r"""(?:^|[\s{,])["']?(?:run|\\x72un|\\u0072un)["']?\s*:""", re.M)
@@ -302,7 +306,8 @@ class VerifiedCli(unittest.TestCase):
         qualification_commands = [(wf.name, c) for wf in sorted((SCRIPTS.parent / ".github/workflows").glob("*.y*ml"))
                                   for c in ci_commands(wf.read_text(encoding="utf-8")) if "qualify" in c]
         self.assertEqual(qualification_commands, [("native-preflight.yml", POSIX_PREFLIGHT_COMMAND),
-                                                  ("native-preflight.yml", NATIVE_SMOKE_COMMAND)])
+                                                  ("native-preflight.yml", NATIVE_SMOKE_COMMAND),
+                                                  ("native-qualification.yml", NATIVE_FULL_COMMAND)])
         self.assertFalse(allowed("python scripts/qualify/run.py --cc x"))
         self.assertFalse(allowed("python scripts/qualify/run.py --safety-profile native"))
         for altered in (POSIX_PREFLIGHT_COMMAND + " --gates CANCEL",
@@ -314,6 +319,10 @@ class VerifiedCli(unittest.TestCase):
                         NATIVE_SMOKE_COMMAND.replace("B5-01-MEMORY", "CANCEL"),
                         NATIVE_SMOKE_COMMAND.replace(".work/runtime-027", "../outside"),
                         NATIVE_SMOKE_COMMAND + " && whoami"):
+            self.assertFalse(allowed(altered), altered)
+        for altered in (NATIVE_FULL_COMMAND + " --gates B5-01-MEMORY",
+                        NATIVE_FULL_COMMAND.replace(".work/runtime-025", "../outside"),
+                        NATIVE_FULL_COMMAND.replace("--out .work/native-full", "--out /tmp/shared")):
             self.assertFalse(allowed(altered), altered)
         # The test-only safety route gets no new launcher exemption.
         safety = (SCRIPTS / "qualify" / "safety.py").read_text(encoding="utf-8")

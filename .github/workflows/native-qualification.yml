@@ -1,0 +1,59 @@
+name: Native qualification trial
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  posix-qualification:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: tree-sitter/tree-sitter
+          ref: 6070dbfefd326bd735e5683eb128cc1b57dad0c0
+          path: .work/runtime-027
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: tree-sitter/tree-sitter
+          ref: f5afe475deb7c0bae6407fb776c76824f717bb61
+          path: .work/runtime-025
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: tree-sitter/tree-sitter
+          ref: d97971e24500218865c05ed1febdee2acf41bae1
+          path: .work/runtime-026
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Install the pinned generator
+        run: npm ci
+      - name: Run all native gates
+        run: python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 --support 0.25.1=.work/runtime-025 --support 0.26.13=.work/runtime-026 --out .work/native-full
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: native-${{ matrix.os }}
+          path: |
+            .work/native-full/identity.json
+            .work/native-full/gates.json
+            .work/native-full/runs.jsonl
+          if-no-files-found: error
+          retention-days: 7
