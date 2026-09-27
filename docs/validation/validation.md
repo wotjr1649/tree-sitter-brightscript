@@ -140,7 +140,12 @@ v0.1.2만의 조건부 승계는 별도로 승인된
 과거 performance와 새 correctness·ASan 한정 replay를 분리하며, 새 동작에는 적용하지 않는다.
 공개 offline verifier 정책은 [public-replay.md](public-replay.md)에 둔다.
 CI guard는 이 verifier의 고정된 `python -I -B -X utf8` 명령만 추가로 허용한다.
-임의 Python flags나 새로운 native launcher 예외는 허용하지 않는다.
+임의 Python flags는 허용하지 않는다. v0.1.4 준비 단계의 유일한 추가 예외는
+`native-preflight.yml`에서 실행하는 고정된
+`python scripts/qualify/run.py --preflight --cc /usr/bin/cc --out .work/posix-preflight`
+명령이다. `test_tscli.py`는 workflow 이름과 정확한 명령을 확인하고 변형된
+인수·경로와 다른 native 실행 명령을 거부한다. 이 예외는 정식 출하 게이트의
+CI 실행 권한이 아니며, POSIX 감독의 실패 대조군을 실행하는 데만 사용한다.
 
 Every check script runs the CLI only through `scripts/tscli.py` (so the check
 does not depend on the order of CI steps) and starts no other program but git,
@@ -158,7 +163,7 @@ step `shell:`, local actions, `binding.gyp` and `.npmrc` settings (Session 05-1
 delta re-audit C4-01, C4-02).
 One file under `scripts/` is exempt: `scripts/qualify/run.py`, the release
 qualification runner ("Release qualification lane" below), which is not a
-check script, is run by no workflow and reaches the CLI only through
+check script, is run by no workflow except the exact POSIX preflight above and reaches the CLI only through
 `tscli.py`; it starts git, the C compiler it is given and the programs that
 compiler built. `scripts/test_tscli.py` checks that it is the only exemption.
 The same entrypoint has an explicit `--safety-profile` test route described

@@ -21,10 +21,16 @@ import hashlib
 import json
 import os
 import re
+import selectors
 import shutil
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
+
+if sys.platform != "win32":
+    import resource
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -54,14 +60,20 @@ def now():
 
 class Lab:
     def __init__(self, cc, out):
-        self.cc, self.out = Path(cc), Path(out)
+        self.cc, self.out = Path(cc).resolve(), Path(out).resolve()
         for d in ("build", "raw", "inputs", "env"):
             (self.out / d).mkdir(parents=True, exist_ok=True)
-        self.env = {k: v for k, v in os.environ.items() if k.upper() in {"SYSTEMROOT", "WINDIR", "COMSPEC", "SYSTEMDRIVE",
-                                                                        "PATHEXT"}}
-        self.env["PATH"] = os.pathsep.join([str(self.cc.parent), str(Path(os.environ["SYSTEMROOT"]) / "System32")])
-        for name in ("HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP", "XDG_CACHE_HOME", "XDG_CONFIG_HOME",
-                     "XDG_STATE_HOME", "TREE_SITTER_LIBDIR", "TREE_SITTER_DIR"):
+        if sys.platform == "win32":
+            self.env = {k: v for k, v in os.environ.items() if k.upper() in {"SYSTEMROOT", "WINDIR", "COMSPEC",
+                                                                            "SYSTEMDRIVE", "PATHEXT"}}
+            self.env["PATH"] = os.pathsep.join([str(self.cc.parent), str(Path(os.environ["SYSTEMROOT"]) / "System32")])
+        else:
+            self.env = {"PATH": os.pathsep.join(dict.fromkeys([str(self.cc.parent), "/usr/bin", "/bin"]))}
+        private_names = ("HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP", "XDG_CACHE_HOME",
+                         "XDG_CONFIG_HOME", "XDG_STATE_HOME", "TREE_SITTER_LIBDIR", "TREE_SITTER_DIR") if sys.platform == "win32" else (
+                         "HOME", "TMPDIR", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME",
+                         "TREE_SITTER_LIBDIR", "TREE_SITTER_DIR")
+        for name in private_names:
             p = self.out / "env" / "tsq-private" / name.lower()
             p.mkdir(parents=True, exist_ok=True)
             self.env[name] = str(p)
@@ -101,6 +113,8 @@ class Lab:
         return first
 
     def supervise(self, cid, argv, cap=CAP, ms=WATCHDOG_MS, output_cap=OUTPUT_CAP):
+        if sys.platform != "win32":
+            return self.supervise_posix(cid, argv, cap, ms, output_cap)
         requested, n = cid, 1
         while (self.out / "raw" / cid).exists():
             n += 1
@@ -120,6 +134,94 @@ class Lab:
         self.record(kind="supervised", command_id=cid, argv=argv, image_sha256=sha(argv[0]), report=report, guard=guard)
         if not guard:
             raise RuntimeError(f"supervisor guard failed for {cid}; the lane stops")
+        return report, (raw / "child.out").read_text(encoding="utf-8", errors="replace")
+
+    def supervise_posix(self, cid, argv, cap, ms, output_cap):
+        """One task-owned child/session with pre-exec virtual-memory limit and bounded output."""
+        if not (16 * 2**20 <= cap <= 1024 * 2**20 and 10 <= ms <= 15000 and 0 < output_cap <= 8 * 2**20):
+            raise ValueError("invalid POSIX supervisor profile")
+        requested, n = cid, 1
+        while (self.out / "raw" / cid).exists():
+            n += 1
+            cid = f"{requested}-r{n}"
+        raw = self.out / "raw" / cid
+        raw.mkdir(parents=True)
+        argv = list(map(str, argv))
+        if not Path(argv[0]).is_absolute() or not Path(argv[0]).is_file():
+            raise ValueError("POSIX supervised image must be an existing absolute path")
+
+        def limits():
+            resource.setrlimit(resource.RLIMIT_AS, (cap, cap))
+
+        start = time.monotonic()
+        with (raw / "child.out").open("xb") as output:
+            proc = subprocess.Popen(argv, env=self.env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                    start_new_session=True, preexec_fn=limits)
+            selector = selectors.DefaultSelector()
+            selector.register(proc.stdout, selectors.EVENT_READ)
+            status, usage, reason, stored, pipe_open, reaped = None, None, "COMPLETED", 0, True, False
+            descendant_pipe = False
+            try:
+                while pipe_open or not reaped:
+                    if time.monotonic() - start > ms / 1000 + 2:
+                        raise RuntimeError(f"POSIX supervisor could not drain or reap {cid}")
+                    if not reaped:
+                        pid, got, used = os.wait4(proc.pid, os.WNOHANG)
+                        if pid:
+                            status, usage, reaped = got, used, True
+                    if time.monotonic() - start > ms / 1000 and reason == "COMPLETED":
+                        reason = "WATCHDOG_TERMINATED"
+                        try:
+                            os.killpg(proc.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                    events = selector.select(timeout=0.02)
+                    for key, _ in events:
+                        data = os.read(key.fileobj.fileno(), 65536)
+                        if not data:
+                            selector.unregister(key.fileobj)
+                            pipe_open = False
+                            continue
+                        room = max(0, output_cap - stored)
+                        output.write(data[:room])
+                        stored += len(data[:room])
+                        if len(data) > room and reason == "COMPLETED":
+                            reason = "OUTPUT_LIMIT_REACHED"
+                            try:
+                                os.killpg(proc.pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                    if reaped and pipe_open and not events and reason == "COMPLETED":
+                        descendant_pipe = True
+                        reason = "DESCENDANTS_TERMINATED"
+                        try:
+                            os.killpg(proc.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                proc.returncode = os.waitstatus_to_exitcode(status)
+            finally:
+                if not reaped:
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    os.wait4(proc.pid, 0)
+                selector.close()
+                proc.stdout.close()
+        peak = (usage.ru_maxrss if sys.platform == "darwin" else usage.ru_maxrss * 1024)
+        report = {"termination_reason": reason, "exit_code_raw": proc.returncode,
+                  "peak_working_set_bytes": peak, "peak_commit_bytes": peak,
+                  "memory_metric": "peak_rss_bytes", "configured_job_memory_limit_bytes": cap,
+                  "image_path": str(Path(argv[0]).resolve()), "exit_confirmed": reaped,
+                  "active_processes": 0 if not pipe_open else None,
+                  "descendant_pipe_observed": descendant_pipe,
+                  "elapsed_ms": (time.monotonic() - start) * 1000}
+        (raw / "supervisor.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
+        guard = reaped and report["active_processes"] == 0 and report["configured_job_memory_limit_bytes"] == cap
+        self.record(kind="supervised", command_id=cid, argv=argv, image_sha256=sha(argv[0]), report=report,
+                    guard=guard)
+        if not guard:
+            raise RuntimeError(f"POSIX supervisor guard failed for {cid}; the lane stops")
         return report, (raw / "child.out").read_text(encoding="utf-8", errors="replace")
 
     def supervisor_refusal(self, cid, cap, ms, output_cap):
@@ -228,19 +330,21 @@ def verify_runtime(root, version):
 
 def self_test(lab):
     """Six benign children prove the memory cap, watchdog, output cap, descendant kill and the private environment."""
-    exe = lab.out / "build/benign.exe"
-    lab.compile("benign", ["-O2", "-Wall", "-Wextra", HERE / "benign.c"], exe)
+    posix = sys.platform != "win32"
+    exe = lab.out / "build" / ("benign" if posix else "benign.exe")
+    lab.compile("benign", ["-O2", "-Wall", "-Wextra", HERE / ("benign_posix.c" if posix else "benign.c")], exe)
     env_before = os.environ.get("S05_PRIVATE_CANARY")
     os.environ["S05_PRIVATE_CANARY"] = "must-not-reach-child"  # the child must not see the parent's variables
     results = []
     for mode in ("normal", "sleep", "memory", "output", "descendant", "private-env"):
-        report, text = lab.supervise(f"selftest-{mode}", [exe, mode], cap=64 * 2**20,
+        report, text = lab.supervise(f"selftest-{mode}", [exe, mode], cap=(512 if posix else 64) * 2**20,
                                      ms=200 if mode == "sleep" else 3000, output_cap=64 * 2**10)
         ok = {"normal": report["termination_reason"] == "COMPLETED" and "NORMAL_COMPLETED" in text,
               "sleep": report["termination_reason"] == "WATCHDOG_TERMINATED",
               "memory": report["exit_code_raw"] == 73 and "ALLOCATION_DENIED" in text,
               "output": report["termination_reason"] == "OUTPUT_LIMIT_REACHED",
-              "descendant": report["termination_reason"] == "DESCENDANTS_TERMINATED" and report["total_processes"] == 2,
+              "descendant": report["termination_reason"] == "DESCENDANTS_TERMINATED" and (
+                  report["descendant_pipe_observed"] if posix else report["total_processes"] == 2),
               "private-env": report["termination_reason"] == "COMPLETED" and "PRIVATE_ENV_COMPLETED" in text}[mode]
         results.append({"mode": mode, "pass": ok})
     if env_before is None:
@@ -269,8 +373,9 @@ def reference_grammar(lab, name):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cc", required=True)
-    ap.add_argument("--runtime", required=True)
+    ap.add_argument("--runtime")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--preflight", action="store_true")
     ap.add_argument("--support", action="append", default=[])
     ap.add_argument("--gates", default=",".join(ALL_GATES))
     ap.add_argument("--seed", type=int, default=5707)
@@ -285,11 +390,18 @@ def main():
     mismatches = cases.check()
     if mismatches:
         raise SystemExit(f"generated inputs differ from the recorded ones: {mismatches}")
-    lab.supervisor = lab.out / "build/supervisor.exe"
-    lab.compile("supervisor", ["-O2", "-Wall", "-Wextra", "-Werror", "-municode", HERE / "supervisor.c", "-lpsapi",
-                               "-Wl,--no-insert-timestamp"],
-                lab.supervisor)
+    if sys.platform == "win32":
+        lab.supervisor = lab.out / "build/supervisor.exe"
+        lab.compile("supervisor", ["-O2", "-Wall", "-Wextra", "-Werror", "-municode", HERE / "supervisor.c", "-lpsapi",
+                                   "-Wl,--no-insert-timestamp"], lab.supervisor)
     selftest = self_test(lab)
+    if args.preflight:
+        (lab.out / "preflight.json").write_text(json.dumps({"platform": sys.platform, "selftest": selftest}, indent=1),
+                                                 encoding="utf-8")
+        print("POSIX_PREFLIGHT_PASS" if sys.platform != "win32" else "WINDOWS_PREFLIGHT_PASS")
+        return 0
+    if not args.runtime:
+        raise SystemExit("--runtime is required for qualification")
     lab.supervised_builds = True
 
     def runtime_objects(version, root):
