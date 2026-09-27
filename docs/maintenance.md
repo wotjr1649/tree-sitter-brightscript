@@ -1,15 +1,16 @@
 # 유지보수와 동결
 
-현재 공개 버전은 [v0.1.2](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.2)이다.
-v0.1.2의 공개 검증·제약은 [출하 기록](reports/0.1.2-maintenance-candidate.md)에 둔다.
-[v0.1.1 출하 기록](reports/0.1.1-maintenance-release.md)과 기존 tag·자산·FAIL은 보존한다.
+현재 공개 버전은 [v0.1.3](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.3)이다.
+v0.1.3의 공개 검증·제약은 [출하 기록](reports/0.1.3-release-candidate.md)에 둔다.
+[v0.1.2 출하 기록](reports/0.1.2-maintenance-candidate.md)과 이전 tag·자산·FAIL은 보존한다.
 공개 tag와 Release 자산, 게시 뒤의 외부 receipt가 출하 사실을 식별한다.
 
 ## 동결
 
-2026-09-27 v0.1.2의 공개 다운로드·source-only·public verifier 검증을 완료했다.
+2026-09-28 v0.1.3의 공개 다운로드와 source-only 빌드·기능 검증을 완료했다.
 승인된 마지막 문서 commit의 exact CI와 최종 인계까지 완료한 시점부터
 `FROZEN_UNTIL_TRIGGER`로 닫는다. 최종 commit·CI·봉인 identity는 외부 출하 receipt에 기록한다.
+v0.1.2의 2026-09-27 동결과 공개 verifier 결과는 역사 기록으로 유지한다.
 기존 이슈·보안 신고 경로는 유지하며 저장소를 archive하지 않는다.
 자동 연구, 정기 watcher, 자동 의존성 갱신과 자동 릴리스는 만들지 않는다.
 
