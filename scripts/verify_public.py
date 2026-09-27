@@ -281,6 +281,7 @@ def verify(bundle, baseline_source, candidate_source=None, candidate_registratio
         if candidate_source is not None:
             candidate = verify_candidate(bundle, source, candidate_source, candidate_registration)
         return {"assessment": "PASS", "policy": comparison.POLICY, "public_files": file_count,
+                "graph_mode": "CANDIDATE_AND_BASELINE" if candidate is not None else "HISTORICAL_BASELINE_ONLY",
                 "baseline_source_files": source_count, "baseline_K1": proof["K1"], "candidate": candidate,
                 "environment": {"python": platform.python_version(), "implementation": platform.python_implementation(),
                                 "platform": platform.platform(), "libc": platform.libc_ver()},

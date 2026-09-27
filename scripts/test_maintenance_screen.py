@@ -45,6 +45,7 @@ class ScreenControls(unittest.TestCase):
         with self.assertRaises(ValueError):
             screen.check_dump(raw, b"", "VALID")
         for bad in (None, "x" * (screen.OUTPUT_BYTES + 1), "\n" * (screen.MAX_NODES + 4),
+                    "\r" * (screen.MAX_NODES + 4), "\v" * (screen.MAX_NODES + 4),
                     raw.replace("N\t1\tidentifier", "N\t-1\tidentifier"),
                     raw.replace("identifier\t-\t0\t1\t1", "identifier\t-\t0\t1\t33")):
             with self.assertRaises(ValueError):
@@ -57,7 +58,11 @@ class ScreenControls(unittest.TestCase):
         final = {"final": True, "op": "QUERY_ONLY", "bytes": 1, "cancelled": False,
                  "has_error": 0, "match_limit_exceeded": False, "captures": 1}
         screen.check_query(final, b"a")
+        for bad in (None, [], "partial"):
+            with self.assertRaises(ValueError):
+                screen.check_query(bad, b"a")
         for key, value in (("final", False), ("cancelled", True), ("bytes", 0),
+                           ("bytes", True), ("bytes", 1.0),
                            ("has_error", False), ("match_limit_exceeded", True), ("captures", None)):
             with self.assertRaises(ValueError):
                 screen.check_query({**final, key: value}, b"a")

@@ -62,13 +62,14 @@ def unzip(archive, prefix, out):
 
 
 def deterministic_zip(path, files, prefix):
-    with zipfile.ZipFile(path, "x", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+    # Stored members make the exact public bytes independent of the host's zlib.
+    with zipfile.ZipFile(path, "x", compression=zipfile.ZIP_STORED) as z:
         for name, data, mode in sorted(files):
             info = zipfile.ZipInfo(prefix + "/" + name, date_time=(1980, 1, 1, 0, 0, 0))
             info.create_system = 3
             info.external_attr = mode << 16
-            info.compress_type = zipfile.ZIP_DEFLATED
-            z.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+            info.compress_type = zipfile.ZIP_STORED
+            z.writestr(info, data)
 
 
 def prepare(out, baseline_assets=None):

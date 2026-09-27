@@ -62,6 +62,8 @@ class Maintenance012(unittest.TestCase):
             for name in ("a.zip", "b.zip"):
                 package.deterministic_zip(root / name, [("input", b"bytes", 0o100644)], "root")
             self.assertEqual((root / "a.zip").read_bytes(), (root / "b.zip").read_bytes())
+            with zipfile.ZipFile(root / "a.zip") as z:
+                self.assertTrue(all(r.compress_type == zipfile.ZIP_STORED for r in z.infolist()))
             package.unzip(root / "a.zip", "root", root / "valid")
             self.assertEqual((root / "valid/input").read_bytes(), b"bytes")
 

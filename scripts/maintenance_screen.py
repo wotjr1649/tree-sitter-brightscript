@@ -130,6 +130,8 @@ def check_dump(text, data, expected_class, expected_named=None):
             or text.count("\n") > MAX_NODES + 3):
         raise ValueError("dump output bound")
     lines = text.splitlines()
+    if len(lines) > MAX_NODES + 3:
+        raise ValueError("dump node bound")
     if not lines or lines[-1] != "DUMP_DONE\t0" or not lines[0].startswith("F\t"):
         raise ValueError("missing dump completion")
     header = lines[0].split("\t")
@@ -154,6 +156,8 @@ def check_dump(text, data, expected_class, expected_named=None):
         if nodes and depth == 0:
             raise ValueError("duplicate root")
         stack.append((start, end))
+        if len(nodes) >= MAX_NODES:
+            raise ValueError("dump node bound")
         nodes.append((depth, kind, field, start, end, flags))
         if flags & 1:
             named.append((kind, field, data[start:end].decode("utf-8", errors="replace")))
@@ -184,7 +188,8 @@ def check_dump(text, data, expected_class, expected_named=None):
 
 
 def check_query(final, data):
-    if (final.get("final") is not True or final.get("op") != "QUERY_ONLY" or final.get("bytes") != len(data)
+    if (type(final) is not dict or final.get("final") is not True or final.get("op") != "QUERY_ONLY"
+            or type(final.get("bytes")) is not int or final.get("bytes") != len(data)
             or final.get("cancelled") is not False or type(final.get("has_error")) is not int
             or final.get("has_error") not in (0, 1)
             or final.get("match_limit_exceeded") is not False or type(final.get("captures")) is not int
