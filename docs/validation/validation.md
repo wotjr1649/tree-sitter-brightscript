@@ -429,7 +429,8 @@ across the three hosts. It binds the candidate commit, generated files,
 runtime versions, runner image, architecture, compiler and CLI identities.
 Only OS-specific path, timing and memory values are excluded from exact
 functional comparison. The evidence ZIP contains normalized results, raw
-gate/run records and identity manifests, with no compiled parser library.
+gate/run records and identity manifests, with a host SHA-256 binding for the
+full raw run file and no compiled parser library.
 The current v3 performance bounds are retained; predeclared OS-specific
 performance calibration remains required before a v0.1.4 release.
 

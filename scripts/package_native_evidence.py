@@ -47,6 +47,8 @@ def verified_files(root, platform, common):
             or [g["gate"] for g in gates["results"]] != list(REQUIRED_GATES)
             or any(g["status"] != "PASS" for g in gates["results"])):
         raise ValueError(f"{platform} raw gate identity mismatch")
+    if sha(paths["native-full/runs.jsonl"]) != host["runs_sha256"]:
+        raise ValueError(f"{platform} raw runs hash mismatch")
     with paths["native-full/runs.jsonl"].open(encoding="utf-8") as source:
         first = json.loads(source.readline())
     if first["report"].get("memory_metric", "windows_private_commit") != host["memory_metric"]:

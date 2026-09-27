@@ -113,6 +113,7 @@ def build(qualification, oracle_a, oracle_b):
             "memory_metric": first_run["report"].get("memory_metric", "windows_private_commit"),
             "identity_sha256": hashlib.sha256((q / "identity.json").read_bytes()).hexdigest(),
             "gates_sha256": hashlib.sha256((q / "gates.json").read_bytes()).hexdigest(),
+            "runs_sha256": hashlib.sha256((q / "runs.jsonl").read_bytes()).hexdigest(),
         },
     }
 

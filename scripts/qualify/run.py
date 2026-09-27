@@ -207,7 +207,7 @@ class Lab:
             selector.register(proc.stdout, selectors.EVENT_READ)
             status, usage, reason, stored, pipe_open, reaped = None, None, "COMPLETED", 0, True, False
             descendant_pipe = False
-            peak_sampled, last_sample, max_sample_gap = 0, start, 0
+            peak_sampled, last_sample, max_sample_gap, samples_after_reap = 0, start, 0, 0
             group_cleared = False
             try:
                 while pipe_open or not reaped:
@@ -222,7 +222,10 @@ class Lab:
                         max_sample_gap = max(max_sample_gap, now - last_sample)
                         last_sample = now
                         try:
-                            peak_sampled = max(peak_sampled, darwin_group_footprint(proc.pid))
+                            footprint = darwin_group_footprint(proc.pid)
+                            peak_sampled = max(peak_sampled, footprint)
+                            if reaped:
+                                samples_after_reap += 1
                         except OSError:
                             if reaped:
                                 raise
@@ -301,6 +304,7 @@ class Lab:
                   "memory_metric": "group_sampled_phys_footprint_bytes" if sys.platform == "darwin" else "peak_rss_bytes",
                   "memory_limit_mode": "group_sampled_kill" if sys.platform == "darwin" else "kernel_rlimit_as",
                   "max_sample_gap_ms": max_sample_gap * 1000, "configured_job_memory_limit_bytes": cap,
+                  "samples_after_reap": samples_after_reap if sys.platform == "darwin" else None,
                   "image_path": str(Path(argv[0]).resolve()), "exit_confirmed": reaped,
                   "active_processes": 0 if not pipe_open else None,
                   "descendant_pipe_observed": descendant_pipe,
@@ -446,7 +450,9 @@ def self_test(lab):
               "memory-child": (report["termination_reason"] == "MEMORY_LIMIT_REACHED" and
                                report["peak_working_set_bytes"] <= 96 * 2**20 and
                                report.get("max_sample_gap_ms", float("inf")) <= 100),
-              "memory-child-orphan": (report["termination_reason"] == "MEMORY_LIMIT_REACHED" and
+              "memory-child-orphan": (report["termination_reason"] in ("MEMORY_LIMIT_REACHED", "DESCENDANTS_TERMINATED") and
+                                      "MEMORY_CHILD_ALIVE" in text and
+                                      report["samples_after_reap"] > 0 and
                                       report["peak_working_set_bytes"] <= 96 * 2**20 and
                                       report.get("max_sample_gap_ms", float("inf")) <= 100),
               "private-env": report["termination_reason"] == "COMPLETED" and "PRIVATE_ENV_COMPLETED" in text}[mode]

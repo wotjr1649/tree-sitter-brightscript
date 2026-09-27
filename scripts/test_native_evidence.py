@@ -124,6 +124,7 @@ class NativeEvidence(unittest.TestCase):
             self.assertEqual(len(result["common"]["incremental"]), 30)
             self.assertEqual([p["case"] for p in result["common"]["incremental"] if "detected" in p],
                              ["comparator self-test 1", "comparator self-test 2"])
+            self.assertEqual(result["host"]["runs_sha256"], sha((q / "runs.jsonl").read_bytes()))
 
     def test_evidence_zip_checks_raw_records_and_is_reproducible(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -136,6 +137,7 @@ class NativeEvidence(unittest.TestCase):
                                       "case": f"case-{i}", "final": final, "events": {},
                                       "report": {"memory_metric": "host-memory"}}) + "\n"
                            for i in range(1533))
+            runs += json.dumps({"budget": 100, "completed": True, "report": {"memory_metric": "host-memory"}}) + "\n"
             with (root / "runs.jsonl").open("w", encoding="utf-8") as output:
                 output.write(runs)
             common["native_runs"] = signatures(root / "runs.jsonl")
@@ -179,6 +181,7 @@ class NativeEvidence(unittest.TestCase):
                 evidence = {"common": common, "host": {"platform": platform, "architecture": arch,
                             "runner_image": runner_image, "identity_sha256": sha((host_root / "native-full/identity.json").read_bytes()),
                             "gates_sha256": sha((host_root / "native-full/gates.json").read_bytes()),
+                            "runs_sha256": sha((host_root / "native-full/runs.jsonl").read_bytes()),
                             "cli_binary_sha256": "0" * 64, "cc_sha256": "0" * 64,
                             "probe_sha256": {"cand": "0" * 64}, "supervisor_kind": "test-supervisor",
                             "memory_metric": "host-memory"}}
@@ -205,6 +208,12 @@ class NativeEvidence(unittest.TestCase):
                 package(*roots, root / "missing-w12.zip")
             for path in manifests:
                 path.write_text(original_manifest, encoding="utf-8")
+            raw_runs = roots[2] / "native-full/runs.jsonl"
+            raw_runs.write_text("".join(raw_runs.read_text(encoding="utf-8").splitlines(keepends=True)[:-1]),
+                                encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "raw runs hash"):
+                package(*roots, root / "missing-cancellation.zip")
+            raw_runs.write_text(runs, encoding="utf-8")
             for host_root in roots:
                 path = host_root / "native-evidence.json"
                 changed = json.loads(path.read_text(encoding="utf-8"))
