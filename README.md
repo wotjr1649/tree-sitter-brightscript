@@ -11,10 +11,12 @@ This project aims to provide a current, well-tested BrightScript syntax grammar 
 
 ## Status
 
-[v0.1.2](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.2)를
-2026-09-27 공개하고 검증했다. [출하 기록](docs/reports/0.1.2-maintenance-candidate.md)은
-verifier·근거 문서·version metadata 유지보수와 보존된 문법 동작을 설명한다.
-인증 없는 다운로드에서 다섯 승인 자산이 일치했고, 공개 source-only 검사와 public verifier가 통과했다.
+[v0.1.3](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.3)을
+2026-09-28 KST 공개하고 검증했다. [출하 기록](docs/reports/0.1.3-release-candidate.md)은
+세 OS CI, Windows 17-gate qualification, 독립 정적 리뷰와 네 공개 자산의 hash를 설명한다.
+배포는 소스 전용이다. Windows x64를 우선 지원하며 Linux x64는 Ubuntu 24.04,
+macOS Apple Silicon ARM64는 macOS 15에서 검증했다. macOS Intel은 지원하지 않는다.
+[v0.1.2 출하 기록](docs/reports/0.1.2-maintenance-candidate.md)은 별도로 보존한다.
 [유지보수 동결](docs/maintenance.md)은 마지막 문서 commit의 CI와 최종 인계 완료 시 효력을 갖는다.
 
 The grammar covers the listed requirements and fixtures in the [registry](docs/specs/language-conformance.md).
@@ -23,18 +25,11 @@ Roku syntax or device compatibility. The [0.1.0 release record](docs/reports/0.1
 and [qualification history](docs/reports/0.1.0-integrated-qualification.md) preserve earlier failures and their disposition.
 No npm package, language binding or WASM artifact is shipped.
 
-The v0.1.3 candidate keeps source-only distribution. It adds native hosted CI
-for Windows x64, Ubuntu x64 and macOS 15 Apple Silicon ARM64; it does not ship
-OS-specific compiled parser libraries. See the
-[candidate record](docs/reports/0.1.3-release-candidate.md) for release gates.
-
-Post-release source validation on the
-[`session/08-cross-platform-ci`](docs/reports/session-08-cross-platform-source-validation.md)
-branch passed native CI on Windows x64, Ubuntu x64 and macOS 15 Apple Silicon
-ARM64. It has not changed the published v0.1.2 assets. macOS Intel is outside
-this validation scope. CI checks the registered parsing and robustness
-workloads on each OS; equal absolute latency across different machines is not
-claimed.
+No OS-specific compiled parser libraries are shipped. The three-OS CI checks
+registered parsing and robustness workloads; equal absolute latency across
+different machines is not claimed. The
+[Session 08 report](docs/reports/session-08-cross-platform-source-validation.md)
+preserves the earlier branch validation and initial macOS failure.
 
 ## Use and verification
 

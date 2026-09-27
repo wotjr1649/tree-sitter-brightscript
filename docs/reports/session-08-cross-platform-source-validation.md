@@ -1,8 +1,10 @@
 # Session 08 — source platform validation
 
-Status: session branch candidate, not merged or released. This work validates
-the existing v0.1.2 grammar source on additional hosts; it does not change the
-v0.1.2 tag, release assets, grammar, scanner, queries, generated parser or ABI.
+Status at the time: session branch candidate. This work validated the existing
+v0.1.2 grammar source on additional hosts without changing the v0.1.2 tag or
+assets. It was later integrated into the
+[v0.1.3 source release](0.1.3-release-candidate.md), which also bumped version
+metadata. The grammar, scanner, queries, public tree and ABI remained unchanged.
 
 ## Target and evidence
 

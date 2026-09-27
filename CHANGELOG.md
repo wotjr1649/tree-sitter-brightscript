@@ -1,11 +1,16 @@
 # 변경 이력
 
-## 0.1.3 — release candidate
+## 0.1.3 — 2026-09-28
+
+[v0.1.3](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.3)을
+소스 전용으로 공개했다. 네 수동 자산의 인증 없는 다운로드와 hash, 공개 소스의
+corpus·native 빌드·샘플 파싱을 검증했다. 세 OS CI와 Windows 17개 native gate의
+범위·한계는 [출하 기록](docs/reports/0.1.3-release-candidate.md)에 둔다.
 
 - Windows x64, Ubuntu x64, macOS 15 Apple Silicon ARM64의 소스 빌드와 공통 기능 CI를 추가한다.
 - macOS의 `ru_maxrss` 단위와 `/var` 경로 정규화에 따른 공개 자료 추출 오류를 수정한다.
 - 문법, scanner, query, public tree는 유지한다. 배포는 소스 전용이며 OS별 바이너리는 제공하지 않는다.
-- [후보 검증 기록](docs/reports/0.1.3-release-candidate.md)에 검증 범위와 출하 조건을 둔다.
+- macOS Intel과 OS 간 동일한 절대 처리시간은 지원·검증 범위 밖이다.
 
 ## 0.1.2 — 2026-09-27
 
