@@ -47,6 +47,32 @@ int main(int argc, char **argv) {
     printf("DESCENDANT %ld\n", (long)child);
     return 0;
   }
+  if (!strcmp(argv[1], "descendant-closed")) {
+    pid_t child = fork();
+    if (child < 0) return 76;
+    if (!child) { close(STDOUT_FILENO); close(STDERR_FILENO); sleep(5); return 0; }
+    printf("DESCENDANT_CLOSED %ld\n", (long)child);
+    return 0;
+  }
+#ifdef __APPLE__
+  if (!strcmp(argv[1], "memory-child")) {
+    pid_t child = fork();
+    if (child < 0) return 76;
+    if (!child) {
+      const struct timespec pause = {0, 2000000};
+      for (int i = 0; i < 256; ++i) {
+        volatile char *p = malloc(1024 * 1024);
+        if (!p) return 73;
+        for (size_t j = 0; j < 1024 * 1024; j += 4096) p[j] = 1;
+        nanosleep(&pause, NULL);
+      }
+      return 74;
+    }
+    puts("MEMORY_CHILD_BEGIN");
+    sleep(5);
+    return 0;
+  }
+#endif
   if (!strcmp(argv[1], "private-env")) {
     const char *names[] = {"HOME", "TMPDIR", "XDG_CACHE_HOME", "XDG_CONFIG_HOME",
                            "XDG_STATE_HOME", "TREE_SITTER_LIBDIR", "TREE_SITTER_DIR"};

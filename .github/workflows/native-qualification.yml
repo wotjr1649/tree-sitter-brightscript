@@ -3,8 +3,14 @@ name: Native qualification trial
 on:
   workflow_dispatch:
   push:
-    branches: [session/10-v014-native-parity]
-    paths: [.github/workflows/native-qualification.yml]
+    branches: [main, session/10-v014-native-parity]
+    paths:
+      - .github/workflows/native-qualification.yml
+      - scripts/qualify/**
+      - scripts/build_native_evidence.py
+      - scripts/check_oracle_pair.py
+      - scripts/compare_native_evidence.py
+      - scripts/record_oracle.py
 
 permissions:
   contents: read

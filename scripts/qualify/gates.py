@@ -239,7 +239,8 @@ def budget_run(rec, budget):
 
 def run_id(rec):
     """One native execution: the supervisor's process id and creation time."""
-    return f"{rec['report'].get('pid')}@{rec['report'].get('creation_filetime')}"
+    report = rec["report"]
+    return f"{report.get('pid')}@{report.get('creation_filetime', report.get('creation_monotonic_ns'))}"
 
 
 def uninstrumented(rec):

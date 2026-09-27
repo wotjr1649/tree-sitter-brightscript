@@ -17,6 +17,7 @@ passes.
 """
 import argparse
 import datetime as dt
+import errno
 import hashlib
 import json
 import os
@@ -43,12 +44,29 @@ if sys.platform == "darwin":
     _libproc = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
     _libproc.proc_pid_rusage.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_void_p)
     _libproc.proc_pid_rusage.restype = ctypes.c_int
+    _libproc.proc_listpgrppids.argtypes = (ctypes.c_int, ctypes.c_void_p, ctypes.c_int)
+    _libproc.proc_listpgrppids.restype = ctypes.c_int
 
     def darwin_footprint(pid):
         usage = DarwinUsage()
         if _libproc.proc_pid_rusage(pid, 0, ctypes.byref(usage)):
             raise OSError(ctypes.get_errno(), "proc_pid_rusage failed")
         return usage.phys_footprint
+
+    def darwin_group_footprint(pgid):
+        pids = (ctypes.c_int * 4096)()
+        ctypes.set_errno(0)
+        count = _libproc.proc_listpgrppids(pgid, pids, ctypes.sizeof(pids))
+        if count < 0 or count >= len(pids) or count == 0 and ctypes.get_errno():
+            raise OSError(ctypes.get_errno(), "proc_listpgrppids failed or overflowed")
+        total = 0
+        for pid in pids[:count]:
+            try:
+                total += darwin_footprint(pid)
+            except OSError as error:
+                if error.errno != errno.ESRCH:
+                    raise
+        return total
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -180,6 +198,7 @@ class Lab:
                 os._exit(92)
 
         start = time.monotonic()
+        start_ns = time.monotonic_ns()
         with (raw / "child.out").open("xb") as output:
             proc = subprocess.Popen(argv, env=self.env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                     start_new_session=True, preexec_fn=limits)
@@ -188,6 +207,7 @@ class Lab:
             status, usage, reason, stored, pipe_open, reaped = None, None, "COMPLETED", 0, True, False
             descendant_pipe = False
             peak_sampled, last_sample, max_sample_gap = 0, start, 0
+            group_cleared = False
             try:
                 while pipe_open or not reaped:
                     if time.monotonic() - start > ms / 1000 + 2:
@@ -201,7 +221,7 @@ class Lab:
                         max_sample_gap = max(max_sample_gap, now - last_sample)
                         last_sample = now
                         try:
-                            peak_sampled = max(peak_sampled, darwin_footprint(proc.pid))
+                            peak_sampled = max(peak_sampled, darwin_group_footprint(proc.pid))
                         except OSError:
                             pid, got, used = os.wait4(proc.pid, os.WNOHANG)
                             if not pid:
@@ -242,21 +262,41 @@ class Lab:
                             os.killpg(proc.pid, signal.SIGKILL)
                         except ProcessLookupError:
                             pass
+                try:
+                    os.killpg(proc.pid, 0)
+                except ProcessLookupError:
+                    pass
+                else:
+                    if reason == "COMPLETED":
+                        reason = "DESCENDANTS_TERMINATED"
+                    os.killpg(proc.pid, signal.SIGKILL)
+                    deadline = time.monotonic() + 2
+                    while time.monotonic() < deadline:
+                        try:
+                            os.killpg(proc.pid, 0)
+                        except ProcessLookupError:
+                            break
+                        time.sleep(0.01)
+                    else:
+                        raise RuntimeError(f"POSIX process group did not exit for {cid}")
+                group_cleared = True
                 proc.returncode = os.waitstatus_to_exitcode(status)
             finally:
-                if not reaped:
+                if not group_cleared:
                     try:
                         os.killpg(proc.pid, signal.SIGKILL)
                     except ProcessLookupError:
                         pass
+                if not reaped:
                     os.wait4(proc.pid, 0)
                 selector.close()
                 proc.stdout.close()
         peak = max(peak_sampled, usage.ru_maxrss if sys.platform == "darwin" else usage.ru_maxrss * 1024)
         report = {"termination_reason": reason, "exit_code_raw": proc.returncode,
+                  "pid": proc.pid, "creation_monotonic_ns": start_ns,
                   "peak_working_set_bytes": peak, "peak_commit_bytes": peak,
-                  "memory_metric": "sampled_phys_footprint_bytes" if sys.platform == "darwin" else "peak_rss_bytes",
-                  "memory_limit_mode": "sampled_kill" if sys.platform == "darwin" else "kernel_rlimit_as",
+                  "memory_metric": "group_sampled_phys_footprint_bytes" if sys.platform == "darwin" else "peak_rss_bytes",
+                  "memory_limit_mode": "group_sampled_kill" if sys.platform == "darwin" else "kernel_rlimit_as",
                   "max_sample_gap_ms": max_sample_gap * 1000, "configured_job_memory_limit_bytes": cap,
                   "image_path": str(Path(argv[0]).resolve()), "exit_confirmed": reaped,
                   "active_processes": 0 if not pipe_open else None,
@@ -382,7 +422,12 @@ def self_test(lab):
     env_before = os.environ.get("S05_PRIVATE_CANARY")
     os.environ["S05_PRIVATE_CANARY"] = "must-not-reach-child"  # the child must not see the parent's variables
     results = []
-    for mode in ("normal", "sleep", "memory", "output", "descendant", "private-env"):
+    modes = ["normal", "sleep", "memory", "output", "descendant", "private-env"]
+    if posix:
+        modes.append("descendant-closed")
+    if sys.platform == "darwin":
+        modes.append("memory-child")
+    for mode in modes:
         report, text = lab.supervise(f"selftest-{mode}", [exe, mode], cap=(64 if sys.platform == "darwin" else 512 if posix else 64) * 2**20,
                                      ms=200 if mode == "sleep" else 3000, output_cap=64 * 2**10)
         ok = {"normal": report["termination_reason"] == "COMPLETED" and "NORMAL_COMPLETED" in text,
@@ -393,6 +438,11 @@ def self_test(lab):
               "output": report["termination_reason"] == "OUTPUT_LIMIT_REACHED",
               "descendant": report["termination_reason"] == "DESCENDANTS_TERMINATED" and (
                   report["descendant_pipe_observed"] if posix else report["total_processes"] == 2),
+              "descendant-closed": (report["termination_reason"] == "DESCENDANTS_TERMINATED" and
+                                    not report.get("descendant_pipe_observed")),
+              "memory-child": (report["termination_reason"] == "MEMORY_LIMIT_REACHED" and
+                               report["peak_working_set_bytes"] <= 96 * 2**20 and
+                               report.get("max_sample_gap_ms", float("inf")) <= 100),
               "private-env": report["termination_reason"] == "COMPLETED" and "PRIVATE_ENV_COMPLETED" in text}[mode]
         results.append({"mode": mode, "pass": ok, "detail": text[-120:] if not ok else ""})
     if env_before is None:
