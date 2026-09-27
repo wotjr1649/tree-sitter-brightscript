@@ -7,8 +7,8 @@ link to it rather than restate it.
 |---|---|---|
 | [roadmap.md](roadmap.md) | Current maturity and planned phases | Orienting; planning a session |
 | [maintenance.md](maintenance.md) | Maintenance scope, security boundary and freeze triggers | Maintaining or reopening a frozen release |
-| [reports/0.1.1-maintenance-release.md](reports/0.1.1-maintenance-release.md) | Verified 0.1.1 release and active freeze; new and inherited evidence kept separate | Checking 0.1.1 publication or maintenance |
-| [reports/0.1.2-maintenance-candidate.md](reports/0.1.2-maintenance-candidate.md) | 51개 처분·한정 조사·verifier 수정과 v0.1.2 후보 상태 | v0.1.2 유지보수 적격성을 검토할 때 |
+| [reports/0.1.1-maintenance-release.md](reports/0.1.1-maintenance-release.md) | 보존된 0.1.1 출하·당시 동결 기록; 새 근거와 승계 근거 구분 | 0.1.1 출하 이력을 확인할 때 |
+| [reports/0.1.2-maintenance-candidate.md](reports/0.1.2-maintenance-candidate.md) | 검증된 0.1.2 출하·51개 처분·한정 조사·verifier 수정 | 현재 출하 identity와 유지보수 근거를 확인할 때 |
 | [design/architecture.md](design/architecture.md) | Pipeline, ownership, layout, principles, decision index | Starting any work |
 | [design/decisions/](design/decisions/) | ADRs: why each architectural decision was made | Changing or questioning a decision |
 | [specs/grammar-contract.md](specs/grammar-contract.md) | What the grammar promises; acceptance policy; non-goals | Designing or reviewing grammar rules |
@@ -36,8 +36,9 @@ Repository-wide operating rules for contributors and coding agents are in
 
 Current contracts are the specifications, validation, provenance and maintenance
 documents. Versioned reports record their named identity and date; earlier HOLD,
-FAIL, schema and performance tables remain historical evidence. The current 0.1.1
-publication record is `reports/0.1.1-maintenance-release.md` (Release v0.1.1, 2026-09-27).
+FAIL, schema and performance tables remain historical evidence. 현재 0.1.2의
+출하 기록은 `reports/0.1.2-maintenance-candidate.md`다 (Release v0.1.2, 2026-09-27).
+기존 0.1.1 출하 기록은 `reports/0.1.1-maintenance-release.md`에 보존한다.
 The preserved 0.1.0 publication record is `reports/0.1.0-release.md`, with its final
 qualification in `reports/0.1.0-integrated-qualification.md`. Security reporting
 and version changes are in [SECURITY.md](../SECURITY.md) and [CHANGELOG.md](../CHANGELOG.md).

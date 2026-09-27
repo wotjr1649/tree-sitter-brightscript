@@ -11,11 +11,11 @@ This project aims to provide a current, well-tested BrightScript syntax grammar 
 
 ## Status
 
-[v0.1.1](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.1)
-was released and publicly verified on 2026-09-27. The [release record](docs/reports/0.1.1-maintenance-release.md)
-identifies the documentation, verification-tool and version-metadata maintenance, with language behaviour preserved.
-Anonymous downloads matched all five approved assets, and the downloaded source passed its build and smoke checks.
-The [maintenance freeze](docs/maintenance.md) is active until a documented trigger requires triage.
+[v0.1.2](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.2)를
+2026-09-27 공개하고 검증했다. [출하 기록](docs/reports/0.1.2-maintenance-candidate.md)은
+verifier·근거 문서·version metadata 유지보수와 보존된 문법 동작을 설명한다.
+인증 없는 다운로드에서 다섯 승인 자산이 일치했고, 공개 source-only 검사와 public verifier가 통과했다.
+[유지보수 동결](docs/maintenance.md)은 마지막 문서 commit의 CI와 최종 인계 완료 시 효력을 갖는다.
 
 The grammar covers the listed requirements and fixtures in the [registry](docs/specs/language-conformance.md).
 Provisional, tolerated and unresolved classifications remain disclosed. Validation is not proof of complete
