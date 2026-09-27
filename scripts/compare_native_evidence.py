@@ -31,6 +31,11 @@ def load(path):
         raise ValueError("incomplete native evidence")
     if host.get("architecture") not in ARCHITECTURES[host["platform"]]:
         raise ValueError("unsupported host architecture")
+    image = host.get("runner_image")
+    if (not isinstance(image, dict) or not isinstance(image.get("os"), str) or not image["os"]
+            or not isinstance(image.get("version"), str) or not image["version"]
+            or image.get("runner_arch") != ("ARM64" if host["platform"] == "darwin" else "X64")):
+        raise ValueError("missing runner image identity")
     if (not isinstance(common["commit"], str) or not SHA1.fullmatch(common["commit"])
             or common["gate_statuses"] != list(REQUIRED_GATES)
             or common["runtime"] != "0.27.0" or common["support"] != ["0.25.1", "0.26.13"]

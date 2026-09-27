@@ -550,6 +550,8 @@ def main():
     other_files = ["scripts/tscli.py", "scripts/corpus.py", "docs/provenance/upstream-sources.md", "package.json",
                    "package-lock.json", "tree-sitter.json"]
     identity = {"cc": str(lab.cc), "cc_sha256": sha(lab.cc),
+                "runner_image": {"os": os.environ.get("ImageOS"), "version": os.environ.get("ImageVersion"),
+                                 "runner_arch": os.environ.get("RUNNER_ARCH")},
                 "supervisor_sha256": sha(lab.supervisor) if lab.supervisor else None,
                 "supervisor_kind": "windows_job" if sys.platform == "win32" else "posix_process_group",
                 "lane_sources": {**{f: sha(HERE / f) for f in lane_files}, **{f: sha(ROOT / f) for f in other_files}},

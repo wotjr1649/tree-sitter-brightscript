@@ -105,6 +105,7 @@ def build(qualification, oracle_a, oracle_b):
         },
         "host": {
             "platform": oracle_id["platform"], "architecture": platform.machine().lower(),
+            "runner_image": identity["runner_image"],
             "cc_sha256": identity["cc_sha256"],
             "cli_binary_sha256": oracle_id["cli_binary_sha256"],
             "supervisor_kind": identity["supervisor_kind"],

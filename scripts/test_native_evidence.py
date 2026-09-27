@@ -3,11 +3,13 @@ import hashlib
 import json
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 from build_native_evidence import REQUIRED_GATES, build, signatures
 from check_oracle_pair import compare as compare_oracles
 from compare_native_evidence import compare as compare_hosts
+from package_native_evidence import package
 
 
 def sha(data):
@@ -18,7 +20,8 @@ class NativeEvidence(unittest.TestCase):
     @staticmethod
     def common():
         zero = "0" * 64
-        return {"commit": "a" * 40, "candidate": {"src/parser.c": zero}, "lane_sources": {"run.py": zero},
+        return {"commit": "a" * 40, "candidate": {"src/parser.c": zero, "grammar.js": zero},
+                "lane_sources": {"run.py": zero},
                 "runtime": "0.27.0", "support": ["0.25.1", "0.26.13"], "seed": 5707,
                 "gate_statuses": list(REQUIRED_GATES), "oracle_cases": 231,
                 "oracle_workload": {"cases": 231, "sha256": zero}, "oracle_content_sha256": zero,
@@ -57,12 +60,17 @@ class NativeEvidence(unittest.TestCase):
             for path, platform, arch in zip(paths, ("win32", "linux", "darwin"),
                                             ("amd64", "x86_64", "arm64")):
                 path.write_text(json.dumps({"common": common, "host": {"platform": platform,
-                                                                          "architecture": arch}}), encoding="utf-8")
+                                                                          "architecture": arch,
+                                                                          "runner_image": {"os": platform,
+                                                                                           "version": "test",
+                                                                                           "runner_arch": "ARM64" if platform == "darwin" else "X64"}}}), encoding="utf-8")
             self.assertEqual(compare_hosts(*paths), common)
             bad = dict(common, native_trees=[dict(common["native_trees"][0], tree_sha256="f" * 64),
                                              *common["native_trees"][1:]])
             paths[2].write_text(json.dumps({"common": bad, "host": {"platform": "darwin",
-                                                                   "architecture": "arm64"}}), encoding="utf-8")
+                                                                   "architecture": "arm64",
+                                                                   "runner_image": {"os": "macos15", "version": "test",
+                                                                                    "runner_arch": "ARM64"}}}), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "native_trees"):
                 compare_hosts(*paths)
             paths[2].write_text(json.dumps({"common": {"gate_statuses": list(REQUIRED_GATES),
@@ -81,6 +89,7 @@ class NativeEvidence(unittest.TestCase):
             identity = {"git_clean": True, "git_head": common["commit"], "candidate": common["candidate"],
                         "lane_sources": common["lane_sources"], "runtime": common["runtime"],
                         "support": common["support"], "seed": common["seed"], "cc_sha256": "0" * 64,
+                        "runner_image": {"os": "win25", "version": "test", "runner_arch": "X64"},
                         "supervisor_kind": "windows_job", "probes": {"cand": "0" * 64}}
             (q / "identity.json").write_text(json.dumps(identity), encoding="utf-8")
             gates = [{"gate": name, "status": "PASS", "points": []} for name in REQUIRED_GATES]
@@ -115,6 +124,61 @@ class NativeEvidence(unittest.TestCase):
             self.assertEqual(len(result["common"]["incremental"]), 30)
             self.assertEqual([p["case"] for p in result["common"]["incremental"] if "detected" in p],
                              ["comparator self-test 1", "comparator self-test 2"])
+
+    def test_evidence_zip_checks_raw_records_and_is_reproducible(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            common = self.common()
+            final = {"final": True, "bytes": 1, "cancelled": False, "has_error": 0, "nodes": 1,
+                     "errors": 0, "missing": 0, "max_depth": 0, "captures": 0,
+                     "match_limit_exceeded": False}
+            runs = "".join(json.dumps({"budget": 0, "completed": True, "build": "cand", "op": "PARSE",
+                                      "case": f"case-{i}", "final": final, "events": {}}) + "\n"
+                           for i in range(1533))
+            with (root / "runs.jsonl").open("w", encoding="utf-8") as output:
+                output.write(runs)
+            common["native_runs"] = signatures(root / "runs.jsonl")
+            roots = []
+            for name, platform, arch, runner_arch in (("windows", "win32", "amd64", "X64"),
+                                                      ("ubuntu", "linux", "x86_64", "X64"),
+                                                      ("macos", "darwin", "arm64", "ARM64")):
+                host_root = root / name
+                roots.append(host_root)
+                (host_root / "native-full").mkdir(parents=True)
+                for oracle_name in ("oracle-a", "oracle-b"):
+                    (host_root / oracle_name).mkdir()
+                (host_root / "native-full/runs.jsonl").write_text(runs, encoding="utf-8")
+                runner_image = {"os": platform, "version": "test", "runner_arch": runner_arch}
+                identity = {"git_clean": True, "git_head": common["commit"], "candidate": common["candidate"],
+                            "runner_image": runner_image}
+                gates = [{"gate": gate, "status": "PASS", "points": []} for gate in REQUIRED_GATES]
+                gates[REQUIRED_GATES.index("SEM-PUBLIC")]["points"] = [
+                    {"native_tree_digests": common["native_trees"]}]
+                gates[REQUIRED_GATES.index("INCREMENTAL-REPAIR")]["points"] = common["incremental"]
+                (host_root / "native-full/identity.json").write_text(json.dumps(identity), encoding="utf-8")
+                (host_root / "native-full/gates.json").write_text(json.dumps(
+                    {"identity": identity, "results": gates}), encoding="utf-8")
+                oracle = {"identity": {"grammar_commit": common["commit"], "platform": platform,
+                                       "generated_files": {"src/parser.c": common["candidate"]["src/parser.c"]},
+                                       "cli_binary_sha256": "0" * 64,
+                                       "workload": common["oracle_workload"],
+                                       "content_sha256": common["oracle_content_sha256"]}}
+                for oracle_name in ("oracle-a", "oracle-b"):
+                    (host_root / oracle_name / "manifest.json").write_text(json.dumps(oracle), encoding="utf-8")
+                evidence = {"common": common, "host": {"platform": platform, "architecture": arch,
+                            "runner_image": runner_image, "identity_sha256": sha((host_root / "native-full/identity.json").read_bytes()),
+                            "gates_sha256": sha((host_root / "native-full/gates.json").read_bytes()),
+                            "cli_binary_sha256": "0" * 64}}
+                (host_root / "native-evidence.json").write_text(json.dumps(evidence), encoding="utf-8")
+            first, second = root / "first.zip", root / "second.zip"
+            package(*roots, first)
+            package(*roots, second)
+            self.assertEqual(sha(first.read_bytes()), sha(second.read_bytes()))
+            with zipfile.ZipFile(first) as archive:
+                self.assertEqual(len(archive.namelist()), 19)
+            (roots[2] / "native-full/gates.json").write_text("{}", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "raw gate identity"):
+                package(*roots, root / "tampered.zip")
 
     def test_timing_is_excluded_but_query_digest_is_not(self):
         with tempfile.TemporaryDirectory() as tmp:

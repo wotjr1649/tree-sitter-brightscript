@@ -1,4 +1,4 @@
-name: Native qualification trial
+name: Three-OS native qualification
 
 on:
   workflow_dispatch:
@@ -10,17 +10,18 @@ on:
       - scripts/build_native_evidence.py
       - scripts/check_oracle_pair.py
       - scripts/compare_native_evidence.py
+      - scripts/package_native_evidence.py
       - scripts/record_oracle.py
 
 permissions:
   contents: read
 
 jobs:
-  posix-qualification:
+  native-qualification:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15]
+        os: [windows-2025-vs2026, ubuntu-24.04, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 180
     steps:
@@ -61,8 +62,12 @@ jobs:
           python scripts/record_oracle.py --out=.work/oracle-b
       - name: Require byte-identical W12 recordings
         run: python scripts/check_oracle_pair.py .work/oracle-a .work/oracle-b
-      - name: Run all native gates
+      - name: Run all native gates on POSIX
+        if: runner.os != 'Windows'
         run: python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 --support 0.25.1=.work/runtime-025 --support 0.26.13=.work/runtime-026 --out .work/native-full
+      - name: Run all native gates on Windows
+        if: runner.os == 'Windows'
+        run: python scripts/qualify/run.py --cc C:/msys64/ucrt64/bin/gcc.exe --runtime .work/runtime-027 --support 0.25.1=.work/runtime-025 --support 0.26.13=.work/runtime-026 --out .work/native-full
       - name: Normalize release evidence
         run: python scripts/build_native_evidence.py --qualification .work/native-full --oracle-a .work/oracle-a --oracle-b .work/oracle-b --out .work/native-evidence.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -76,5 +81,31 @@ jobs:
             .work/native-full/runs.jsonl
             .work/oracle-a/manifest.json
             .work/oracle-b/manifest.json
+          if-no-files-found: error
+          retention-days: 7
+
+  three-os-parity:
+    needs: native-qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: native-*
+          path: .work/parity
+      - name: Compare exact normalized outcomes
+        run: python scripts/compare_native_evidence.py --windows .work/parity/native-windows-2025-vs2026/native-evidence.json --ubuntu .work/parity/native-ubuntu-24.04/native-evidence.json --macos .work/parity/native-macos-15/native-evidence.json
+      - name: Make bounded source-only release evidence
+        run: python scripts/package_native_evidence.py --windows .work/parity/native-windows-2025-vs2026 --ubuntu .work/parity/native-ubuntu-24.04 --macos .work/parity/native-macos-15 --out .work/parity/v0.1.4-native-evidence.zip
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v0.1.4-native-evidence
+          path: .work/parity/v0.1.4-native-evidence.zip
           if-no-files-found: error
           retention-days: 7
