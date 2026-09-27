@@ -2,7 +2,6 @@
 Usage: python scripts/check_maintenance.py [--baseline=v0.1.0]
 No parser bytes are rewritten. JSON comparison permits only the enumerated pointers.
 """
-import copy
 import hashlib
 import json
 from pathlib import Path
@@ -49,16 +48,17 @@ def compare(old, new):
             if not parser_delta(a, b): raise ValueError("parser delta outside unique version metadata")
         elif name in POINTERS:
             before, after = unique_json(a), unique_json(b)
-            normalized = copy.deepcopy(after)
             for pointer in POINTERS[name]:
-                x, y = before, normalized
+                x, y = before, after
                 for key in pointer[:-1]: x, y = x[key], y[key]
                 key = pointer[-1]
                 if x[key] != "0.1.0" or y[key] != "0.1.1": raise ValueError("unexpected version")
-                y[key] = x[key]
-            # JSON booleans and numbers must stay distinct (Python True == 1).
-            if json.dumps(normalized, sort_keys=True, allow_nan=False) != json.dumps(before, sort_keys=True, allow_nan=False):
-                raise ValueError("unexpected JSON pointer delta: " + name)
+            # Every old literal must be one of the structurally checked pointers.
+            # This narrow patch rejects formatting, key-order and JSON-type changes too.
+            if a.count(b'"0.1.0"') != len(POINTERS[name]):
+                raise ValueError("version literal inventory differs: " + name)
+            if b != a.replace(b'"0.1.0"', b'"0.1.1"'):
+                raise ValueError("bytes outside approved JSON version values differ: " + name)
         elif a != b:
             raise ValueError("frozen component differs: " + name)
         if a != b: changed.append(name)

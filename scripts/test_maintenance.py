@@ -45,6 +45,10 @@ def main():
     t=copy.deepcopy(new);j=m.unique_json(t["package.json"]);j["private"]=False;t["package.json"]=json.dumps(j).encode();mutants.append(("private",t))
     t=copy.deepcopy(new);j=m.unique_json(t["package.json"]);j["private"]=1;t["package.json"]=json.dumps(j).encode();mutants.append(("private JSON type",t))
     t=copy.deepcopy(new);j=m.unique_json(t["tree-sitter.json"]);j["bindings"]["c"]=0;t["tree-sitter.json"]=json.dumps(j).encode();mutants.append(("binding JSON type",t))
+    t=copy.deepcopy(new);assert b'"private": true' in t["package.json"]
+    t["package.json"]=t["package.json"].replace(b'"private": true',b'"private":  true',1);mutants.append(("JSON whitespace",t))
+    t=copy.deepcopy(new);j=m.unique_json(t["package.json"])
+    t["package.json"]=json.dumps(dict(reversed(list(j.items())))).encode();mutants.append(("JSON key order",t))
     t=copy.deepcopy(new);t["queries/highlights.scm"]=t["queries/highlights.scm"].replace(b"@keyword",b"@constant",1);mutants.append(("query capture",t))
     t=copy.deepcopy(new);nodes=m.unique_json(t["src/node-types.json"]);node=next(n for n in nodes if n.get("fields"))
     field=next(iter(node["fields"]));node["fields"][field+"_changed"]=node["fields"].pop(field)
