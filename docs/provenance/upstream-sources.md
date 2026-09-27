@@ -103,6 +103,26 @@ requirements citing the page (listed above) stand unchanged. Level 1 snapshot
 identity of the Session 05-7 release candidate: `roku-docs-2026-09-26`
 (content equal to `roku-docs-2026-09-23`).
 
+### Level 1 refresh `roku-docs-2026-09-27-session-06`
+
+2026-09-27 Session 06에서 같은 공식 URL 10개를 새로 읽어 기존 snapshot 옆에 보존했다.
+content-region 정의는 위와 같다. release-notes의 Cloudflare email-protection token 이외에
+content byte 변화가 없으며 해당 토큰만 마스킹한 대조도 동일했다. 기존 requirement의
+L1 근거·분류는 유지한다. 원문 전체는 Git/공개 verification asset에 포함하지 않는다.
+
+| Route | Content-region SHA-256 | Region bytes |
+|---|---|---|
+| `brightscript-language-reference` | `fbf20981bd408f86d84bb3582e4e42d320cea6c5b1d9b49f1896f21755fdc9e9` | 2811 |
+| `statement-summary` | `8020ea7624129d2ddf45a3e1df02f4f6163fe98614da98003b958923d8dca797` | 2472 |
+| `program-statements` | `6fafd31136b4e00721447570ea0bfe3ac498a07af912ea25bdd424538b74dc69` | 37874 |
+| `expressions-variables-types` | `38bee10d10baa5a00d680f66b1e57790fc83558b5f50d8eaef1c7ba2340fabc3` | 51174 |
+| `reserved-words` | `32260686e464b8810c56c8fbc69a329435a3bf17736b0bb0973c97fba34f6ecf` | 1254 |
+| `conditional-compilation` | `631e08f6686f1edf7afacdd98767b9e42e6f5fcd1898cec83562cb7d7283c87c` | 8436 |
+| `error-handling` | `ad6dfc415d3a74e00d9ae2f95c3963e15a12f105480d9c818c9dcf8afaf1973b` | 32667 |
+| `release-notes` | `0d5d58acf53036bfc861c192c6faba94f908334844c9d61475b0201750fdf045` | 311640 |
+| `component-architecture` | `eaf5c5ca0129e292ad15e8341e4bec43a27f3799c2550202a71c04c1b1f9076f` | 47229 |
+| `runtime-functions` | `3541a3c20253b08330a84d853964dd474c818e6821183d999957599ef3cc4375` | 11363 |
+
 ## Level 3 — Tree-sitter
 
 | Item | Identity (observed 2026-09-23) |
@@ -212,3 +232,17 @@ MIT, no `LICENSE` file). Nothing from it is used as specification.
 ## Level 2 — Official behaviour
 
 None recorded.
+
+## Session 06 bounded upstream check (2026-09-27)
+
+The latest stable Tree-sitter release read from the official release API remains v0.27.0.
+Issues [#5910](https://github.com/tree-sitter/tree-sitter/issues/5910) and
+[#5925](https://github.com/tree-sitter/tree-sitter/issues/5925) remain open (runtime recovery / lexer).
+Their historical relevance stays disclosed; no pin change is made from release freshness alone.
+The maintenance evidence uses the unchanged production runtime/compiler recipe.
+
+The separately approved Windows safety tool is portable LLVM MinGW 20260922, test-only:
+[maintainer asset](https://github.com/mstorsjo/llvm-mingw/releases/tag/20260922), UCRT x86_64 ZIP
+SHA-256 `e3ad77d117a4bea19a7a3b333341824d79a5a371004a10e25b8504e7b3047666`.
+Acquisition is not sanitizer or coverage evidence; capability tests and the fixed profile are required.
+The production Tree-sitter/GCC pins and default qualification guards stay unchanged.

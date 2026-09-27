@@ -1,5 +1,9 @@
 # Session 05-3: repository-owned query hardening
 
+> 역사 자료 안내 (2026-09-27): 아래 결과는 본문의 당시 commit/parser와 검사 시점에 한정된다.
+> 현재 공개 0.1.0은 [출하 기록](0.1.0-release.md#release-v010)과 [최종 qualification](0.1.0-integrated-qualification.md),
+> 유지보수 후보는 [0.1.1 기록](0.1.1-maintenance-release.md)을 참고한다. 과거 FAIL과 수치는 보존한다.
+
 **Status (2026-09-25): 0.1.0 is not released and stays on hold**
 (`HOLD_FOR_RELEASE_REMEDIATION`, [0.1.0-release.md](0.1.0-release.md#status-hold)).
 This session changed only what the repository owns: the highlight query, its

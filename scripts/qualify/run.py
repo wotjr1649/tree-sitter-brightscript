@@ -122,6 +122,22 @@ class Lab:
             raise RuntimeError(f"supervisor guard failed for {cid}; the lane stops")
         return report, (raw / "child.out").read_text(encoding="utf-8", errors="replace")
 
+    def supervisor_refusal(self, cid, cap, ms, output_cap):
+        """Test invalid guard configuration: it must exit before report/child creation."""
+        raw = self.out / "raw" / cid
+        raw.mkdir()
+        argv = [str(self.out / "build/benign.exe"), "normal"]
+        command = [str(self.supervisor), str(raw / "supervisor.json"), str(raw / "child.out"),
+                   str(cap), str(ms), str(output_cap), argv[0], subprocess.list2cmdline(argv)]
+        cp = subprocess.run(command, env=self.env, capture_output=True, timeout=5,
+                            creationflags=subprocess.DETACHED_PROCESS)
+        ok = cp.returncode == 64 and not list(raw.iterdir())
+        self.record(kind="guard-refusal-selftest", command_id=cid, argv=command,
+                    exit=cp.returncode, no_child_or_report=not list(raw.iterdir()), passed=ok)
+        if not ok:
+            raise RuntimeError("supervisor did not refuse the invalid profile")
+        return {"id":cid,"pass":ok}
+
 
 class Runner:
     """What the gates call: measurements of built probes on generated inputs."""
@@ -357,4 +373,7 @@ def main():
 
 
 if __name__ == "__main__":
+    if "--safety-profile" in sys.argv:
+        import safety
+        sys.exit(safety.main())
     sys.exit(main())

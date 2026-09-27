@@ -286,6 +286,11 @@ class VerifiedCli(unittest.TestCase):
                     for c in ci_commands(wf.read_text(encoding="utf-8"))]
         self.assertFalse([c for c in commands if "qualify" in c])
         self.assertFalse(allowed("python scripts/qualify/run.py --cc x"))
+        self.assertFalse(allowed("python scripts/qualify/run.py --safety-profile native"))
+        # The test-only safety route gets no new launcher exemption.
+        safety = (SCRIPTS / "qualify" / "safety.py").read_text(encoding="utf-8")
+        self.assertEqual(launches(safety), [])
+        self.assertIn('"--safety-profile" in sys.argv', source)
 
 
 LAUNCHERS = re.compile(r"\bEXE\b|tree-sitter-cli['\"]?\s*/|tree-sitter\.(exe|cmd)\b|['\"]tree-sitter['\"]|\.bin[/\\]"

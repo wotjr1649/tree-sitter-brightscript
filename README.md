@@ -11,9 +11,26 @@ This project aims to provide a current, well-tested BrightScript syntax grammar 
 
 ## Status
 
-Grammar version 0.1.0: `grammar.js`, the generated parser in `src/`, the conformance corpus, `queries/highlights.scm` and the check scripts. Every `documented`, `provisional`, `tolerated` and `invalid` requirement in the [registry](docs/specs/language-conformance.md) has passing fixtures; `unresolved` and `out-of-scope` requirements are not claimed. 0.1.0 is released: the `v0.1.0` tag and its [GitHub Release](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.0) (2026-09-26). Session 05-1 ended on hold with three release-blocking findings (quadratic recovery memory, a stack overflow on long malformed PRINT runs, a quadratic highlight query within long PRINT statements; [status](docs/reports/0.1.0-release.md#status-hold)), and Sessions 05-2 and 07 found four more ([details](docs/reports/0.1.0-structural-recovery-safety.md)). Session 05-7 re-froze the public schema before the first release ([ADR-0007](docs/design/decisions/ADR-0007-pre-release-schema-refreeze.md)) and added an error-recovery external scanner ([ADR-0008](docs/design/decisions/ADR-0008-error-recovery-scanner.md)); its candidate closes all seven on the stock runtime, confirmed by Session 05-7-2 in three passing runs of the release qualification lane on the local Windows host after a disclosed revision of the lane's cancellation check ([qualification](docs/reports/0.1.0-integrated-qualification.md)); it was released after the owner's approval. The 0.1.0 release is the commit identified by the `v0.1.0` tag and its GitHub Release; its record is [docs/reports/0.1.0-release.md](docs/reports/0.1.0-release.md), which links the release-candidate evidence, the independent audit, and the performance and comparative-conformance reports. The quadratic-time error-recovery class KL-002 ([docs/validation/validation.md](docs/validation/validation.md)) is retired in the release. No package is published to npm or any other registry, and no language binding or WASM artifact is provided. See [docs/roadmap.md](docs/roadmap.md).
+[v0.1.0](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.0)
+is released (2026-09-26). The [0.1.1 maintenance candidate](docs/reports/0.1.1-maintenance-release.md)
+is being prepared: documentation, verification tools and version metadata, with language behaviour preserved.
+Its publication is conditional on the required evidence and the owner's exact release approval.
+The [maintenance policy](docs/maintenance.md) takes effect as a freeze only after public verification.
 
-No compatibility or completeness claim should be inferred until the corresponding release gate in [docs/validation/validation.md](docs/validation/validation.md) is met.
+The grammar covers the listed requirements and fixtures in the [registry](docs/specs/language-conformance.md).
+Provisional, tolerated and unresolved classifications remain disclosed. Validation is not proof of complete
+Roku syntax or device compatibility. The [0.1.0 release record](docs/reports/0.1.0-release.md#release-v010)
+and [qualification history](docs/reports/0.1.0-integrated-qualification.md) preserve earlier failures and their disposition.
+No npm package, language binding or WASM artifact is shipped.
+
+## Use and verification
+
+Consumers use `src/parser.c`, `src/scanner.c` and `src/tree_sitter/`, with
+`queries/highlights.scm` for highlighting. Include the scanner when building the native grammar.
+For this source checkout, install the locked development generator with `npm ci`, then run
+`python scripts/check_generated.py` and `python scripts/tscli.py test`.
+The verified CLI uses private binary, configuration and parser-library paths.
+The full check list and the limits of each claim are in [validation](docs/validation/validation.md).
 
 ## Goals
 
@@ -67,11 +84,9 @@ The authoritative validation contract is [docs/validation/validation.md](docs/va
 
 ## go-treesitter integration
 
-This repository is intended to be the grammar producer for `go-treesitter`.
-
-`go-treesitter` converts a pinned, generated `src/parser.c` into its CGO-free grammar representation, so the Go integration path does not depend on any cgo language binding. Its released `main` still pins a different, legacy BrightScript grammar. Session 03 switched it to this grammar on a local integration branch in that repository; the result is recorded in the release-candidate report. That downstream check (V9) did not pass, so no `go-treesitter` compatibility is claimed; the integration is separate work in that repository.
-
-Each release will bind its grammar identity to the source commit, generated parser identity, Tree-sitter generator identity, and validation evidence.
+This repository produces the native grammar sources. The downstream scanner port and V9 evidence
+belong to `go-treesitter` under [ADR-0006](docs/design/decisions/ADR-0006-downstream-integration-boundary.md).
+The earlier unsuccessful integration record stays historical; this maintenance patch makes no Go compatibility claim.
 
 ## Documentation
 
