@@ -3,9 +3,9 @@
 ## Current maturity
 
 v0.1.0 was released on 2026-09-26 ([release record](reports/0.1.0-release.md#release-v010)).
-The [0.1.1 maintenance candidate](reports/0.1.1-maintenance-release.md) preserves product behaviour
-and separates new validation from historical performance evidence. Publication is not complete.
-After verified publication, [maintenance freeze](maintenance.md) begins; only its concrete triggers reopen triage.
+The [0.1.1 maintenance release](reports/0.1.1-maintenance-release.md) was published and publicly verified on 2026-09-27.
+It preserves product behaviour and separates new validation from historical performance evidence.
+The [maintenance freeze](maintenance.md) is active; only its concrete triggers reopen triage.
 
 The phases below record the original development roadmap, not automatic next tasks.
 Past holds and failed campaigns remain in [qualification history](reports/0.1.0-integrated-qualification.md).

@@ -11,11 +11,11 @@ This project aims to provide a current, well-tested BrightScript syntax grammar 
 
 ## Status
 
-[v0.1.0](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.0)
-is released (2026-09-26). The [0.1.1 maintenance candidate](docs/reports/0.1.1-maintenance-release.md)
-is being prepared: documentation, verification tools and version metadata, with language behaviour preserved.
-Its publication is conditional on the required evidence and the owner's exact release approval.
-The [maintenance policy](docs/maintenance.md) takes effect as a freeze only after public verification.
+[v0.1.1](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.1)
+was released and publicly verified on 2026-09-27. The [release record](docs/reports/0.1.1-maintenance-release.md)
+identifies the documentation, verification-tool and version-metadata maintenance, with language behaviour preserved.
+Anonymous downloads matched all five approved assets, and the downloaded source passed its build and smoke checks.
+The [maintenance freeze](docs/maintenance.md) is active until a documented trigger requires triage.
 
 The grammar covers the listed requirements and fixtures in the [registry](docs/specs/language-conformance.md).
 Provisional, tolerated and unresolved classifications remain disclosed. Validation is not proof of complete

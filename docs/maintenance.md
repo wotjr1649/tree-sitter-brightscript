@@ -1,13 +1,13 @@
 # 유지보수와 동결
 
-현재 공개 버전은 [v0.1.0](reports/0.1.0-release.md#release-v010)이다.
-v0.1.1 유지보수 후보의 상태·검증·제약은 [후보 기록](reports/0.1.1-maintenance-release.md)에 둔다.
+현재 공개 버전은 [v0.1.1](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.1)이다.
+v0.1.1의 공개 검증·제약은 [출하 기록](reports/0.1.1-maintenance-release.md)에 둔다.
 공개 tag와 Release 자산, 게시 뒤의 외부 receipt가 출하 사실을 식별한다.
 
 ## 동결
 
-v0.1.1의 공개 다운로드·source-only 검증을 마친 뒤에만
-`FROZEN_UNTIL_TRIGGER`를 활성화한다. 준비 완료나 승인 대기는 동결 완료가 아니다.
+2026-09-27 v0.1.1의 공개 다운로드·source-only 검증을 마쳐
+`FROZEN_UNTIL_TRIGGER`를 활성화했다. 준비 완료나 승인 대기만으로 활성화한 것이 아니다.
 기존 이슈·보안 신고 경로는 유지하며 저장소를 archive하지 않는다.
 자동 연구, 정기 watcher, 자동 의존성 갱신과 자동 릴리스는 만들지 않는다.
 
