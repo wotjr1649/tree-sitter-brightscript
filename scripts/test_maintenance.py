@@ -1,12 +1,15 @@
 """Discriminating controls for the strict maintenance comparator; no native process."""
 import copy
 import json
-from pathlib import Path
+import subprocess
 
 import check_maintenance as m
 
+HISTORICAL_011 = "2dcefa4831c1a946bd1b0609686e4a147a4a23e8"
+
 def main():
-    old = {n:(m.ROOT/n).read_bytes() for n in m.COMPONENTS}
+    old = {n: subprocess.run(["git", "show", f"{HISTORICAL_011}:{n}"], cwd=m.ROOT,
+                             capture_output=True, check=True, timeout=30).stdout for n in m.COMPONENTS}
     # The same controls work before and after the metadata bump.
     for patch in (1, 2):
         marker = m.METADATA.replace(b".patch_version = 0", f".patch_version = {patch}".encode())

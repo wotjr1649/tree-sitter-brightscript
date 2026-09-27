@@ -37,6 +37,7 @@ jobs:
       - name: Verified CLI path self-test
         run: python scripts/test_tscli.py
       - name: Offline replay and maintenance controls
+        shell: bash
         run: |
           python scripts/test_replay_compare.py
           python scripts/test_public_verifier.py
@@ -51,14 +52,17 @@ jobs:
         # Verified binary, private parser library and configuration (validation.md "Identity binding").
         run: python scripts/tscli.py test
       - name: Composite samples (W03) and equivalent spellings (W05)
+        shell: bash
         run: |
           python scripts/check_samples.py
           python scripts/check_spellings.py
       - name: Robustness (W06, W07, W08, W13 with fuzzing)
+        shell: bash
         run: |
           python scripts/test_robustness_units.py
           python scripts/check_robustness.py
       - name: Incremental edits (W10) and literal-false spike criteria C4, C5
+        shell: bash
         run: |
           python scripts/check_incremental.py
           python scripts/check_spike.py
