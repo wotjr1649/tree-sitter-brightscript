@@ -133,11 +133,17 @@ class NativeEvidence(unittest.TestCase):
                      "errors": 0, "missing": 0, "max_depth": 0, "captures": 0,
                      "match_limit_exceeded": False}
             runs = "".join(json.dumps({"budget": 0, "completed": True, "build": "cand", "op": "PARSE",
-                                      "case": f"case-{i}", "final": final, "events": {}}) + "\n"
+                                      "case": f"case-{i}", "final": final, "events": {},
+                                      "report": {"memory_metric": "host-memory"}}) + "\n"
                            for i in range(1533))
             with (root / "runs.jsonl").open("w", encoding="utf-8") as output:
                 output.write(runs)
             common["native_runs"] = signatures(root / "runs.jsonl")
+            records = [{"n": i, "name": f"oracle-{i}", "input_sha256": "1" * 64,
+                        "tree_sha256": "2" * 64, "cst_sha256": "3" * 64,
+                        "has_error": False, "expected_error": False} for i in range(231)]
+            common["oracle_workload"]["sha256"] = sha(("1" * 64 * 231).encode())
+            common["oracle_content_sha256"] = sha((("1" * 64 + "2" * 64 + "3" * 64) * 231).encode())
             roots = []
             for name, platform, arch, runner_arch in (("windows", "win32", "amd64", "X64"),
                                                       ("ubuntu", "linux", "x86_64", "X64"),
@@ -150,7 +156,10 @@ class NativeEvidence(unittest.TestCase):
                 (host_root / "native-full/runs.jsonl").write_text(runs, encoding="utf-8")
                 runner_image = {"os": platform, "version": "test", "runner_arch": runner_arch}
                 identity = {"git_clean": True, "git_head": common["commit"], "candidate": common["candidate"],
-                            "runner_image": runner_image}
+                            "runner_image": runner_image, "lane_sources": common["lane_sources"],
+                            "runtime": common["runtime"], "support": common["support"], "seed": common["seed"],
+                            "cc_sha256": "0" * 64, "probes": {"cand": "0" * 64},
+                            "supervisor_kind": "test-supervisor"}
                 gates = [{"gate": gate, "status": "PASS", "points": []} for gate in REQUIRED_GATES]
                 gates[REQUIRED_GATES.index("SEM-PUBLIC")]["points"] = [
                     {"native_tree_digests": common["native_trees"]}]
@@ -161,14 +170,18 @@ class NativeEvidence(unittest.TestCase):
                 oracle = {"identity": {"grammar_commit": common["commit"], "platform": platform,
                                        "generated_files": {"src/parser.c": common["candidate"]["src/parser.c"]},
                                        "cli_binary_sha256": "0" * 64,
+                                       "generator": "tree-sitter 0.27.0", "abi": 15,
                                        "workload": common["oracle_workload"],
-                                       "content_sha256": common["oracle_content_sha256"]}}
+                                       "content_sha256": common["oracle_content_sha256"]},
+                          "results": records}
                 for oracle_name in ("oracle-a", "oracle-b"):
                     (host_root / oracle_name / "manifest.json").write_text(json.dumps(oracle), encoding="utf-8")
                 evidence = {"common": common, "host": {"platform": platform, "architecture": arch,
                             "runner_image": runner_image, "identity_sha256": sha((host_root / "native-full/identity.json").read_bytes()),
                             "gates_sha256": sha((host_root / "native-full/gates.json").read_bytes()),
-                            "cli_binary_sha256": "0" * 64}}
+                            "cli_binary_sha256": "0" * 64, "cc_sha256": "0" * 64,
+                            "probe_sha256": {"cand": "0" * 64}, "supervisor_kind": "test-supervisor",
+                            "memory_metric": "host-memory"}}
                 (host_root / "native-evidence.json").write_text(json.dumps(evidence), encoding="utf-8")
             first, second = root / "first.zip", root / "second.zip"
             package(*roots, first)
@@ -176,9 +189,29 @@ class NativeEvidence(unittest.TestCase):
             self.assertEqual(sha(first.read_bytes()), sha(second.read_bytes()))
             with zipfile.ZipFile(first) as archive:
                 self.assertEqual(len(archive.namelist()), 19)
-            (roots[2] / "native-full/gates.json").write_text("{}", encoding="utf-8")
+            mac_gates = roots[2] / "native-full/gates.json"
+            original_gates = mac_gates.read_text(encoding="utf-8")
+            mac_gates.write_text("{}", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "raw gate identity"):
                 package(*roots, root / "tampered.zip")
+            mac_gates.write_text(original_gates, encoding="utf-8")
+            manifests = [roots[2] / name / "manifest.json" for name in ("oracle-a", "oracle-b")]
+            original_manifest = manifests[0].read_text(encoding="utf-8")
+            incomplete = json.loads(original_manifest)
+            incomplete["results"] = []
+            for path in manifests:
+                path.write_text(json.dumps(incomplete), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "W12 result set"):
+                package(*roots, root / "missing-w12.zip")
+            for path in manifests:
+                path.write_text(original_manifest, encoding="utf-8")
+            for host_root in roots:
+                path = host_root / "native-evidence.json"
+                changed = json.loads(path.read_text(encoding="utf-8"))
+                changed["common"]["lane_sources"] = {"run.py": "f" * 64}
+                path.write_text(json.dumps(changed), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "raw gate identity"):
+                package(*roots, root / "false-tool.zip")
 
     def test_timing_is_excluded_but_query_digest_is_not(self):
         with tempfile.TemporaryDirectory() as tmp:

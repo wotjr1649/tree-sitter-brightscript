@@ -10,6 +10,10 @@ macOS 15 ARM64 CI evidence. The earlier
 was post-v0.1.2 evidence; it did not change that release's identity.
 The [maintenance freeze](maintenance.md) takes effect after final documentation
 CI and handoff; only its concrete triggers reopen triage.
+The explicitly requested [v0.1.4 native parity candidate](reports/0.1.4-native-parity-candidate.md)
+is on a separate session branch and remains HOLD while its three-OS native
+qualification and review are incomplete. It does not change the published
+v0.1.3 identity.
 
 The phases below record the original development roadmap, not automatic next tasks.
 Past holds and failed campaigns remain in [qualification history](reports/0.1.0-integrated-qualification.md).

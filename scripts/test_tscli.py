@@ -60,7 +60,7 @@ NATIVE_FULL_COMMAND = ("python scripts/qualify/run.py --cc /usr/bin/cc --runtime
                        "--support 0.25.1=.work/runtime-025 --support 0.26.13=.work/runtime-026 "
                        "--out .work/native-full")
 CI_ALLOWED += "|" + re.escape(NATIVE_FULL_COMMAND)
-NATIVE_WINDOWS_FULL_COMMAND = ("python scripts/qualify/run.py --cc C:/msys64/ucrt64/bin/gcc.exe "
+NATIVE_WINDOWS_FULL_COMMAND = ("python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe "
                                "--runtime .work/runtime-027 --support 0.25.1=.work/runtime-025 "
                                "--support 0.26.13=.work/runtime-026 --out .work/native-full")
 CI_ALLOWED += "|" + re.escape(NATIVE_WINDOWS_FULL_COMMAND)
@@ -330,7 +330,7 @@ class VerifiedCli(unittest.TestCase):
                         NATIVE_FULL_COMMAND.replace("--out .work/native-full", "--out /tmp/shared")):
             self.assertFalse(allowed(altered), altered)
         for altered in (NATIVE_WINDOWS_FULL_COMMAND + " --gates B5-01-MEMORY",
-                        NATIVE_WINDOWS_FULL_COMMAND.replace("C:/msys64/ucrt64/bin/gcc.exe", "gcc.exe"),
+                        NATIVE_WINDOWS_FULL_COMMAND.replace("C:/mingw64/bin/gcc.exe", "gcc.exe"),
                         NATIVE_WINDOWS_FULL_COMMAND.replace("--out .work/native-full", "--out C:/shared")):
             self.assertFalse(allowed(altered), altered)
         # The test-only safety route gets no new launcher exemption.

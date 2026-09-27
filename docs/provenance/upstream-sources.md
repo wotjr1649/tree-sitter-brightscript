@@ -151,6 +151,33 @@ All other bytes match. The requirements citing this route, listed in the
 2026-09-23-r2 refresh above, retain their existing evidence and status; no
 syntax or release-note text changed. The other nine routes are byte-equal.
 
+### Level 1 refresh `roku-docs-2026-09-28-v014`
+
+Retrieved 2026-09-27T20:19:16Z–20:19:28Z (2026-09-28 KST) for the v0.1.4
+candidate. The ten fixed official routes returned HTTP 200 without redirects.
+Raw responses and the comparison manifest are local under
+`_ref/normative/roku-docs-2026-09-28-v014/` and are not committed. The content
+region definition and page-declared modification times are unchanged from the
+v0.1.3 refresh above.
+
+| Route | Content-region SHA-256 | Bytes | Compared with v0.1.3 |
+|---|---|---:|---|
+| `brightscript-language-reference` | `fbf20981bd408f86d84bb3582e4e42d320cea6c5b1d9b49f1896f21755fdc9e9` | 2,811 | identical |
+| `statement-summary` | `8020ea7624129d2ddf45a3e1df02f4f6163fe98614da98003b958923d8dca797` | 2,472 | identical |
+| `program-statements` | `6fafd31136b4e00721447570ea0bfe3ac498a07af912ea25bdd424538b74dc69` | 37,874 | identical |
+| `expressions-variables-types` | `38bee10d10baa5a00d680f66b1e57790fc83558b5f50d8eaef1c7ba2340fabc3` | 51,174 | identical |
+| `reserved-words` | `32260686e464b8810c56c8fbc69a329435a3bf17736b0bb0973c97fba34f6ecf` | 1,254 | identical |
+| `conditional-compilation` | `631e08f6686f1edf7afacdd98767b9e42e6f5fcd1898cec83562cb7d7283c87c` | 8,436 | identical |
+| `error-handling` | `ad6dfc415d3a74e00d9ae2f95c3963e15a12f105480d9c818c9dcf8afaf1973b` | 32,667 | identical |
+| `release-notes` | `3d01a869edd10cab4e3a34748686f21b4245591d2baa4038fb01de4a4aa4eee2` | 311,640 | Cloudflare email-protection tokens only |
+| `component-architecture` | `eaf5c5ca0129e292ad15e8341e4bec43a27f3799c2550202a71c04c1b1f9076f` | 47,229 | identical |
+| `runtime-functions` | `3541a3c20253b08330a84d853964dd474c818e6821183d999957599ef3cc4375` | 11,363 | identical |
+
+Masking only the `/cdn-cgi/l/email-protection#…` and `data-cfemail` token
+values makes the old and new `release-notes` content regions byte-equal. The
+requirements citing that route retain their prior evidence and status; no
+language text changed. The other nine content regions are byte-equal.
+
 ## Level 3 — Tree-sitter
 
 | Item | Identity (observed 2026-09-23) |

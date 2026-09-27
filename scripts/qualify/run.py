@@ -1,4 +1,4 @@
-"""Release qualification lane runner (docs/validation/validation.md, "Release qualification lane"). Windows.
+"""Release qualification lane runner (docs/validation/validation.md, "Release qualification lane").
 
     python scripts/qualify/run.py --cc <gcc.exe> --runtime <tree-sitter 0.27.0 source root> --out <new dir>
         [--support 0.25.1=<source root>] [--support 0.26.13=<source root>] [--gates G1,G2,...] [--seed N]
@@ -6,8 +6,9 @@
 This file and scripts/tscli.py are the only files under scripts/ that start programs (scripts/test_tscli.py
 checks it). It starts git (to read the reference grammars), the pinned CLI through tscli (generate), the C
 compiler named by --cc, and programs that compiler built under --out; every probe run and every build after the
-supervisor's own happens inside the Job-object supervisor that is built and self-tested first (limits: 512 MiB
-commit, 15 s, 8 MiB output, one child at a time). Two steps use the pinned CLI through tscli outside the supervisor,
+supervisor's own happens inside the Windows Job-object or POSIX process-group supervisor, self-tested first
+(limits: 512 MiB reported host memory metric, 15 s, 8 MiB output, one child at a time). Two steps use the pinned
+CLI through tscli outside the supervisor,
 with its own time limits: regenerating the reference grammars, and RECOVERY-LOCALITY, which parses each mutant with
 `parse --cst` in the candidate and the H checkout (the CLI compiles each grammar once with the --cc compiler into a
 private library directory per checkout). A runtime source root is used only if every file listed in
@@ -216,13 +217,15 @@ class Lab:
                         pid, got, used = os.wait4(proc.pid, os.WNOHANG)
                         if pid:
                             status, usage, reaped = got, used, True
-                    if sys.platform == "darwin" and not reaped:
+                    if sys.platform == "darwin":
                         now = time.monotonic()
                         max_sample_gap = max(max_sample_gap, now - last_sample)
                         last_sample = now
                         try:
                             peak_sampled = max(peak_sampled, darwin_group_footprint(proc.pid))
                         except OSError:
+                            if reaped:
+                                raise
                             pid, got, used = os.wait4(proc.pid, os.WNOHANG)
                             if not pid:
                                 raise
@@ -426,7 +429,7 @@ def self_test(lab):
     if posix:
         modes.append("descendant-closed")
     if sys.platform == "darwin":
-        modes.append("memory-child")
+        modes.extend(("memory-child", "memory-child-orphan"))
     for mode in modes:
         report, text = lab.supervise(f"selftest-{mode}", [exe, mode], cap=(64 if sys.platform == "darwin" else 512 if posix else 64) * 2**20,
                                      ms=200 if mode == "sleep" else 3000, output_cap=64 * 2**10)
@@ -443,6 +446,9 @@ def self_test(lab):
               "memory-child": (report["termination_reason"] == "MEMORY_LIMIT_REACHED" and
                                report["peak_working_set_bytes"] <= 96 * 2**20 and
                                report.get("max_sample_gap_ms", float("inf")) <= 100),
+              "memory-child-orphan": (report["termination_reason"] == "MEMORY_LIMIT_REACHED" and
+                                      report["peak_working_set_bytes"] <= 96 * 2**20 and
+                                      report.get("max_sample_gap_ms", float("inf")) <= 100),
               "private-env": report["termination_reason"] == "COMPLETED" and "PRIVATE_ENV_COMPLETED" in text}[mode]
         results.append({"mode": mode, "pass": ok, "detail": text[-120:] if not ok else ""})
     if env_before is None:

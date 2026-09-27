@@ -10,6 +10,7 @@ link to it rather than restate it.
 | [reports/0.1.1-maintenance-release.md](reports/0.1.1-maintenance-release.md) | 보존된 0.1.1 출하·당시 동결 기록; 새 근거와 승계 근거 구분 | 0.1.1 출하 이력을 확인할 때 |
 | [reports/0.1.2-maintenance-candidate.md](reports/0.1.2-maintenance-candidate.md) | 보존된 0.1.2 출하·51개 처분·verifier 수정 | 0.1.2 이력을 확인할 때 |
 | [reports/0.1.3-release-candidate.md](reports/0.1.3-release-candidate.md) | 소스 전용 0.1.3 출하·세 OS CI·자산 검증 | 현재 출하 identity를 확인할 때 |
+| [reports/0.1.4-native-parity-candidate.md](reports/0.1.4-native-parity-candidate.md) | 0.1.4 세 OS native 검증 후보, 실패 및 HOLD 상태 | 0.1.4 작업·출하 판정을 확인할 때 |
 | [reports/session-08-cross-platform-source-validation.md](reports/session-08-cross-platform-source-validation.md) | 출하 후 Windows·Ubuntu·macOS ARM64 소스 검증 후보와 한계 | OS별 CI 근거를 확인할 때 |
 | [design/architecture.md](design/architecture.md) | Pipeline, ownership, layout, principles, decision index | Starting any work |
 | [design/decisions/](design/decisions/) | ADRs: why each architectural decision was made | Changing or questioning a decision |

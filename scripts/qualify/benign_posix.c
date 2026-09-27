@@ -55,7 +55,8 @@ int main(int argc, char **argv) {
     return 0;
   }
 #ifdef __APPLE__
-  if (!strcmp(argv[1], "memory-child")) {
+  if (!strcmp(argv[1], "memory-child") || !strcmp(argv[1], "memory-child-orphan")) {
+    int orphan = !strcmp(argv[1], "memory-child-orphan");
     pid_t child = fork();
     if (child < 0) return 76;
     if (!child) {
@@ -64,11 +65,13 @@ int main(int argc, char **argv) {
         volatile char *p = malloc(1024 * 1024);
         if (!p) return 73;
         for (size_t j = 0; j < 1024 * 1024; j += 4096) p[j] = 1;
+        if (orphan) puts("MEMORY_CHILD_ALIVE");
         nanosleep(&pause, NULL);
       }
       return 74;
     }
     puts("MEMORY_CHILD_BEGIN");
+    if (orphan) return 0;
     sleep(5);
     return 0;
   }

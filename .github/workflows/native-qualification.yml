@@ -4,14 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [main, session/10-v014-native-parity]
-    paths:
-      - .github/workflows/native-qualification.yml
-      - scripts/qualify/**
-      - scripts/build_native_evidence.py
-      - scripts/check_oracle_pair.py
-      - scripts/compare_native_evidence.py
-      - scripts/package_native_evidence.py
-      - scripts/record_oracle.py
 
 permissions:
   contents: read
@@ -67,7 +59,7 @@ jobs:
         run: python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 --support 0.25.1=.work/runtime-025 --support 0.26.13=.work/runtime-026 --out .work/native-full
       - name: Run all native gates on Windows
         if: runner.os == 'Windows'
-        run: python scripts/qualify/run.py --cc C:/msys64/ucrt64/bin/gcc.exe --runtime .work/runtime-027 --support 0.25.1=.work/runtime-025 --support 0.26.13=.work/runtime-026 --out .work/native-full
+        run: python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe --runtime .work/runtime-027 --support 0.25.1=.work/runtime-025 --support 0.26.13=.work/runtime-026 --out .work/native-full
       - name: Normalize release evidence
         run: python scripts/build_native_evidence.py --qualification .work/native-full --oracle-a .work/oracle-a --oracle-b .work/oracle-b --out .work/native-evidence.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

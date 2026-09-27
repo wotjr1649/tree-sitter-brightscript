@@ -140,15 +140,16 @@ v0.1.2만의 조건부 승계는 별도로 승인된
 과거 performance와 새 correctness·ASan 한정 replay를 분리하며, 새 동작에는 적용하지 않는다.
 공개 offline verifier 정책은 [public-replay.md](public-replay.md)에 둔다.
 CI guard는 이 verifier의 고정된 `python -I -B -X utf8` 명령만 추가로 허용한다.
-임의 Python flags는 허용하지 않는다. v0.1.4 준비 단계의 유일한 추가 예외는
+임의 Python flags는 허용하지 않는다. v0.1.4 준비 단계의 추가 예외는
 `native-preflight.yml`에서 실행하는 고정된
 `python scripts/qualify/run.py --preflight --cc /usr/bin/cc --out .work/posix-preflight`
 명령과 같은 workflow의 `--gates B5-01-MEMORY` 단일 native smoke 명령,
-`native-qualification.yml`의 고정된 전체 게이트 명령이다. 해당 workflow는
-기본 브랜치 등록 전에는 작업 브랜치에서 이 파일이 바뀌는 push에만 반응한다.
-`test_tscli.py`는
-workflow 이름과 정확한 세 명령을 확인하고 변형된 인수·경로와 다른 native 실행
-명령을 거부한다. 이 workflow는 v0.1.4 엔지니어링 시험용이며 결과를 확인하기
+`native-qualification.yml`의 POSIX 및 Windows 고정 전체 게이트 명령이다.
+후자는 세 OS native 실행과 필수 집계 작업을 한 workflow에 둔다. 작업 브랜치의
+모든 push에 반응하고 기본 브랜치 병합 뒤에도 동일한 검사를
+실행한다. `test_tscli.py`는 workflow 이름과 정확한 네 명령을 확인하고 변형된
+인수·경로와 다른 native 실행 명령을 거부한다. 이 workflow는 v0.1.4
+엔지니어링 시험용이며 전체 집계 결과를 확인하기
 전에는 출하 증거가 아니다.
 
 Every check script runs the CLI only through `scripts/tscli.py` (so the check
@@ -167,7 +168,8 @@ step `shell:`, local actions, `binding.gyp` and `.npmrc` settings (Session 05-1
 delta re-audit C4-01, C4-02).
 One file under `scripts/` is exempt: `scripts/qualify/run.py`, the release
 qualification runner ("Release qualification lane" below), which is not a
-check script, is run by no workflow except the exact POSIX preflight above and reaches the CLI only through
+check script, is run by workflows only through the exact preflight, smoke and
+three-OS full-lane commands above and reaches the CLI only through
 `tscli.py`; it starts git, the C compiler it is given and the programs that
 compiler built. `scripts/test_tscli.py` checks that it is the only exemption.
 The same entrypoint has an explicit `--safety-profile` test route described
@@ -395,6 +397,41 @@ points stay as SAFETY points and their cancellation moved to 100 ms points
 chosen after that result; this is a policy revision, not the earlier check. RECOVERY-LOCALITY and the regeneration of
 the references run the pinned CLI outside the supervisor, with the `--cc`
 compiler and a private parser-library directory per checkout.
+
+### v0.1.4 three-OS native candidate
+
+The historical Windows lane above is retained. The v0.1.4 candidate runs
+the same registered inputs, 17 result names and existing protocol-v3 bounds
+on `windows-2025-vs2026` x64, `ubuntu-24.04` x64 and `macos-15` ARM64 in
+`.github/workflows/native-qualification.yml`. These are candidate checks,
+not a v0.1.4 release claim. A failed OS job prevents the required aggregation
+job from running. The full record and known FAILs are in
+[the candidate report](../reports/0.1.4-native-parity-candidate.md).
+
+The POSIX supervisor uses a private environment, a process group, a watchdog
+and bounded output, with a preflight that exercises a descendant which keeps
+the pipe open and one which closes it. Ubuntu applies `RLIMIT_AS` to each
+child and measures peak RSS. macOS could not apply `RLIMIT_AS` on the hosted
+runner, so it samples the process group's physical footprint using Apple's
+[`libproc` interfaces](https://github.com/apple-oss-distributions/xnu/blob/main/libsyscall/wrappers/libproc/libproc.h)
+and kills the group when the cap is exceeded; a child-memory control checks
+this path. The interface is private and the sampled cap is not a hard kernel
+limit. Windows private commit, Ubuntu RSS and macOS footprint are different
+metrics and must retain their host labels. The process-group controls do not
+cover a child that deliberately creates a new session. No such control is
+silently inferred from a Windows Job-object PASS.
+
+Each hosted OS records the W12/V6 native oracle twice and requires stable
+bytes for its 231 inputs. The aggregate job requires the exact 17 gate names,
+2,811 native tree digests, 1,533 deterministic native API signatures and
+30 incremental results including two planted comparator controls to match
+across the three hosts. It binds the candidate commit, generated files,
+runtime versions, runner image, architecture, compiler and CLI identities.
+Only OS-specific path, timing and memory values are excluded from exact
+functional comparison. The evidence ZIP contains normalized results, raw
+gate/run records and identity manifests, with no compiled parser library.
+The current v3 performance bounds are retained; predeclared OS-specific
+performance calibration remains required before a v0.1.4 release.
 
 ## Maintenance native safety profile (0.1.1)
 

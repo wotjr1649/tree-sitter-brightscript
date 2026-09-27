@@ -6,7 +6,7 @@ import zipfile
 from pathlib import Path
 
 from build_native_evidence import REQUIRED_GATES, incremental_signatures, signatures
-from compare_native_evidence import compare, load
+from compare_native_evidence import compare, digest, load
 
 
 FILES = ("native-evidence.json", "native-full/identity.json", "native-full/gates.json",
@@ -37,10 +37,20 @@ def verified_files(root, platform, common):
             or sha(paths["native-full/gates.json"]) != host["gates_sha256"]
             or gates["identity"] != identity or not identity["git_clean"]
             or identity["git_head"] != common["commit"] or identity["candidate"] != common["candidate"]
+            or identity["lane_sources"] != common["lane_sources"]
+            or identity["runtime"] != common["runtime"] or identity["support"] != common["support"]
+            or identity["seed"] != common["seed"]
             or identity["runner_image"] != host["runner_image"]
+            or identity["cc_sha256"] != host["cc_sha256"]
+            or identity["probes"] != host["probe_sha256"]
+            or identity["supervisor_kind"] != host["supervisor_kind"]
             or [g["gate"] for g in gates["results"]] != list(REQUIRED_GATES)
             or any(g["status"] != "PASS" for g in gates["results"])):
         raise ValueError(f"{platform} raw gate identity mismatch")
+    with paths["native-full/runs.jsonl"].open(encoding="utf-8") as source:
+        first = json.loads(source.readline())
+    if first["report"].get("memory_metric", "windows_private_commit") != host["memory_metric"]:
+        raise ValueError(f"{platform} raw memory metric mismatch")
     if (signatures(paths["native-full/runs.jsonl"]) != common["native_runs"]
             or gates["results"][REQUIRED_GATES.index("SEM-PUBLIC")]["points"][0]["native_tree_digests"]
             != common["native_trees"]
@@ -49,14 +59,29 @@ def verified_files(root, platform, common):
         raise ValueError(f"{platform} raw native results differ")
     if paths["oracle-a/manifest.json"].read_bytes() != paths["oracle-b/manifest.json"].read_bytes():
         raise ValueError(f"{platform} W12 recordings differ")
-    oracle = json.loads(paths["oracle-a/manifest.json"].read_text(encoding="utf-8"))["identity"]
+    manifest = json.loads(paths["oracle-a/manifest.json"].read_text(encoding="utf-8"))
+    oracle, results = manifest["identity"], manifest["results"]
+    if (not isinstance(results, list) or len(results) != 231
+            or any(not isinstance(row, dict) or row.get("n") != n
+                   or not isinstance(row.get("name"), str) or not row["name"]
+                   or any(not digest(row.get(key)) for key in ("input_sha256", "tree_sha256", "cst_sha256"))
+                   or type(row.get("has_error")) is not bool or type(row.get("expected_error")) is not bool
+                   or row["has_error"] != row["expected_error"] for n, row in enumerate(results))
+            or len({row["name"] for row in results}) != 231):
+        raise ValueError(f"{platform} W12 result set is incomplete")
+    workload = hashlib.sha256("".join(row["input_sha256"] for row in results).encode()).hexdigest()
+    content = hashlib.sha256("".join(row["input_sha256"] + row["tree_sha256"] + row["cst_sha256"]
+                                     for row in results).encode()).hexdigest()
     if (oracle["grammar_commit"] != common["commit"] or oracle["platform"] != platform
+            or oracle["generator"] != "tree-sitter 0.27.0" or oracle["abi"] != 15
             or not oracle["generated_files"]
             or any(common["candidate"].get(name) != digest
                    for name, digest in oracle["generated_files"].items())
             or oracle["cli_binary_sha256"] != host["cli_binary_sha256"]
             or oracle["workload"] != common["oracle_workload"]
-            or oracle["content_sha256"] != common["oracle_content_sha256"]):
+            or oracle["workload"]["sha256"] != workload
+            or oracle["content_sha256"] != common["oracle_content_sha256"]
+            or oracle["content_sha256"] != content):
         raise ValueError(f"{platform} W12 identity mismatch")
     return paths
 
