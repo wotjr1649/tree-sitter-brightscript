@@ -23,6 +23,11 @@ Roku syntax or device compatibility. The [0.1.0 release record](docs/reports/0.1
 and [qualification history](docs/reports/0.1.0-integrated-qualification.md) preserve earlier failures and their disposition.
 No npm package, language binding or WASM artifact is shipped.
 
+The v0.1.3 candidate keeps source-only distribution. It adds native hosted CI
+for Windows x64, Ubuntu x64 and macOS 15 Apple Silicon ARM64; it does not ship
+OS-specific compiled parser libraries. See the
+[candidate record](docs/reports/0.1.3-release-candidate.md) for release gates.
+
 Post-release source validation on the
 [`session/08-cross-platform-ci`](docs/reports/session-08-cross-platform-source-validation.md)
 branch passed native CI on Windows x64, Ubuntu x64 and macOS 15 Apple Silicon
