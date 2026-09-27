@@ -32,7 +32,9 @@ def main():
         t=copy.deepcopy(new);t[n]+=b" ";mutants.append((n,t))
     for name,before,after in (
         ("table",b"ts_parse_table",b"tx_parse_table"),
+        ("table value",b"[ts_builtin_sym_end] = ACTIONS(1)",b"[ts_builtin_sym_end] = ACTIONS(2)"),
         ("scanner map",b"ts_external_scanner_symbol_map",b"tx_external_scanner_symbol_map"),
+        ("scanner map value",b"[ts_external_token__recovery_run] = sym__recovery_run",b"[ts_external_token__recovery_run] = sym__recovery_newline"),
         ("ABI",b"#define LANGUAGE_VERSION 15",b"#define LANGUAGE_VERSION 14"),
         ("outside whitespace",b"#include",b" #include"),
         ("major",b".major_version = 0",b".major_version = 1"),
@@ -41,6 +43,12 @@ def main():
         assert before in new["src/parser.c"], name
         t=copy.deepcopy(new);t["src/parser.c"]=t["src/parser.c"].replace(before,after,1);mutants.append((name,t))
     t=copy.deepcopy(new);j=m.unique_json(t["package.json"]);j["private"]=False;t["package.json"]=json.dumps(j).encode();mutants.append(("private",t))
+    t=copy.deepcopy(new);j=m.unique_json(t["package.json"]);j["private"]=1;t["package.json"]=json.dumps(j).encode();mutants.append(("private JSON type",t))
+    t=copy.deepcopy(new);j=m.unique_json(t["tree-sitter.json"]);j["bindings"]["c"]=0;t["tree-sitter.json"]=json.dumps(j).encode();mutants.append(("binding JSON type",t))
+    t=copy.deepcopy(new);t["queries/highlights.scm"]=t["queries/highlights.scm"].replace(b"@keyword",b"@constant",1);mutants.append(("query capture",t))
+    t=copy.deepcopy(new);nodes=m.unique_json(t["src/node-types.json"]);node=next(n for n in nodes if n.get("fields"))
+    field=next(iter(node["fields"]));node["fields"][field+"_changed"]=node["fields"].pop(field)
+    t["src/node-types.json"]=json.dumps(nodes).encode();mutants.append(("node field",t))
     t=copy.deepcopy(new);t["package.json"]=b'{"version":"0.1.1","version":"0.1.0"}';mutants.append(("duplicate JSON",t))
     for name,t in mutants:
         try:m.compare(old,t)

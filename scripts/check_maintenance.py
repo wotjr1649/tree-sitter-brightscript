@@ -56,7 +56,9 @@ def compare(old, new):
                 key = pointer[-1]
                 if x[key] != "0.1.0" or y[key] != "0.1.1": raise ValueError("unexpected version")
                 y[key] = x[key]
-            if normalized != before: raise ValueError("unexpected JSON pointer delta: " + name)
+            # JSON booleans and numbers must stay distinct (Python True == 1).
+            if json.dumps(normalized, sort_keys=True, allow_nan=False) != json.dumps(before, sort_keys=True, allow_nan=False):
+                raise ValueError("unexpected JSON pointer delta: " + name)
         elif a != b:
             raise ValueError("frozen component differs: " + name)
         if a != b: changed.append(name)
