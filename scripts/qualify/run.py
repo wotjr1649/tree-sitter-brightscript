@@ -473,10 +473,11 @@ def main():
         return objs
 
     def probe(name, grammar, runtime, runtime_root, alloc=False):
-        exe = lab.out / "build" / f"probe-{name}.exe"
+        exe = lab.out / "build" / (f"probe-{name}.exe" if sys.platform == "win32" else f"probe-{name}")
         flags = ["-DMEASURE_ALLOC"] if alloc else []
+        platform_link = ["-lpsapi", "-Wl,--no-insert-timestamp"] if sys.platform == "win32" else []
         lab.compile(f"probe-{name}", ["-O2", "-Wall", "-Wextra", *flags, "-I", Path(runtime_root) / "lib/include",
-                                      HERE / "probe.c", *grammar, *runtime, "-lpsapi", "-Wl,--no-insert-timestamp"], exe)
+                                      HERE / "probe.c", *grammar, *runtime, *platform_link], exe)
         return exe
 
     rt = runtime_objects("0.27.0", args.runtime)
@@ -493,12 +494,14 @@ def main():
         version, root = spec.split("=", 1)
         probes[f"cand-rt{version}"] = (probe(f"cand-rt{version}", cand, runtime_objects(version, root), root), query)
         support_versions.append(version)
-    lane_files = ["run.py", "gates.py", "cases.py", "probe.c", "supervisor.c", "benign.c", "recorded-inputs.json",
+    lane_files = ["run.py", "gates.py", "cases.py", "probe.c", "supervisor.c", "benign.c", "benign_posix.c", "recorded-inputs.json",
                   "runtime-0.27.0.sha256", "runtime-0.25.1.sha256", "runtime-0.26.13.sha256"]
     status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, timeout=60)
     other_files = ["scripts/tscli.py", "scripts/corpus.py", "docs/provenance/upstream-sources.md", "package.json",
                    "package-lock.json", "tree-sitter.json"]
-    identity = {"cc": str(lab.cc), "cc_sha256": sha(lab.cc), "supervisor_sha256": sha(lab.supervisor),
+    identity = {"cc": str(lab.cc), "cc_sha256": sha(lab.cc),
+                "supervisor_sha256": sha(lab.supervisor) if lab.supervisor else None,
+                "supervisor_kind": "windows_job" if sys.platform == "win32" else "posix_process_group",
                 "lane_sources": {**{f: sha(HERE / f) for f in lane_files}, **{f: sha(ROOT / f) for f in other_files}},
                 "git_clean": status.returncode == 0 and not status.stdout.strip(),
                 "selftest": selftest, "candidate": {f: sha(ROOT / f) for f in (

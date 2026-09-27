@@ -19,8 +19,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: tree-sitter/tree-sitter
+          ref: 6070dbfefd326bd735e5683eb128cc1b57dad0c0
+          path: .work/runtime-027
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
+      - name: Install the pinned generator
+        run: npm ci
       - name: Prove native process controls
         run: python scripts/qualify/run.py --preflight --cc /usr/bin/cc --out .work/posix-preflight
+      - name: Run one native memory gate
+        run: python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 --out .work/native-smoke --gates B5-01-MEMORY

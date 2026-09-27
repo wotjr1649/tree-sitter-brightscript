@@ -143,9 +143,10 @@ CI guard는 이 verifier의 고정된 `python -I -B -X utf8` 명령만 추가로
 임의 Python flags는 허용하지 않는다. v0.1.4 준비 단계의 유일한 추가 예외는
 `native-preflight.yml`에서 실행하는 고정된
 `python scripts/qualify/run.py --preflight --cc /usr/bin/cc --out .work/posix-preflight`
-명령이다. `test_tscli.py`는 workflow 이름과 정확한 명령을 확인하고 변형된
-인수·경로와 다른 native 실행 명령을 거부한다. 이 예외는 정식 출하 게이트의
-CI 실행 권한이 아니며, POSIX 감독의 실패 대조군을 실행하는 데만 사용한다.
+명령과 같은 workflow의 `--gates B5-01-MEMORY` 단일 native smoke 명령이다.
+`test_tscli.py`는 workflow 이름과 정확한 두 명령을 확인하고 변형된 인수·경로와
+다른 native 실행 명령을 거부한다. 이 예외는 정식 출하 게이트 전체의 CI 실행
+권한이 아니며, POSIX 감독 대조군과 한 게이트의 실제 빌드 경로를 검증한다.
 
 Every check script runs the CLI only through `scripts/tscli.py` (so the check
 does not depend on the order of CI steps) and starts no other program but git,

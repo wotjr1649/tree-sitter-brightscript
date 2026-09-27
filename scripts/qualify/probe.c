@@ -4,7 +4,7 @@
  * @license MIT
  *
  * Linked statically with the stock Tree-sitter runtime and this grammar's
- * parser and scanner; run only under scripts/qualify/supervisor.c.
+ * parser and scanner; run only under the qualification supervisor.
  * Built twice: plain, and with -DMEASURE_ALLOC (a counting allocator through
  * the public ts_set_allocator hook; its timings are never used as timings).
  *
@@ -22,11 +22,19 @@
  * Output is one JSON object per line; a run that reaches its end prints
  * {"final":true,...}. Only public API calls are used.
  */
+#ifdef _WIN32
 #include <windows.h>
 #include <psapi.h>
+#else
+#include <sys/resource.h>
+#include <time.h>
+#endif
 #include <stdarg.h>
 #include <stdint.h>
 #include <stddef.h>
+#ifndef _WIN32
+typedef size_t SIZE_T;
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,12 +42,20 @@
 
 const TSLanguage *tree_sitter_brightscript(void);
 
+#ifdef _WIN32
 static LARGE_INTEGER frequency;
 static double clock_ms(void) {
   LARGE_INTEGER c;
   QueryPerformanceCounter(&c);
   return c.QuadPart * 1000.0 / frequency.QuadPart;
 }
+#else
+static double clock_ms(void) {
+  struct timespec t;
+  if (clock_gettime(CLOCK_MONOTONIC, &t)) exit(93);
+  return (double)t.tv_sec * 1000.0 + (double)t.tv_nsec / 1000000.0;
+}
+#endif
 
 /* ------------------------------------------------------------- allocator */
 static uint64_t live_bytes, peak_bytes, total_bytes, allocations;
@@ -118,12 +134,24 @@ static TSParser *new_parser(void) {
 }
 
 static void memory_now(SIZE_T *ws, SIZE_T *commit) {
+#ifdef _WIN32
   PROCESS_MEMORY_COUNTERS_EX c;
   c.cb = sizeof c;
   if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS *)&c, sizeof c)) {
     *ws = c.WorkingSetSize;
     *commit = c.PrivateUsage;
   }
+#else
+  struct rusage r;
+  if (getrusage(RUSAGE_SELF, &r)) exit(94);
+  /* The POSIX lane's process-memory metric is peak RSS, not Windows private commit. */
+  *ws = *commit = (SIZE_T)r.ru_maxrss *
+#ifdef __APPLE__
+      1;
+#else
+      1024;
+#endif
+#endif
 }
 
 /* ----------------------------------------------------------------- digests */
@@ -606,7 +634,9 @@ static int two(const char *a_path, const char *b_path) {
 }
 
 int main(int argc, char **argv) {
+#ifdef _WIN32
   QueryPerformanceFrequency(&frequency);
+#endif
   setvbuf(stdout, NULL, _IONBF, 0);
 #ifdef MEASURE_ALLOC
   ts_set_allocator(counting_malloc, counting_calloc, counting_realloc, counting_free);
