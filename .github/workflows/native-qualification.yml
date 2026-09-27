@@ -48,15 +48,27 @@ jobs:
           python-version: "3.14"
       - name: Install the pinned generator
         run: npm ci
+      - name: Record W12 native oracle twice
+        shell: bash
+        run: |
+          python scripts/record_oracle.py --out=.work/oracle-a
+          python scripts/record_oracle.py --out=.work/oracle-b
+      - name: Require byte-identical W12 recordings
+        run: python scripts/check_oracle_pair.py .work/oracle-a .work/oracle-b
       - name: Run all native gates
         run: python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 --support 0.25.1=.work/runtime-025 --support 0.26.13=.work/runtime-026 --out .work/native-full
+      - name: Normalize release evidence
+        run: python scripts/build_native_evidence.py --qualification .work/native-full --oracle-a .work/oracle-a --oracle-b .work/oracle-b --out .work/native-evidence.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: native-${{ matrix.os }}
           path: |
+            .work/native-evidence.json
             .work/native-full/identity.json
             .work/native-full/gates.json
             .work/native-full/runs.jsonl
+            .work/oracle-a/manifest.json
+            .work/oracle-b/manifest.json
           if-no-files-found: error
           retention-days: 7
