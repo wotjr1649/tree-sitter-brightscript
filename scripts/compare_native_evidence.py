@@ -5,10 +5,11 @@ import re
 from pathlib import Path
 
 from build_native_evidence import REQUIRED_GATES, registered_run_keys
+from qualify import response_policy
 
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 SHA1 = re.compile(r"[0-9a-f]{40}\Z")
-COMMON_KEYS = {"commit", "candidate", "lane_sources", "protocol", "runtime", "support", "seed", "gate_statuses",
+COMMON_KEYS = {"commit", "candidate", "lane_sources", "protocol", "response_policy", "runtime", "support", "seed", "gate_statuses",
                "oracle_cases", "oracle_workload", "oracle_content_sha256", "native_trees", "native_runs",
                "incremental"}
 ARCHITECTURES = {"win32": {"amd64", "x86_64"}, "linux": {"x86_64", "amd64"},
@@ -29,6 +30,7 @@ def load(path):
     common, host = result["common"], result["host"]
     if set(common) != COMMON_KEYS or not isinstance(host, dict) or host.get("platform") not in ARCHITECTURES:
         raise ValueError("incomplete native evidence")
+    response_policy.require_identity(common)
     if host.get("architecture") not in ARCHITECTURES[host["platform"]]:
         raise ValueError("unsupported host architecture")
     image = host.get("runner_image")
@@ -38,7 +40,7 @@ def load(path):
         raise ValueError("missing runner image identity")
     if (not isinstance(common["commit"], str) or not SHA1.fullmatch(common["commit"])
             or common["gate_statuses"] != list(REQUIRED_GATES)
-            or common["protocol"] != "v4.1" or common["runtime"] != "0.27.0" or common["support"] != ["0.25.1", "0.26.13"]
+            or common["runtime"] != "0.27.0" or common["support"] != ["0.25.1", "0.26.13"]
             or common["seed"] != 5707 or common["oracle_cases"] != 231
             or common["oracle_workload"].get("cases") != 231
             or not digest(common["oracle_workload"].get("sha256"))

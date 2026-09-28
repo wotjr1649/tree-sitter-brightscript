@@ -1,6 +1,8 @@
 """Small positive and planted-difference controls for cross-OS evidence comparison."""
 import hashlib
+import copy
 import json
+from functools import lru_cache
 import shutil
 import tempfile
 import unittest
@@ -16,10 +18,43 @@ from qualify.test_latency_diagnostic import WitnessRecords
 from qualify.test_gates_v4 import V4Judgement
 from qualify.test_etw_diagnostic import EtwDiagnostic
 from qualify.test_completion_pilot import CompletionPilot
+from qualify.test_response_policy import ResponsePolicy, CancellationRecords, PlainRecords
+from qualify import response_policy
 
 
 def sha(data):
     return hashlib.sha256(data).hexdigest()
+
+
+@lru_cache(maxsize=1)
+def response_fixture():
+    """Complete synthetic response segment, including separately retained historical failures."""
+    rows, results = [], []
+
+    class Capture:
+        def __init__(self, runner):
+            self.runner, self.lab = runner, runner.lab
+
+        def run(self, *args, **kwargs):
+            row = self.runner.run(*args, **kwargs)
+            row["report"].update(pid=len(rows) + 1, memory_metric="host-memory")
+            row["final"].update(nodes=0, errors=0, missing=0, max_depth=0, captures=0, match_limit_exceeded=False)
+            rows.append(row)
+            return row
+
+    for runner, judge in ((CancellationRecords(), response_policy.gates_v4.cancel),
+                          (PlainRecords(1.), response_policy.gates.overshoot),
+                          (PlainRecords(), response_policy.gates.gaps_and_cleanup)):
+        result = response_policy.evaluate(Capture(runner), judge)
+        results.extend(result if isinstance(result, list) else [result])
+    return results, rows
+
+
+def gate_records():
+    results = [{"gate": name, "status": "PASS", "points": []} for name in REQUIRED_GATES]
+    for result in response_fixture()[0]:
+        results[REQUIRED_GATES.index(result["gate"])] = copy.deepcopy(result)
+    return results
 
 
 class NativeEvidence(unittest.TestCase):
@@ -44,7 +79,7 @@ class NativeEvidence(unittest.TestCase):
         zero = "0" * 64
         return {"commit": "a" * 40, "candidate": {"src/parser.c": zero, "grammar.js": zero},
                 "lane_sources": {"run.py": zero},
-                "protocol": "v4.1", "runtime": "0.27.0", "support": ["0.25.1", "0.26.13"], "seed": 5707,
+                "protocol": "v5", "response_policy": response_policy.IDENTITY, "runtime": "0.27.0", "support": ["0.25.1", "0.26.13"], "seed": 5707,
                 "gate_statuses": list(REQUIRED_GATES), "oracle_cases": 231,
                 "oracle_workload": {"cases": 231, "sha256": zero}, "oracle_content_sha256": zero,
                 "native_trees": [{"name": f"case-{i}", "input_sha256": zero, "tree_sha256": zero}
@@ -94,6 +129,16 @@ class NativeEvidence(unittest.TestCase):
             with self.assertRaises(ValueError):
                 compare_hosts(*paths)
             paths[0].write_text(original, encoding="utf-8")
+            for protocol, limit in (("v4.1", 250), ("v5", 100), ("v5", 500)):
+                changed = json.loads(original)
+                changed["common"]["protocol"] = protocol
+                policy = changed["common"]["response_policy"]
+                policy["spec"]["limits_ms"]["callback_gap_ms"] = limit
+                policy["sha256"] = sha(json.dumps(policy["spec"], sort_keys=True, separators=(",", ":")).encode())
+                paths[0].write_text(json.dumps(changed), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "response policy"):
+                    compare_hosts(*paths)
+            paths[0].write_text(original, encoding="utf-8")
             bad = dict(common, native_trees=[dict(common["native_trees"][0], tree_sha256="f" * 64),
                                              *common["native_trees"][1:]])
             paths[2].write_text(json.dumps({"common": bad, "host": {"platform": "darwin",
@@ -116,12 +161,12 @@ class NativeEvidence(unittest.TestCase):
             q.mkdir()
             common = self.common()
             identity = {"git_clean": True, "git_head": common["commit"], "candidate": common["candidate"],
-                        "lane_sources": common["lane_sources"], "runtime": common["runtime"], "protocol": "v4.1",
+                        "lane_sources": common["lane_sources"], "runtime": common["runtime"], "protocol": "v5", "response_policy": response_policy.IDENTITY,
                         "support": common["support"], "seed": common["seed"], "cc_sha256": "0" * 64,
                         "runner_image": {"os": "win25", "version": "test", "runner_arch": "X64"},
                         "supervisor_kind": "windows_job", "probes": {"cand": "0" * 64}}
             (q / "identity.json").write_text(json.dumps(identity), encoding="utf-8")
-            gates = [{"gate": name, "status": "PASS", "points": []} for name in REQUIRED_GATES]
+            gates = gate_records()
             gates[REQUIRED_GATES.index("SEM-PUBLIC")]["points"] = [{"native_tree_digests": common["native_trees"]}]
             gates[REQUIRED_GATES.index("INCREMENTAL-REPAIR")]["points"] = common["incremental"]
             (q / "gates.json").write_text(json.dumps({"identity": identity, "results": gates}), encoding="utf-8")
@@ -130,7 +175,7 @@ class NativeEvidence(unittest.TestCase):
                      "match_limit_exceeded": False}
             run = {"budget": 0, "completed": True, "build": "cand", "op": "PARSE", "case": "one",
                    "final": final, "events": {}, "report": {"memory_metric": "windows_private_commit"}}
-            (q / "runs.jsonl").write_text(json.dumps(run) + "\n", encoding="utf-8")
+            (q / "runs.jsonl").write_text("".join(json.dumps(x) + "\n" for x in [run, *response_fixture()[1]]), encoding="utf-8")
             blobs = (("inputs", "brs", b"x"), ("trees", "txt", b"t"), ("cst", "txt", b"c"))
             records = [{"n": i, **{f"{folder[:-1] if folder != 'cst' else 'cst'}_sha256": sha(data)
                                     for folder, _, data in blobs}} for i in range(231)]
@@ -154,6 +199,10 @@ class NativeEvidence(unittest.TestCase):
             self.assertEqual([p["case"] for p in result["common"]["incremental"] if "detected" in p],
                              ["comparator self-test 1", "comparator self-test 2"])
             self.assertEqual(result["host"]["runs_sha256"], sha((q / "runs.jsonl").read_bytes()))
+            gates[REQUIRED_GATES.index("CANCEL")]["legacy_v4_1_100ms"] = {"gate": "CANCEL", "status": "FAIL"}
+            (q / "gates.json").write_text(json.dumps({"identity": identity, "results": gates}), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "response raw replay"):
+                build(q, root / "oracle-a", root / "oracle-b")
 
     def test_evidence_zip_checks_raw_records_and_is_reproducible(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -162,10 +211,14 @@ class NativeEvidence(unittest.TestCase):
             final = {"final": True, "bytes": 1, "cancelled": False, "has_error": 0, "nodes": 1,
                      "errors": 0, "missing": 0, "max_depth": 0, "captures": 0,
                      "match_limit_exceeded": False}
+            response_rows = response_fixture()[1]
+            response_finals = {"|".join(x[k] for k in ("build", "op", "case")): x["final"]
+                               for x in response_rows if x["budget"] == 0}
             runs = "".join(json.dumps({"budget": 0, "completed": True, "build": b, "op": o,
-                                      "case": c, "final": final, "events": {},
+                                      "case": c, "final": response_finals.get("|".join((b,o,c)), final), "events": {},
                                       "report": {"memory_metric": "host-memory"}}) + "\n"
                            for b, o, c in (key.split("|") for key in sorted(registered_run_keys())))
+            runs += "".join(json.dumps(x) + "\n" for x in response_rows)
             runs += json.dumps({"budget": 100, "completed": True, "report": {"memory_metric": "host-memory"}}) + "\n"
             with (root / "runs.jsonl").open("w", encoding="utf-8") as output:
                 output.write(runs)
@@ -188,11 +241,11 @@ class NativeEvidence(unittest.TestCase):
                 runner_image = {"os": platform, "version": "test", "runner_arch": runner_arch}
                 identity = {"git_clean": True, "git_head": common["commit"], "candidate": common["candidate"],
                             "runner_image": runner_image, "lane_sources": common["lane_sources"],
-                            "protocol": "v4.1", "runtime": common["runtime"], "support": common["support"], "seed": common["seed"],
+                            "protocol": "v5", "response_policy": response_policy.IDENTITY, "runtime": common["runtime"], "support": common["support"], "seed": common["seed"],
                             "cc_sha256": "0" * 64, "probes": {"cand": "0" * 64},
                             "supervisor_sha256": "0" * 64 if platform == "win32" else None,
                             "supervisor_kind": "test-supervisor"}
-                gates = [{"gate": gate, "status": "PASS", "points": []} for gate in REQUIRED_GATES]
+                gates = gate_records()
                 gates[REQUIRED_GATES.index("SEM-PUBLIC")]["points"] = [
                     {"native_tree_digests": common["native_trees"]}]
                 gates[REQUIRED_GATES.index("INCREMENTAL-REPAIR")]["points"] = common["incremental"]
@@ -223,6 +276,22 @@ class NativeEvidence(unittest.TestCase):
             self.assertEqual(sha(first.read_bytes()), sha(second.read_bytes()))
             with zipfile.ZipFile(first) as archive:
                 self.assertEqual(len(archive.namelist()), 19)
+                self.assertEqual(json.loads(archive.read("manifest.json"))["response_policy"], response_policy.IDENTITY)
+            target = roots[2]
+            gate_path, evidence_path = target / "native-full/gates.json", target / "native-evidence.json"
+            original_gate, original_evidence = gate_path.read_bytes(), evidence_path.read_bytes()
+            for name in response_policy.GATES:
+                changed = json.loads(original_gate)
+                legacy = changed["results"][REQUIRED_GATES.index(name)]["legacy_v4_1_100ms"]
+                del legacy["points"]
+                gate_path.write_text(json.dumps(changed), encoding="utf-8")
+                changed_evidence = json.loads(original_evidence)
+                changed_evidence["host"]["gates_sha256"] = sha(gate_path.read_bytes())
+                evidence_path.write_text(json.dumps(changed_evidence), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "response raw replay"):
+                    package(*roots, root / "truncated-legacy.zip")
+            gate_path.write_bytes(original_gate)
+            evidence_path.write_bytes(original_evidence)
             cohorts = [root / name for name in ("cohort-a", "cohort-b")]
             for cohort, run_id in zip(cohorts, ("101", "202")):
                 for source, name in zip(roots, HOSTS):
@@ -264,6 +333,8 @@ class NativeEvidence(unittest.TestCase):
             with zipfile.ZipFile(combined) as archive:
                 self.assertEqual(set(archive.namelist()), {"manifest.json", "cohort-1.zip", "cohort-2.zip"})
                 self.assertEqual(json.loads(archive.read("manifest.json"))["os_jobs"], 6)
+                self.assertEqual(json.loads(archive.read("manifest.json"))["protocol"], "v5")
+                self.assertEqual(json.loads(archive.read("manifest.json"))["response_policy"], response_policy.IDENTITY)
             target = cohorts[1] / HOSTS[0]
             changed_paths = [target / name for name in ("native-full/identity.json", "native-full/gates.json",
                                                        "native-evidence.json")]

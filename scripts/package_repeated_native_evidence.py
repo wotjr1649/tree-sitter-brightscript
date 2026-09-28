@@ -49,7 +49,8 @@ def repeated(first, second, out):
     with tempfile.TemporaryDirectory(prefix="native-cohorts-", dir=out.parent) as directory:
         zips = [package(*cohort, Path(directory) / f"cohort-{i}.zip") for i, cohort in enumerate(roots, 1)]
         entries = [(f"cohort-{i}.zip", path.read_bytes()) for i, path in enumerate(zips, 1)]
-        receipt = {"commit": common[0]["commit"], "protocol": "v4.1", "verdict": "PASS",
+        receipt = {"commit": common[0]["commit"], "protocol": common[0]["protocol"],
+                   "response_policy": common[0]["response_policy"], "verdict": "PASS",
                    "hosted_runs": runs, "os_jobs": 6, "gates_per_job": 17,
                    "native_keys": len(common[0]["native_runs"]),
                    "files": [{"path": name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}

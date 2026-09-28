@@ -407,8 +407,19 @@ compiler and a private parser-library directory per checkout.
 
 ### v0.1.4 three-OS native candidate
 
+The active prospective contract is now **v5**, under the owner's explicit
+250 ms choice in [ADR-0011](../design/decisions/ADR-0011-background-response-contract.md).
+Follow [native-v5-plan.md](native-v5-plan.md) for exact timing references,
+policy binding and the required preflight/six-job qualification. Stock runtime,
+all 17 purposes, functional/memory/growth/supervision requirements and registered
+inputs remain. The four 100 ms response bounds below are historical v4/v4.1;
+v5 uses 250 ms and retains separate historical judgements. This does not change
+the macOS memory guard's 100 ms controls or any published release evidence.
+
+#### Retained v4/v4.1 contract and qualification procedure
+
 The historical Windows lane above and its failures are retained. The v0.1.4
-candidate now uses protocol v4.1, with the same registered inputs, 17 result
+candidate previously used protocol v4.1, with the same registered inputs, 17 result
 names and existing numeric bounds
 on `windows-2025-vs2026` x64, `ubuntu-24.04` x64 and `macos-15` ARM64 in
 `.github/workflows/native-qualification.yml`. These are candidate checks,

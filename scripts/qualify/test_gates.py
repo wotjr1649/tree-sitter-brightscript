@@ -272,7 +272,7 @@ MUTANTS = {
         "not (tree_ms == -1 and cancelled or number(tree_ms) is not None\n" + " " * 58 + "and not cancelled)", "False"),
     "flag types not checked": ("or type(cancelled) is not bool or type(at_callback) is not bool", ""),
     "coverage not required": ('pass_=safety and coverage in ("TRIGGERED", "NOT_REQUIRED"))', "pass_=safety)"),
-    "return bound fixed at 300 ms": ("max(ret) <= budget + 100", "max(ret) <= 300"),
+    "return bound fixed at 300 ms": ("max(ret) <= budget + response_ms", "max(ret) <= 300"),
     "warmup not checked": ("for j, c, m in zip(judged, checks, mixed))",
                            "for j, c, m in zip(judged[1:], checks[1:], mixed[1:]))"),
     "result state not checked": ('wrong = checks.count("WRONG_RESULT")', "wrong = 0"),

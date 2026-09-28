@@ -121,6 +121,7 @@ sys.path.insert(0, str(HERE.parent))
 import cases  # noqa: E402
 import gates  # noqa: E402
 import gates_v4  # noqa: E402
+import response_policy  # noqa: E402
 import tscli  # noqa: E402
 
 CAP, WATCHDOG_MS, OUTPUT_CAP = 512 * 2**20, 15000, 8 * 2**20
@@ -910,7 +911,8 @@ def main():
         support_versions.append(version)
     lane_files = ["run.py", "gates.py", "cases.py", "probe.c", "supervisor.c", "test_supervisor_accounting.c", "benign.c", "benign_posix.c", "recorded-inputs.json",
                   "runtime-0.27.0.sha256", "runtime-0.25.1.sha256", "runtime-0.26.13.sha256"]
-    lane_files.extend(("characterize.py", "gates_v4.py", "test_characterize.py", "test_gates.py", "test_gates_v4.py"))
+    lane_files.extend(("characterize.py", "gates_v4.py", "test_characterize.py", "test_gates.py", "test_gates_v4.py",
+                       "response_policy.py", "test_response_policy.py"))
     if latency_mode:
         lane_files.extend(("latency_diagnostic.py", "test_latency_diagnostic.py"))
     if args.etw_diagnostic:
@@ -938,6 +940,16 @@ def main():
                 "git_head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True,
                                            timeout=60).stdout.strip(),
                 "protocol": "v4.1", "runtime": "0.27.0", "support": support_versions, "seed": args.seed, "gates": selected}
+    if not (completion_mode or latency_mode or args.characterize):
+        identity.update(protocol=response_policy.PROTOCOL, response_policy=response_policy.IDENTITY)
+        if os.environ.get("TSQ_RESPONSE_EXPECTED_COMMIT") and (
+                not identity["git_clean"] or identity["git_head"] != os.environ["TSQ_RESPONSE_EXPECTED_COMMIT"]
+                or os.environ.get("GITHUB_REPOSITORY") != "wotjr1649/tree-sitter-brightscript"
+                or os.environ.get("GITHUB_REF") != "refs/heads/session/10-v014-latency-diagnosis"
+                or os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch" or os.environ.get("GITHUB_RUN_ATTEMPT") != "1"
+                or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted" or os.environ.get("GITHUB_JOB") != "completion"
+                or os.environ.get("RUNNER_ARCH") != {"win32": "X64", "linux": "X64", "darwin": "ARM64"}.get(sys.platform)):
+            raise RuntimeError("response preflight requires the clean preassigned commit")
     (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
     r = Runner(lab, probes, query, roots={"cand": ROOT, "h": refs["h"]}, runtime_build="separate-scheduled-v4.1")
     if completion_mode:
@@ -978,10 +990,14 @@ def main():
         (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
         r.runtime_build = "separate-scheduled-progressed-cancellation"
         return characterize.run(r, identity, lab.out)
+    response_policy.require_identity(identity)
+    r.runtime_build = "separate-scheduled-v5-stock-runtime"
     results = []
     plan = {"B5-01-MEMORY": lambda: gates.b5_01_memory(r), "B5-02-LIFECYCLE": lambda: gates.b5_02_lifecycle(r),
-            "A5-01-COST": lambda: gates_v4.performance(r, args.seed), "CANCEL": lambda: gates_v4.cancel(r),
-            "CANCEL-OVERSHOOT": lambda: gates.overshoot(r), "MAX-CALLBACK-GAP": lambda: gates.gaps_and_cleanup(r),
+            "A5-01-COST": lambda: gates_v4.performance(r, args.seed),
+            "CANCEL": lambda: response_policy.evaluate(r, gates_v4.cancel),
+            "CANCEL-OVERSHOOT": lambda: response_policy.evaluate(r, gates.overshoot),
+            "MAX-CALLBACK-GAP": lambda: response_policy.evaluate(r, gates.gaps_and_cleanup),
             "LARGE-INPUT": lambda: gates.large_input(r), "QUERY-MALFORMED": lambda: gates.query_malformed(r),
             "VALID-PARSE": lambda: gates_v4.performance(r, args.seed, valid=True), "SEM-PUBLIC": lambda: gates.sem_public(r, args.seed),
             "INCREMENTAL-REPAIR": lambda: gates.incremental_repair(r), "RESUME-RESET": lambda: gates.resume_and_two(r),

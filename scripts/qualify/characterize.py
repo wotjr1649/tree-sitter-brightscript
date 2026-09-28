@@ -12,7 +12,7 @@ import gates
 BASELINE = "b9eab178472c9a43914bd86eb9a14b8a16a9464e"  # peeled immutable v0.1.3
 
 
-def first_callback_record(rec, length, allocator, progressed=False):
+def first_callback_record(rec, length, allocator, progressed=False, *, response_ms=100):
     """Judge one diagnostic run by its own trigger, return, cleanup and supervisor evidence."""
     pe, cl = rec.get("events", {}).get("parse", {}), rec.get("events", {}).get("cleanup", {})
     final, report = rec.get("final") or {}, rec.get("report", {})
@@ -56,18 +56,18 @@ def first_callback_record(rec, length, allocator, progressed=False):
         return {"pass": False, "status": "MEASUREMENT_INCONSISTENT"}
     latency, growth = parse_ms - request, cleanup_peak - live
     # The null tree sentinel is not negative cleanup time. Allocator timings are diagnostic only.
-    passed = growth < 64 * gates.MIB if allocator else latency <= 100 and cleanup <= 100
+    passed = growth < 64 * gates.MIB if allocator else latency <= response_ms and cleanup <= response_ms
     return {"pass": passed, "status": "PASS" if passed else "FAIL", "return_after_request_ms": latency,
             "cleanup_ms": cleanup, "growth_after_request_bytes": growth}
 
 
-def first_callback_control(r, progressed=False):
+def first_callback_control(r, progressed=False, *, response_ms=100):
     points, all_ids = [], []
     op, tag = ("CANCEL_HALF", "half") if progressed else ("CANCEL_FIRST", "first")
     for case in gates.CANCEL_ACTUAL:
         plain = [r.run("cand", op, case, 0, tag=f"{tag}{i}") for i in range(6)]
         alloc = r.run("cand-alloc", op, case, 0, tag=f"{tag}-alloc")
-        judged = [first_callback_record(x, len(gates.cases.generate(case)), i == 6, progressed)
+        judged = [first_callback_record(x, len(gates.cases.generate(case)), i == 6, progressed, response_ms=response_ms)
                   for i, x in enumerate(plain + [alloc])]
         ids = [gates.run_id(x) for x in plain + [alloc]]
         all_ids.extend(ids)

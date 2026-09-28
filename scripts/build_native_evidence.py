@@ -10,6 +10,7 @@ from check_oracle_pair import compare, stable_files
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "qualify"))
 import gates as registered
+import response_policy
 
 REQUIRED_GATES = (
     "B5-01-MEMORY", "B5-02-LIFECYCLE", "A5-01-COST", "CANCEL", "CANCEL-OVERSHOOT",
@@ -105,11 +106,14 @@ def build(qualification, oracle_a, oracle_b):
     q = Path(qualification)
     identity = read_json(q / "identity.json", 2**20)
     gate_record = read_json(q / "gates.json")
-    if gate_record["identity"] != identity or not identity["git_clean"] or identity.get("protocol") != "v4.1":
+    response_policy.require_identity(identity)
+    if gate_record["identity"] != identity or not identity["git_clean"]:
         raise ValueError("qualification identity is incomplete or dirty")
     gates = gate_record["results"]
+    response_policy.require_results(gates)
     if tuple(g["gate"] for g in gates) != REQUIRED_GATES or any(g["status"] != "PASS" for g in gates):
         raise ValueError("a required native gate is missing, reordered or not PASS")
+    response_policy.require_raw_results(q / "runs.jsonl", gates)
     count, content_sha = compare(oracle_a, oracle_b)
     _, oracle = stable_files(oracle_a)
     oracle_id = oracle["identity"]
@@ -130,7 +134,8 @@ def build(qualification, oracle_a, oracle_b):
         "common": {
             "commit": identity["git_head"], "candidate": identity["candidate"],
             "lane_sources": identity["lane_sources"],
-            "protocol": identity["protocol"], "runtime": identity["runtime"], "support": identity["support"], "seed": identity["seed"],
+            "protocol": identity["protocol"], "response_policy": identity["response_policy"],
+            "runtime": identity["runtime"], "support": identity["support"], "seed": identity["seed"],
             "gate_statuses": [g["gate"] for g in gates],
             "oracle_cases": count, "oracle_workload": oracle_id["workload"],
             "oracle_content_sha256": content_sha, "native_trees": trees,

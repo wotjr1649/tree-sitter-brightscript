@@ -45,7 +45,7 @@ class CompletionPilot(unittest.TestCase):
     def test_hosted_scope(self):
         text = (Path(__file__).resolve().parents[2] / ".github/workflows/native-characterization.yml").read_text()
         block = text.split("  completion:\n", 1)[1]
-        self.assertIn("inputs.experiment == 'completion-gap') && github.run_attempt == 1", block)
+        self.assertIn("inputs.experiment == 'completion-gap' || inputs.experiment == 'response-v5') && github.run_attempt == 1", block)
         self.assertIn("github.sha == inputs.expected_commit", block)
         self.assertIn("fromJSON(inputs.experiment == 'completion-gap' && '[\"macos-15\"]'", block)
         self.assertIn("'[\"windows-2025-vs2026\", \"ubuntu-24.04\", \"macos-15\"]'", block)
@@ -54,7 +54,8 @@ class CompletionPilot(unittest.TestCase):
         paths = re.search(r"          path: \|\n((?:            [^\n]+\n)+)", block).group(1)
         self.assertEqual([x.strip() for x in paths.splitlines()], [".work/completion-pilot/" + name for name in (
             "identity.json", "runs.jsonl", "commands.jsonl", "completion-pilot.json", "controls-result.txt")]
-            + [".work/completion-gap/" + name for name in ("identity.json", "runs.jsonl", "commands.jsonl", "completion-gap.json")])
+            + [".work/completion-gap/" + name for name in ("identity.json", "runs.jsonl", "commands.jsonl", "completion-gap.json")]
+            + [".work/response-v5/" + name for name in ("identity.json", "gates.json", "runs.jsonl", "commands.jsonl")])
 
     def test_gap_diagnostic_registration_and_negative_controls(self):
         plan = pilot.gap_registration()

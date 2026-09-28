@@ -3,6 +3,10 @@
 Status: diagnostic plan, not an accepted release result. The v0.1.4 candidate
 remains HOLD. This plan follows an independent adversarial review on
 2026-09-28; it does not change historical protocol-v3 verdicts.
+The later owner-selected 250 ms response requirement is prospective protocol
+[v5](native-v5-plan.md). The v4 requirements and results below are retained
+historical evidence; the selected response requirements are superseded by
+[ADR-0011](../design/decisions/ADR-0011-background-response-contract.md).
 Tracking: [issue #11](https://github.com/wotjr1649/tree-sitter-brightscript/issues/11)
 in the existing v0.1.4 milestone and PR #10.
 

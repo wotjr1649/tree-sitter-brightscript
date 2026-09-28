@@ -75,6 +75,11 @@ CI_ALLOWED += "|" + "|".join(map(re.escape, (COMPLETION_WINDOWS_COMMAND, COMPLET
 COMPLETION_GAP_COMMAND = ("python scripts/qualify/run.py --cc /usr/bin/cc "
                           "--runtime .work/runtime-027 --out .work/completion-gap --completion-gap-diagnostic")
 CI_ALLOWED += "|" + re.escape(COMPLETION_GAP_COMMAND)
+RESPONSE_WINDOWS_COMMAND = ("python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe --runtime .work/runtime-027 "
+                            "--out .work/response-v5 --gates CANCEL,CANCEL-OVERSHOOT,MAX-CALLBACK-GAP")
+RESPONSE_POSIX_COMMAND = ("python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 "
+                          "--out .work/response-v5 --gates CANCEL,CANCEL-OVERSHOOT,MAX-CALLBACK-GAP")
+CI_ALLOWED += "|" + "|".join(map(re.escape, (RESPONSE_WINDOWS_COMMAND, RESPONSE_POSIX_COMMAND)))
 # `run` keys in the spellings recognised here (flow mapping, quoted key, extra spaces, `\x72un`, `\u0072un`);
 # each must be one the parser read. Other escapes are not recognised (validation.md "Identity binding").
 ANY_RUN_KEY = re.compile(r"""(?:^|[\s{,])["']?(?:run|\\x72un|\\u0072un)["']?\s*:""", re.M)
@@ -324,6 +329,8 @@ class VerifiedCli(unittest.TestCase):
                                                   ("native-characterization.yml", COMPLETION_WINDOWS_COMMAND),
                                                   ("native-characterization.yml", COMPLETION_POSIX_COMMAND),
                                                   ("native-characterization.yml", COMPLETION_GAP_COMMAND),
+                                                  ("native-characterization.yml", RESPONSE_WINDOWS_COMMAND),
+                                                  ("native-characterization.yml", RESPONSE_POSIX_COMMAND),
                                                   ("native-preflight.yml", POSIX_PREFLIGHT_COMMAND),
                                                   ("native-preflight.yml", NATIVE_SMOKE_COMMAND),
                                                   ("native-qualification.yml", NATIVE_FULL_COMMAND),
@@ -355,6 +362,12 @@ class VerifiedCli(unittest.TestCase):
                            command + "; whoami", command + "\nwhoami"):
                 if mutant != command:
                     self.assertFalse(allowed(mutant), mutant)
+        for command in (RESPONSE_WINDOWS_COMMAND, RESPONSE_POSIX_COMMAND):
+            self.assertTrue(allowed(command))
+            for mutant in (command + " --response-ms 500", command + " --completion-pilot",
+                           command.replace("CANCEL,CANCEL-OVERSHOOT,MAX-CALLBACK-GAP", "CANCEL"),
+                           command.replace(".work/response-v5", "../outside"), command + "; whoami"):
+                self.assertFalse(allowed(mutant), mutant)
         for altered in (POSIX_PREFLIGHT_COMMAND + " --gates CANCEL",
                         POSIX_PREFLIGHT_COMMAND.replace("/usr/bin/cc", "cc"),
                         POSIX_PREFLIGHT_COMMAND.replace(".work/posix-preflight", "../outside"),

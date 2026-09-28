@@ -7,6 +7,7 @@ from pathlib import Path
 
 from build_native_evidence import REQUIRED_GATES, incremental_signatures, signatures
 from compare_native_evidence import compare, digest, load
+from qualify import response_policy
 
 
 FILES = ("native-evidence.json", "native-full/identity.json", "native-full/gates.json",
@@ -33,12 +34,14 @@ def verified_files(root, platform, common):
         raise ValueError(f"{platform} evidence identity mismatch")
     identity = json.loads(paths["native-full/identity.json"].read_text(encoding="utf-8"))
     gates = json.loads(paths["native-full/gates.json"].read_text(encoding="utf-8"))
+    response_policy.require_identity(identity)
     if (sha(paths["native-full/identity.json"]) != host["identity_sha256"]
             or sha(paths["native-full/gates.json"]) != host["gates_sha256"]
             or gates["identity"] != identity or not identity["git_clean"]
             or identity["git_head"] != common["commit"] or identity["candidate"] != common["candidate"]
             or identity["lane_sources"] != common["lane_sources"]
             or identity.get("protocol") != common["protocol"]
+            or identity.get("response_policy") != common["response_policy"]
             or identity["runtime"] != common["runtime"] or identity["support"] != common["support"]
             or identity["seed"] != common["seed"]
             or identity["runner_image"] != host["runner_image"]
@@ -50,8 +53,10 @@ def verified_files(root, platform, common):
             or [g["gate"] for g in gates["results"]] != list(REQUIRED_GATES)
             or any(g["status"] != "PASS" for g in gates["results"])):
         raise ValueError(f"{platform} raw gate identity mismatch")
+    response_policy.require_results(gates["results"])
     if sha(paths["native-full/runs.jsonl"]) != host["runs_sha256"]:
         raise ValueError(f"{platform} raw runs hash mismatch")
+    response_policy.require_raw_results(paths["native-full/runs.jsonl"], gates["results"])
     with paths["native-full/runs.jsonl"].open(encoding="utf-8") as source:
         first = json.loads(source.readline())
     if first["report"].get("memory_metric", "windows_private_commit") != host["memory_metric"]:
@@ -111,7 +116,8 @@ def package(windows, ubuntu, macos, out):
                 item.external_attr = 0o644 << 16
                 archive.writestr(item, data)
                 entries.append({"path": member, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)})
-        receipt = {"commit": common["commit"], "gates": len(REQUIRED_GATES),
+        receipt = {"commit": common["commit"], "protocol": common["protocol"], "response_policy": common["response_policy"],
+                   "gates": len(REQUIRED_GATES),
                    "native_trees": len(common["native_trees"]), "oracle_cases": common["oracle_cases"],
                    "files": entries}
         item = zipfile.ZipInfo("manifest.json", date_time=(1980, 1, 1, 0, 0, 0))
