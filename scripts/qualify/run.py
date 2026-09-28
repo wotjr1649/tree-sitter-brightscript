@@ -1,4 +1,4 @@
-"""Release qualification lane runner (docs/validation/validation.md, "Release qualification lane"). Windows.
+"""Release qualification lane runner (docs/validation/validation.md, "Release qualification lane").
 
     python scripts/qualify/run.py --cc <gcc.exe> --runtime <tree-sitter 0.27.0 source root> --out <new dir>
         [--support 0.25.1=<source root>] [--support 0.26.13=<source root>] [--gates G1,G2,...] [--seed N]
@@ -6,25 +6,113 @@
 This file and scripts/tscli.py are the only files under scripts/ that start programs (scripts/test_tscli.py
 checks it). It starts git (to read the reference grammars), the pinned CLI through tscli (generate), the C
 compiler named by --cc, and programs that compiler built under --out; every probe run and every build after the
-supervisor's own happens inside the Job-object supervisor that is built and self-tested first (limits: 512 MiB
-commit, 15 s, 8 MiB output, one child at a time). Two steps use the pinned CLI through tscli outside the supervisor,
+supervisor's own happens inside the Windows Job-object or POSIX process-group supervisor, self-tested first
+(limits: 512 MiB reported host memory metric, 15 s, 8 MiB output, one child at a time). Two steps use the pinned
+CLI through tscli outside the supervisor,
 with its own time limits: regenerating the reference grammars, and RECOVERY-LOCALITY, which parses each mutant with
 `parse --cst` in the candidate and the H checkout (the CLI compiles each grammar once with the --cc compiler into a
 private library directory per checkout). A runtime source root is used only if every file listed in
 runtime-<version>.sha256 matches.
 Results: <out>/runs.jsonl (every run) and <out>/gates.json; the exit status is 0 only if every selected gate
 passes.
+The separately authorized --etw-diagnostic route adds one bounded concurrent
+collector Job; it never produces a qualification verdict (native-v4-plan.md).
 """
 import argparse
 import datetime as dt
+import errno
 import hashlib
 import json
 import os
 import re
+import selectors
 import shutil
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
+
+if sys.platform != "win32":
+    import resource
+if sys.platform == "darwin":
+    import ctypes
+
+    class DarwinUsage(ctypes.Structure):
+        _fields_ = [("uuid", ctypes.c_uint8 * 16),
+                    *[(name, ctypes.c_uint64) for name in (
+                        "user_time", "system_time", "idle_wakeups", "interrupt_wakeups", "pageins",
+                        "wired_size", "resident_size", "phys_footprint", "start", "exit")]]
+
+    _libproc = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
+    _libproc.proc_pid_rusage.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_void_p)
+    _libproc.proc_pid_rusage.restype = ctypes.c_int
+    _libproc.proc_listpgrppids.argtypes = (ctypes.c_int, ctypes.c_void_p, ctypes.c_int)
+    _libproc.proc_listpgrppids.restype = ctypes.c_int
+    _libproc.proc_pidinfo.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_int)
+    _libproc.proc_pidinfo.restype = ctypes.c_int
+
+    def darwin_group_pids(pgid):
+        pids = (ctypes.c_int * 4096)()
+        ctypes.set_errno(0)
+        count = _libproc.proc_listpgrppids(pgid, pids, ctypes.sizeof(pids))
+        if count < 0 or count >= len(pids) or count == 0 and ctypes.get_errno():
+            raise OSError(ctypes.get_errno(), "proc_listpgrppids failed or overflowed")
+        return pids[:count]
+
+    def darwin_footprint(pid):
+        usage = DarwinUsage()
+        if _libproc.proc_pid_rusage(pid, 0, ctypes.byref(usage)):
+            raise OSError(ctypes.get_errno(), "proc_pid_rusage failed")
+        return usage.phys_footprint
+
+    def darwin_group_footprint(pgid):
+        total = 0
+        for pid in darwin_group_pids(pgid):
+            try:
+                total += darwin_footprint(pid)
+            except OSError as error:
+                if error.errno != errno.ESRCH:
+                    raise
+        return total
+
+    def darwin_live_group_pids(pgid, leader, leader_exited):
+        live = []
+        for pid in darwin_group_pids(pgid):
+            if pid == leader and leader_exited:
+                continue
+            info = (ctypes.c_uint8 * 256)()
+            ctypes.set_errno(0)
+            size = _libproc.proc_pidinfo(pid, 13, 0, info, ctypes.sizeof(info))  # PROC_PIDT_SHORTBSDINFO
+            if not size and ctypes.get_errno() == errno.ESRCH:
+                continue
+            if size < 16:
+                raise OSError(ctypes.get_errno(), "proc_pidinfo status unavailable")
+            status = ctypes.c_uint32.from_buffer(info, 12).value  # pbsi_status; SZOMB == 5
+            if status != 5:
+                live.append(pid)
+        return live
+
+
+def posix_live_group_pids(pgid, leader, leader_exited):
+    if sys.platform == "darwin":
+        return darwin_live_group_pids(pgid, leader, leader_exited)
+    live = []
+    for path in Path("/proc").iterdir():
+        if not path.name.isdecimal():
+            continue
+        try:
+            pid = int(path.name)
+            if os.getpgid(pid) != pgid:
+                continue
+            fields = (path / "stat").read_text(encoding="utf-8", errors="replace").rsplit(") ", 1)[1].split()
+        except (FileNotFoundError, ProcessLookupError):
+            continue
+        if int(fields[2]) != pgid:
+            raise RuntimeError("POSIX process group changed during inspection")
+        if fields[0] not in ("Z", "X") and (pid != leader or not leader_exited):
+            live.append(pid)
+    return live
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -32,6 +120,8 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 import cases  # noqa: E402
 import gates  # noqa: E402
+import gates_v4  # noqa: E402
+import response_policy  # noqa: E402
 import tscli  # noqa: E402
 
 CAP, WATCHDOG_MS, OUTPUT_CAP = 512 * 2**20, 15000, 8 * 2**20
@@ -54,18 +144,25 @@ def now():
 
 class Lab:
     def __init__(self, cc, out):
-        self.cc, self.out = Path(cc), Path(out)
+        self.cc, self.out = Path(cc).resolve(), Path(out).resolve()
         for d in ("build", "raw", "inputs", "env"):
             (self.out / d).mkdir(parents=True, exist_ok=True)
-        self.env = {k: v for k, v in os.environ.items() if k.upper() in {"SYSTEMROOT", "WINDIR", "COMSPEC", "SYSTEMDRIVE",
-                                                                        "PATHEXT"}}
-        self.env["PATH"] = os.pathsep.join([str(self.cc.parent), str(Path(os.environ["SYSTEMROOT"]) / "System32")])
-        for name in ("HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP", "XDG_CACHE_HOME", "XDG_CONFIG_HOME",
-                     "XDG_STATE_HOME", "TREE_SITTER_LIBDIR", "TREE_SITTER_DIR"):
+        if sys.platform == "win32":
+            self.env = {k: v for k, v in os.environ.items() if k.upper() in {"SYSTEMROOT", "WINDIR", "COMSPEC",
+                                                                            "SYSTEMDRIVE", "PATHEXT"}}
+            self.env["PATH"] = os.pathsep.join([str(self.cc.parent), str(Path(os.environ["SYSTEMROOT"]) / "System32")])
+        else:
+            self.env = {"PATH": os.pathsep.join(dict.fromkeys([str(self.cc.parent), "/usr/bin", "/bin"]))}
+        private_names = ("HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP", "XDG_CACHE_HOME",
+                         "XDG_CONFIG_HOME", "XDG_STATE_HOME", "TREE_SITTER_LIBDIR", "TREE_SITTER_DIR") if sys.platform == "win32" else (
+                         "HOME", "TMPDIR", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME",
+                         "TREE_SITTER_LIBDIR", "TREE_SITTER_DIR")
+        for name in private_names:
             p = self.out / "env" / "tsq-private" / name.lower()
             p.mkdir(parents=True, exist_ok=True)
             self.env[name] = str(p)
         self.supervisor, self.supervised_builds = None, False
+        self.supervisor_grace = 30
         self.log = (self.out / "commands.jsonl").open("a", encoding="utf-8", newline="\n")
         self.runs = []
 
@@ -101,6 +198,8 @@ class Lab:
         return first
 
     def supervise(self, cid, argv, cap=CAP, ms=WATCHDOG_MS, output_cap=OUTPUT_CAP):
+        if sys.platform != "win32":
+            return self.supervise_posix(cid, argv, cap, ms, output_cap)
         requested, n = cid, 1
         while (self.out / "raw" / cid).exists():
             n += 1
@@ -110,7 +209,7 @@ class Lab:
         argv = list(map(str, argv))
         command = [str(self.supervisor), str(raw / "supervisor.json"), str(raw / "child.out"), str(cap), str(ms),
                    str(output_cap), argv[0], subprocess.list2cmdline(argv)]
-        cp = subprocess.run(command, env=self.env, capture_output=True, timeout=ms / 1000 + 30,
+        cp = subprocess.run(command, env=self.env, capture_output=True, timeout=ms / 1000 + self.supervisor_grace,
                             creationflags=subprocess.DETACHED_PROCESS)
         report = json.loads((raw / "supervisor.json").read_text(encoding="utf-8"))
         guard = (cp.returncode == 0 and report["win32_error"] == 0 and report["assigned_before_resume"] and
@@ -120,6 +219,164 @@ class Lab:
         self.record(kind="supervised", command_id=cid, argv=argv, image_sha256=sha(argv[0]), report=report, guard=guard)
         if not guard:
             raise RuntimeError(f"supervisor guard failed for {cid}; the lane stops")
+        return report, (raw / "child.out").read_text(encoding="utf-8", errors="replace")
+
+    def supervise_posix(self, cid, argv, cap, ms, output_cap):
+        """One task-owned child/session with pre-exec virtual-memory limit and bounded output."""
+        if not (16 * 2**20 <= cap <= 1024 * 2**20 and 10 <= ms <= 15000 and 0 < output_cap <= 8 * 2**20):
+            raise ValueError("invalid POSIX supervisor profile")
+        requested, n = cid, 1
+        while (self.out / "raw" / cid).exists():
+            n += 1
+            cid = f"{requested}-r{n}"
+        raw = self.out / "raw" / cid
+        raw.mkdir(parents=True)
+        argv = list(map(str, argv))
+        if not Path(argv[0]).is_absolute() or not Path(argv[0]).is_file():
+            raise ValueError("POSIX supervised image must be an existing absolute path")
+
+        def limits():
+            if sys.platform == "darwin":
+                return  # The hosted macOS kernel rejected RLIMIT_AS; the parent enforces a sampled footprint limit.
+            try:
+                _, hard = resource.getrlimit(resource.RLIMIT_AS)
+                resource.setrlimit(resource.RLIMIT_AS, (cap, cap))
+            except (OSError, ValueError) as error:
+                current = resource.getrlimit(resource.RLIMIT_AS)
+                os.write(2, f"RLIMIT_AS_FAILED {type(error).__name__} {error} current={current}\n".encode())
+                os._exit(92)
+
+        start = time.monotonic()
+        start_ns = time.monotonic_ns()
+        with (raw / "child.out").open("xb") as output:
+            proc = subprocess.Popen(argv, env=self.env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                    start_new_session=True, preexec_fn=limits)
+            selector = selectors.DefaultSelector()
+            selector.register(proc.stdout, selectors.EVENT_READ)
+            status, usage, reason, stored, pipe_open, exited, waited = None, None, "COMPLETED", 0, True, False, False
+            descendant_pipe = False
+            peak_sampled, last_sample, max_sample_gap, samples_after_exit = 0, start, 0, 0
+            memory_kill_requested, memory_group_exit = None, None
+            group_cleared = False
+            try:
+                while pipe_open or not exited:
+                    if time.monotonic() - start > ms / 1000 + 2:
+                        raise RuntimeError(f"POSIX supervisor could not drain or observe exit for {cid}")
+                    if not exited:
+                        # WNOWAIT retains the group leader PID until descendants are inspected and signalled.
+                        exited = os.waitid(os.P_PID, proc.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT) is not None
+                    if sys.platform == "darwin":
+                        now = time.monotonic()
+                        max_sample_gap = max(max_sample_gap, now - last_sample)
+                        last_sample = now
+                        try:
+                            footprint = darwin_group_footprint(proc.pid)
+                            peak_sampled = max(peak_sampled, footprint)
+                            if exited:
+                                samples_after_exit += 1
+                        except OSError as error:
+                            if error.errno != errno.ESRCH:
+                                raise
+                            if exited:
+                                raise
+                            if os.waitid(os.P_PID, proc.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT) is None:
+                                raise
+                            exited = True
+                        if peak_sampled > cap and reason == "COMPLETED":
+                            reason = "MEMORY_LIMIT_REACHED"
+                            memory_kill_requested = time.monotonic()
+                            try:
+                                os.killpg(proc.pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                    if time.monotonic() - start > ms / 1000 and reason == "COMPLETED":
+                        reason = "WATCHDOG_TERMINATED"
+                        try:
+                            os.killpg(proc.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                    events = selector.select(timeout=0.02)
+                    for key, _ in events:
+                        data = os.read(key.fileobj.fileno(), 65536)
+                        if not data:
+                            selector.unregister(key.fileobj)
+                            pipe_open = False
+                            continue
+                        room = max(0, output_cap - stored)
+                        output.write(data[:room])
+                        stored += len(data[:room])
+                        if len(data) > room and reason == "COMPLETED":
+                            reason = "OUTPUT_LIMIT_REACHED"
+                            try:
+                                os.killpg(proc.pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                    if exited and pipe_open and not events and reason == "COMPLETED":
+                        descendant_pipe = True
+                        reason = "DESCENDANTS_TERMINATED"
+                        try:
+                            os.killpg(proc.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                if posix_live_group_pids(proc.pid, proc.pid, exited):
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except (ProcessLookupError, PermissionError):
+                        if posix_live_group_pids(proc.pid, proc.pid, exited):
+                            raise
+                    else:
+                        if reason == "COMPLETED":
+                            reason = "DESCENDANTS_TERMINATED"
+                    deadline = time.monotonic() + 2
+                    while time.monotonic() < deadline:
+                        if not posix_live_group_pids(proc.pid, proc.pid, exited):
+                            break
+                        time.sleep(0.01)
+                    else:
+                        raise RuntimeError(f"POSIX process group did not exit for {cid}")
+                group_cleared = True
+                if memory_kill_requested is not None:
+                    memory_group_exit = time.monotonic()
+                _, status, usage = os.wait4(proc.pid, 0)
+                waited = True
+                proc.returncode = os.waitstatus_to_exitcode(status)
+            finally:
+                if not group_cleared and not waited:
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except (ProcessLookupError, PermissionError):
+                        pass
+                    try:
+                        os.kill(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    os.wait4(proc.pid, 0)
+                selector.close()
+                proc.stdout.close()
+        peak = max(peak_sampled, usage.ru_maxrss if sys.platform == "darwin" else usage.ru_maxrss * 1024)
+        report = {"termination_reason": reason, "exit_code_raw": proc.returncode,
+                  "pid": proc.pid, "creation_monotonic_ns": start_ns,
+                  "peak_working_set_bytes": peak, "peak_commit_bytes": peak,
+                  "memory_metric": "group_sampled_phys_footprint_bytes" if sys.platform == "darwin" else "peak_rss_bytes",
+                  "memory_limit_mode": "group_sampled_kill" if sys.platform == "darwin" else "kernel_rlimit_as",
+                  "sampled_peak_footprint_bytes": peak_sampled if sys.platform == "darwin" else None,
+                  "sampled_overshoot_bytes": max(0, peak_sampled - cap) if sys.platform == "darwin" else None,
+                  "memory_kill_to_group_exit_ms": ((memory_group_exit - memory_kill_requested) * 1000
+                                                   if memory_group_exit is not None else None),
+                  "process_peak_rss_bytes": usage.ru_maxrss if sys.platform == "darwin" else usage.ru_maxrss * 1024,
+                  "user_cpu_ms": usage.ru_utime * 1000, "kernel_cpu_ms": usage.ru_stime * 1000,
+                  "max_sample_gap_ms": max_sample_gap * 1000, "configured_job_memory_limit_bytes": cap,
+                  "samples_after_exit": samples_after_exit if sys.platform == "darwin" else None,
+                  "image_path": str(Path(argv[0]).resolve()), "exit_confirmed": waited,
+                  "active_processes": 0 if not pipe_open else None,
+                  "descendant_pipe_observed": descendant_pipe,
+                  "elapsed_ms": (time.monotonic() - start) * 1000}
+        (raw / "supervisor.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
+        guard = waited and report["active_processes"] == 0 and report["configured_job_memory_limit_bytes"] == cap
+        self.record(kind="supervised", command_id=cid, argv=argv, image_sha256=sha(argv[0]), report=report,
+                    guard=guard)
+        if not guard:
+            raise RuntimeError(f"POSIX supervisor guard failed for {cid}; the lane stops")
         return report, (raw / "child.out").read_text(encoding="utf-8", errors="replace")
 
     def supervisor_refusal(self, cid, cap, ms, output_cap):
@@ -139,11 +396,27 @@ class Lab:
         return {"id":cid,"pass":ok}
 
 
+def retained_run(rec):
+    """Keep only fields used after a budget-zero run; full evidence stays in runs.jsonl.
+
+    Linux fork/exec peak RSS also includes the inherited Python image. Retaining
+    every full record here needlessly inflates that image throughout a long lane.
+    Cancellation needs its complete records for per-run judgement and registration.
+    """
+    if rec["budget"] or rec["op"] in ("CANCEL_FIRST", "CANCEL_HALF"):
+        return rec
+    return {"build": rec["build"], "case": rec["case"],
+            "report": {k: rec["report"][k] for k in (
+                "pid", "creation_filetime", "creation_monotonic_ns", "peak_commit_bytes") if k in rec["report"]}}
+
+
 class Runner:
     """What the gates call: measurements of built probes on generated inputs."""
 
-    def __init__(self, lab, probes, query, roots=None):
+    def __init__(self, lab, probes, query, roots=None, runtime_build="separate"):
         self.lab, self.probes, self.query, self.roots = lab, probes, query, roots or {}
+        self.runtime_build = runtime_build
+        self.run_ids = set()
 
     def input(self, case):
         path = self.lab.out / "inputs" / f"{case}.brs"
@@ -183,11 +456,16 @@ class Runner:
         events = {e["event"]: e for e in self.json_lines(text) if "event" in e}
         final = next((e for e in self.json_lines(text) if e.get("final")), None)
         rec = {"build": build, "op": op, "case": case, "budget": budget, "tag": tag, "report": report,
+               "runtime_build": self.runtime_build,
                "completed": report["termination_reason"] == "COMPLETED" and report["exit_code_raw"] == 0,
                "events": events, "final": final}
-        self.lab.runs.append(rec)
+        self.lab.runs.append(retained_run(rec))
         with (self.lab.out / "runs.jsonl").open("a", encoding="utf-8", newline="\n") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        identity = gates.run_id(rec)
+        if identity in self.run_ids or "None" in identity:
+            raise RuntimeError("missing or repeated native process identity; record retained")
+        self.run_ids.add(identity)
         return rec
 
     def probe(self, build, args, tag):
@@ -228,21 +506,55 @@ def verify_runtime(root, version):
 
 def self_test(lab):
     """Six benign children prove the memory cap, watchdog, output cap, descendant kill and the private environment."""
-    exe = lab.out / "build/benign.exe"
-    lab.compile("benign", ["-O2", "-Wall", "-Wextra", HERE / "benign.c"], exe)
+    posix = sys.platform != "win32"
+    exe = lab.out / "build" / ("benign" if posix else "benign.exe")
+    lab.compile("benign", ["-O2", "-Wall", "-Wextra", HERE / ("benign_posix.c" if posix else "benign.c")], exe)
     env_before = os.environ.get("S05_PRIVATE_CANARY")
     os.environ["S05_PRIVATE_CANARY"] = "must-not-reach-child"  # the child must not see the parent's variables
     results = []
-    for mode in ("normal", "sleep", "memory", "output", "descendant", "private-env"):
-        report, text = lab.supervise(f"selftest-{mode}", [exe, mode], cap=64 * 2**20,
+    if not posix:
+        accounting = lab.out / "build/accounting-test.exe"
+        lab.compile("accounting-test", ["-O2", "-Wall", "-Wextra", "-Werror",
+                    HERE / "test_supervisor_accounting.c", "-lpsapi", "-Wl,--no-insert-timestamp"], accounting)
+        report, text = lab.supervise("selftest-accounting-state", [accounting],
+                                     cap=64 * 2**20, ms=3000, output_cap=64 * 2**10)
+        results.append({"mode": "accounting-state", "pass": report["termination_reason"] == "COMPLETED"
+                        and report["exit_code_raw"] == 0 and text.strip() == "ACCOUNTING_STATE_PASS 10",
+                        "report": report})
+    modes = ["normal", "sleep", "memory", "output", "descendant", "private-env"]
+    if posix:
+        modes.append("descendant-closed")
+    if sys.platform == "darwin":
+        modes.extend(("memory-child", "memory-child-orphan"))
+    for mode in modes:
+        report, text = lab.supervise(f"selftest-{mode}", [exe, mode], cap=(64 if sys.platform == "darwin" else 512 if posix else 64) * 2**20,
                                      ms=200 if mode == "sleep" else 3000, output_cap=64 * 2**10)
         ok = {"normal": report["termination_reason"] == "COMPLETED" and "NORMAL_COMPLETED" in text,
               "sleep": report["termination_reason"] == "WATCHDOG_TERMINATED",
-              "memory": report["exit_code_raw"] == 73 and "ALLOCATION_DENIED" in text,
+              "memory": (report["termination_reason"] == "MEMORY_LIMIT_REACHED" and
+                         report["peak_working_set_bytes"] <= 96 * 2**20 and report["max_sample_gap_ms"] <= 100)
+                        if sys.platform == "darwin" else report["exit_code_raw"] == 73 and "ALLOCATION_DENIED" in text,
               "output": report["termination_reason"] == "OUTPUT_LIMIT_REACHED",
-              "descendant": report["termination_reason"] == "DESCENDANTS_TERMINATED" and report["total_processes"] == 2,
+              "descendant": report["termination_reason"] == "DESCENDANTS_TERMINATED" and (
+                  report["descendant_pipe_observed"] if posix else report["total_processes"] == 2),
+              "descendant-closed": (report["termination_reason"] == "DESCENDANTS_TERMINATED" and
+                                    not report.get("descendant_pipe_observed")),
+              "memory-child": (report["termination_reason"] == "MEMORY_LIMIT_REACHED" and
+                               report["peak_working_set_bytes"] <= 96 * 2**20 and
+                               report.get("max_sample_gap_ms", float("inf")) <= 100),
+              "memory-child-orphan": (report["termination_reason"] in ("MEMORY_LIMIT_REACHED", "DESCENDANTS_TERMINATED") and
+                                      "MEMORY_CHILD_ALIVE" in text and
+                                      report["samples_after_exit"] > 0 and
+                                      report["peak_working_set_bytes"] <= 96 * 2**20 and
+                                      report.get("max_sample_gap_ms", float("inf")) <= 100),
               "private-env": report["termination_reason"] == "COMPLETED" and "PRIVATE_ENV_COMPLETED" in text}[mode]
-        results.append({"mode": mode, "pass": ok})
+        if sys.platform == "darwin" and report["termination_reason"] == "MEMORY_LIMIT_REACHED":
+            ok &= gates.sampled_memory_control(report)
+        ok &= all(gates.number(report.get(k)) is not None for k in ("user_cpu_ms", "kernel_cpu_ms"))
+        if mode == "sleep":
+            ok &= report["user_cpu_ms"] + report["kernel_cpu_ms"] < report.get("wall_ms", report.get("elapsed_ms", 0))
+        results.append({"mode": mode, "pass": ok, "detail": text[-120:] if not ok else "",
+                        "report": report})
     if env_before is None:
         os.environ.pop("S05_PRIVATE_CANARY")
     else:
@@ -266,15 +578,239 @@ def reference_grammar(lab, name):
     return d
 
 
+def etw_session(collector, exe, mode, receipts, public_out, work=None):
+    """One owned session, bounded recovery, no retry. Cleanup also runs after a probe failure."""
+    from concurrent.futures import ThreadPoolExecutor
+    directory = collector.out / mode
+    directory.mkdir()
+    began = time.monotonic()
+    receipt = {"mode": mode, "absence_confirmed": False, "session_seconds_upper_bound": None}
+    receipts.append(receipt)
+    error, result = None, None
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(collector.supervise, mode, [exe, mode, directory],
+                             128 * 2**20, 40000 if mode == "capture" else 1000, 64 * 2**10)
+        try:
+            while not (directory / "ready.json").exists():
+                if future.done() or time.monotonic() - began >= 5:
+                    raise RuntimeError("ETW collector did not become ready")
+                time.sleep(0.01)
+            if work:
+                result = work(began + 15, lambda: not future.done())
+        except Exception as exc:
+            error = exc
+        finally:
+            try:
+                (directory / "stop").write_text("stop\n", encoding="ascii")
+            except Exception as exc:
+                error = error or exc  # the collector watchdog and owned cleanup still run
+            try:
+                report, output = future.result(timeout=max(0.001, began + 45 - time.monotonic()))
+                receipt.update(termination_reason=report["termination_reason"], exit_code=report["exit_code_raw"])
+                expected = {"capture": ("COMPLETED", 0), "crash-control": ("COMPLETED", 92),
+                            "stall-control": ("WATCHDOG_TERMINATED", report["exit_code_raw"])}[mode]
+                if (report["termination_reason"], report["exit_code_raw"]) != expected:
+                    error = error or RuntimeError("ETW collector failed")
+            except Exception as exc:
+                error = error or exc
+            # The future's subprocess timeout kills its supervisor; kill-on-close
+            # ends its child, but NOT the kernel session. An exact GUID receipt
+            # allows cleanup of only this session, followed by an absence query.
+            try:
+                cleanup_mode = "stop-owned" if (directory / "ownership.bin").exists() else "assert-absent"
+                report, output = collector.supervise(mode + "-cleanup", [exe, cleanup_mode, directory],
+                                                      cap=64 * 2**20, ms=2000, output_cap=64 * 2**10)
+                receipt["absence_confirmed"] = (report["termination_reason"] == "COMPLETED"
+                    and report["exit_code_raw"] == 0 and output.strip() == "ETW_OWNED_SESSION_ABSENT")
+                if not receipt["absence_confirmed"]:
+                    raise RuntimeError("owned ETW session absence NOT confirmed")
+                receipt["session_seconds_upper_bound"] = time.monotonic() - began
+                limit = 60 if mode == "capture" else 13
+                if receipt["session_seconds_upper_bound"] > limit:
+                    raise RuntimeError("ETW lifecycle exceeded its reservation")
+            except Exception as exc:
+                error = error or exc
+            meta = directory / "capture.json"
+            try:
+                if meta.exists():
+                    value = json.loads(meta.read_text(encoding="utf-8"))
+                    receipt["capture"] = {k: value[k] for k in (
+                        "ok", "error", "start_status", "started", "stopped", "rows", "ignored", "malformed", "overflow",
+                        "consumer_status", "events_lost", "buffers_lost", "qpc_start", "qpc_end", "qpc_frequency",
+                        "flags", "buffer_kib", "maximum_buffers", "number_of_buffers", "rejected_opcode",
+                        "rejected_version", "rejected_length", "rejected_reason") if type(value.get(k)) in (bool, int)}
+            except Exception as exc:
+                error = error or exc
+            receipt["pass"] = error is None
+            (public_out / "etw-lifecycle.json").write_text(json.dumps(receipts, indent=1), encoding="utf-8")
+    if error:
+        raise error
+    return result, directory
+
+
+def etw_collector(lab):
+    """Build and offline-check the same bounded collector for either diagnostic."""
+    collector = Lab(lab.cc, lab.out / "trace-private")
+    collector.supervisor_grace = lab.supervisor_grace = 5
+    collector.supervisor = collector.out / "build/supervisor.exe"
+    lab.compile("etw-supervisor", ["-O2", "-Wall", "-Wextra", "-Werror", "-municode", "-DTSQ_SAFETY_PROFILE",
+                                    HERE / "supervisor.c", "-lpsapi", "-Wl,--no-insert-timestamp"], collector.supervisor)
+    exe = collector.out / "build/etw-capture.exe"
+    lab.compile("etw-collector", ["-O2", "-Wall", "-Wextra", "-Werror", "-municode", HERE / "etw_capture.c",
+                                 "-lole32", "-ladvapi32", "-Wl,--no-insert-timestamp"], exe)
+    report, text = collector.supervise("offline-codec", [exe, "--selftest"], cap=64 * 2**20,
+                                       ms=2000, output_cap=64 * 2**10)
+    if report["exit_code_raw"] != 0 or text.strip() != "ETW_OFFLINE_SELFTEST_PASS":
+        raise RuntimeError("ETW offline codec control failed")
+    return collector, exe
+
+
+def etw_compatibility(lab, selftest):
+    """One capture for the first rejection descriptor; no parser or performance work."""
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True,
+                           check=True, timeout=60).stdout.strip()
+    status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True,
+                             check=True, timeout=60).stdout.strip()
+    if status or head != os.environ.get("TSQ_ETW_EXPECTED_COMMIT"):
+        raise RuntimeError("ETW compatibility requires the clean preassigned commit")
+    collector, exe = etw_collector(lab)
+    identity = {"protocol": "etw-compatibility-v1", "qualification": False, "git_head": head, "git_clean": True,
+        "hosted_run": {"id": os.environ.get("GITHUB_RUN_ID"), "attempt": os.environ.get("GITHUB_RUN_ATTEMPT")},
+        "runner_image": {"os": os.environ.get("ImageOS"), "version": os.environ.get("ImageVersion"),
+                         "runner_arch": os.environ.get("RUNNER_ARCH")}, "selftest": selftest,
+        "cc_sha256": sha(lab.cc), "etw_collector_sha256": sha(exe), "etw_supervisor_sha256": sha(collector.supervisor),
+        "lane_sources": {name: sha(HERE / name) for name in ("run.py", "etw_capture.c", "supervisor.c",
+                          "test_supervisor_accounting.c", "benign.c", "test_etw_diagnostic.py", "cases.py",
+                          "gates.py", "gates_v4.py", "characterize.py")},
+        "scope": {"sessions": 1, "lifetime_seconds": 60, "buffer_bytes": 64 * 2**20, "parser_runs": 0}}
+    (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
+    # One second is sufficient to request a short observation, not a guarantee
+    # of schema coverage. Self-stop/watchdog/cleanup retain their 60s reservation.
+    etw_session(collector, exe, "capture", [], lab.out, lambda deadline, active: time.sleep(1))
+    print("ETW_COMPATIBILITY_CAPTURE_COMPLETE; no performance conclusion", flush=True)
+    return 0
+
+
+def etw_diagnosis(r, identity):
+    """One Windows hosted diagnostic; stock qualification limits remain unchanged."""
+    import etw_diagnostic as etw
+    import latency_diagnostic
+    lab = r.lab
+    rows = etw.prelude()
+    collector, exe = etw_collector(lab)
+    identity.update(protocol="etw-latency-diagnostic-v1", gates=[], qualification=False,
+                    etw_collector_sha256=sha(exe), etw_supervisor_sha256=sha(collector.supervisor),
+                    prelude_sha256=etw.PREFIX_SHA, prelude_runs=len(rows), targets=etw.TARGETS)
+    identity["diagnostic_inputs"] = {case: {"sha256": sha(r.input(case)), "bytes": r.input(case).stat().st_size}
+                                     for case in sorted({row[2] for row in rows} | set(etw.TARGETS))}
+    (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
+    r.runtime_build = "etw-diagnostic-only-not-qualification"
+    receipts = []
+    # Failure controls must prove cleanup before the long untraced prelude.
+    for mode in ("crash-control", "stall-control"):
+        etw_session(collector, exe, mode, receipts, lab.out)
+    r.probes.update({"aa-left": r.probes["cand"], "aa-right": r.probes["cand"]})
+    for index, (build, op, case, budget, tag) in enumerate(rows):
+        record = r.run(build, op, case, budget, "prelude-" + str(index) + "-" + tag)
+        if not record["completed"] or not record["final"] or record["final"].get("op") != op:
+            raise RuntimeError("ETW prelude execution failed; record retained")
+        if (index + 1) % 500 == 0:
+            print("ETW_PRELUDE_RECORDED", index + 1, flush=True)
+    refs, marked = [], []
+
+    def references(phase):
+        for index, case in enumerate(etw.TARGETS):
+            record = r.run("cand", "PARSE", case, 0, f"{phase}-{index}")
+            if not latency_diagnostic.witness_record(record, case, r.input(case).stat().st_size):
+                raise RuntimeError("ETW stock reference incomplete")
+            refs.append({"phase": phase, "case": case, "tag": record["tag"],
+                         "parse_ms": record["events"]["parse"]["parse_ms"],
+                         "gap_ms": record["events"]["parse"]["max_gap_incl_edges_ms"],
+                         "cleanup_ms": record["events"]["cleanup"]["tree_delete_ms"]
+                                       + record["events"]["cleanup"]["parser_delete_ms"]})
+
+    def measured(deadline, collector_active):
+        for index, case in enumerate(etw.TARGETS):
+            if time.monotonic() >= deadline or not collector_active():
+                raise RuntimeError("ETW measurement reservation exhausted")
+            record = r.run("cand-etw", "PARSE", case, 0, f"traced-{index}")
+            marked.append(record)
+            if not record["completed"] or not collector_active():
+                raise RuntimeError("ETW target execution or concurrent capture failed")
+
+    references("before")
+    _, directory = etw_session(collector, exe, "capture", receipts, lab.out, measured)
+    if sum(x["session_seconds_upper_bound"] for x in receipts) > 120:
+        raise RuntimeError("ETW cumulative reservation exceeded")
+    references("after")
+    metadata = json.loads((directory / "capture.json").read_text(encoding="utf-8"))
+    events, trace_sha = etw.trace_rows(directory / "numeric-private.bin", metadata)
+    observations = [etw.observation(rec, events, metadata, r.input(rec["case"]).stat().st_size) for rec in marked]
+    if len(observations) != len(etw.TARGETS) or len(refs) != 2 * len(etw.TARGETS):
+        raise RuntimeError("ETW registration incomplete")
+    (lab.out / "etw-summary.json").write_text(json.dumps({"qualification": False, "observations_complete": True,
+        "capture": metadata, "private_numeric_sha256": trace_sha, "lifecycle": receipts,
+        "references": refs, "observations": observations,
+        "limitations": ["Instrumented and time-ordered; no causal ETW overhead or affinity A/B claim.",
+                        "Scheduled duration can include interrupts and hypervisor pauses.",
+                        "Only our owned session absence is verified; other VM tracing is unknown."]}, indent=1), encoding="utf-8")
+    print("ETW_DIAGNOSTIC_COMPLETE", flush=True)
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cc", required=True)
-    ap.add_argument("--runtime", required=True)
+    ap.add_argument("--runtime")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--preflight", action="store_true")
+    ap.add_argument("--characterize", action="store_true")
+    ap.add_argument("--latency-diagnostic", action="store_true")
+    ap.add_argument("--latency-witness", action="store_true")
+    ap.add_argument("--etw-diagnostic", action="store_true")
+    ap.add_argument("--etw-compatibility", action="store_true")
+    ap.add_argument("--completion-pilot", action="store_true")
+    ap.add_argument("--completion-gap-diagnostic", action="store_true")
     ap.add_argument("--support", action="append", default=[])
     ap.add_argument("--gates", default=",".join(ALL_GATES))
     ap.add_argument("--seed", type=int, default=5707)
     args = ap.parse_args()
+    if args.characterize and (args.preflight or args.support or args.gates != ",".join(ALL_GATES)):
+        raise SystemExit("characterization has a fixed plan and cannot select gates, support or preflight")
+    etw_mode = args.etw_diagnostic or args.etw_compatibility
+    latency_mode = args.latency_diagnostic or args.latency_witness or etw_mode
+    completion_mode = args.completion_pilot or args.completion_gap_diagnostic
+    if completion_mode:
+        if (latency_mode or args.characterize or args.preflight or args.support
+                or args.gates != ",".join(ALL_GATES) or args.seed != 5707
+                or args.completion_pilot and args.completion_gap_diagnostic):
+            raise SystemExit("completion pilot has a fixed registration and cannot select other modes")
+        work_root = (ROOT / ".work").resolve()
+        if not work_root.is_relative_to(ROOT.resolve()) or not Path(args.out).resolve().is_relative_to(work_root):
+            raise SystemExit("completion pilot output must remain in the task workspace .work directory")
+        if os.environ.get("GITHUB_ACTIONS") == "true" and (
+                os.environ.get("GITHUB_REPOSITORY") != "wotjr1649/tree-sitter-brightscript"
+                or os.environ.get("GITHUB_REF") != "refs/heads/session/10-v014-latency-diagnosis"
+                or os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch"
+                or os.environ.get("GITHUB_RUN_ATTEMPT") != "1"
+                or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"
+                or os.environ.get("RUNNER_ARCH") != {"win32": "X64", "linux": "X64", "darwin": "ARM64"}.get(sys.platform)
+                or args.completion_gap_diagnostic and sys.platform != "darwin"
+                or os.environ.get("GITHUB_JOB") != "completion"):
+            raise SystemExit("completion pilot requires the preassigned first-attempt hosted job")
+    if latency_mode and (args.characterize or args.preflight or args.support or args.gates != ",".join(ALL_GATES)
+                         or sum((args.latency_diagnostic, args.latency_witness, args.etw_diagnostic,
+                                 args.etw_compatibility)) != 1):
+        raise SystemExit("latency diagnosis has a fixed plan and cannot select other modes or gates")
+    if args.latency_witness and sys.platform != "win32":
+        raise SystemExit("the latency witness plan is Windows-only")
+    if etw_mode and (sys.platform != "win32" or os.environ.get("GITHUB_ACTIONS") != "true"
+            or os.environ.get("GITHUB_REPOSITORY") != "wotjr1649/tree-sitter-brightscript"
+            or os.environ.get("GITHUB_REF") != "refs/heads/session/10-v014-latency-diagnosis"
+            or os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch"
+            or os.environ.get("GITHUB_RUN_ATTEMPT") != "1" or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"
+            or os.environ.get("GITHUB_JOB") != "characterize"):
+        raise SystemExit("live ETW is restricted to the preassigned first-attempt hosted Windows job")
     selected = [g for g in args.gates.split(",") if g]
     unknown = sorted(set(selected) - set(ALL_GATES))
     if unknown:
@@ -285,12 +821,23 @@ def main():
     mismatches = cases.check()
     if mismatches:
         raise SystemExit(f"generated inputs differ from the recorded ones: {mismatches}")
-    lab.supervisor = lab.out / "build/supervisor.exe"
-    lab.compile("supervisor", ["-O2", "-Wall", "-Wextra", "-Werror", "-municode", HERE / "supervisor.c", "-lpsapi",
-                               "-Wl,--no-insert-timestamp"],
-                lab.supervisor)
+    if sys.platform == "win32":
+        lab.supervisor = lab.out / "build/supervisor.exe"
+        lab.compile("supervisor", ["-O2", "-Wall", "-Wextra", "-Werror", "-municode", HERE / "supervisor.c", "-lpsapi",
+                                   "-Wl,--no-insert-timestamp"], lab.supervisor)
     selftest = self_test(lab)
+    if args.preflight:
+        (lab.out / "preflight.json").write_text(json.dumps({"platform": sys.platform, "selftest": selftest}, indent=1),
+                                                 encoding="utf-8")
+        print("POSIX_PREFLIGHT_PASS" if sys.platform != "win32" else "WINDOWS_PREFLIGHT_PASS")
+        return 0
     lab.supervised_builds = True
+    if args.etw_compatibility:
+        if args.runtime:
+            raise SystemExit("ETW compatibility does not run a parser runtime")
+        return etw_compatibility(lab, selftest)
+    if not args.runtime:
+        raise SystemExit("--runtime is required for qualification")
 
     def runtime_objects(version, root):
         units = verify_runtime(root, version)
@@ -312,11 +859,23 @@ def main():
                 objs.append(o)
         return objs
 
-    def probe(name, grammar, runtime, runtime_root, alloc=False):
-        exe = lab.out / "build" / f"probe-{name}.exe"
+    def probe(name, grammar, runtime, runtime_root, alloc=False, scheduled=False, slow=False, diagnostic=False, source=None,
+              etw=False):
+        exe = lab.out / "build" / (f"probe-{name}.exe" if sys.platform == "win32" else f"probe-{name}")
+        if source is not None:
+            exe = Path(source).parent / exe.name  # PE exports retain the executable basename.
         flags = ["-DMEASURE_ALLOC"] if alloc else []
+        if scheduled:
+            flags.append("-DTSQ_SCHEDULED")
+        if slow:
+            flags.append("-DTSQ_SLOW_NAV")
+        if diagnostic:
+            flags.append("-DTSQ_DIAGNOSTIC_CLOCKS")
+        if etw:
+            flags.append("-DTSQ_ETW_MARKERS")
+        platform_link = ["-lpsapi", "-Wl,--no-insert-timestamp"] if sys.platform == "win32" else []
         lab.compile(f"probe-{name}", ["-O2", "-Wall", "-Wextra", *flags, "-I", Path(runtime_root) / "lib/include",
-                                      HERE / "probe.c", *grammar, *runtime, "-lpsapi", "-Wl,--no-insert-timestamp"], exe)
+                                      source or HERE / "probe.c", *grammar, *runtime, *platform_link], exe)
         return exe
 
     rt = runtime_objects("0.27.0", args.runtime)
@@ -324,21 +883,53 @@ def main():
     refs = {n: reference_grammar(lab, n) for n in ("h", "bp")}
     ref_objs = {n: grammar_objects(n, d / "src") for n, d in refs.items()}
     query = ROOT / "queries/highlights.scm"
-    probes = {"cand": (probe("cand", cand, rt, args.runtime), query),
-              "cand-alloc": (probe("cand-alloc", cand, rt, args.runtime, alloc=True), query),
-              "h": (probe("h", ref_objs["h"], rt, args.runtime), refs["h"] / "queries/highlights.scm"),
-              "bp": (probe("bp", ref_objs["bp"], rt, args.runtime), refs["bp"] / "queries/highlights.scm")}
+    probes = {"cand": (probe("cand", cand, rt, args.runtime, scheduled=True), query),
+              "cand-alloc": (probe("cand-alloc", cand, rt, args.runtime, alloc=True, scheduled=True), query),
+              "h": (probe("h", ref_objs["h"], rt, args.runtime, scheduled=True), refs["h"] / "queries/highlights.scm"),
+              "bp": (probe("bp", ref_objs["bp"], rt, args.runtime, scheduled=True), refs["bp"] / "queries/highlights.scm"),
+              "slow": (probe("slow", cand, rt, args.runtime, scheduled=True, slow=True), query)}
+    unchanged_probes = {}
+    if latency_mode:
+        old_probe = lab.out / "build/unchanged-control/probe.c"
+        old_probe.parent.mkdir()
+        old_probe.write_bytes(subprocess.run(["git", "show", "f3f67fa604baf845a4b569310080a0904a55a9d3:scripts/qualify/probe.c"], cwd=ROOT,
+                                             capture_output=True, check=True, timeout=60).stdout)
+        for name, alloc in (("cand", False), ("cand-alloc", True)):
+            old = probe(name, cand, rt, args.runtime, alloc=alloc, scheduled=True, source=old_probe)
+            if old.read_bytes() != probes[name][0].read_bytes():
+                raise RuntimeError("uninstrumented probe bytes changed: " + name)
+            unchanged_probes[name] = sha(old)
+            if args.latency_diagnostic:
+                probes[name + "-diagnostic"] = (probe(name + "-diagnostic", cand, rt, args.runtime,
+                                                      alloc=alloc, scheduled=True, diagnostic=True), query)
+        if args.etw_diagnostic:
+            probes["cand-etw"] = (probe("cand-etw", cand, rt, args.runtime, scheduled=True, etw=True), query)
     support_versions = []
     for spec in args.support:
         version, root = spec.split("=", 1)
         probes[f"cand-rt{version}"] = (probe(f"cand-rt{version}", cand, runtime_objects(version, root), root), query)
         support_versions.append(version)
-    lane_files = ["run.py", "gates.py", "cases.py", "probe.c", "supervisor.c", "benign.c", "recorded-inputs.json",
+    lane_files = ["run.py", "gates.py", "cases.py", "probe.c", "supervisor.c", "test_supervisor_accounting.c", "benign.c", "benign_posix.c", "recorded-inputs.json",
                   "runtime-0.27.0.sha256", "runtime-0.25.1.sha256", "runtime-0.26.13.sha256"]
+    lane_files.extend(("characterize.py", "gates_v4.py", "test_characterize.py", "test_gates.py", "test_gates_v4.py",
+                       "response_policy.py", "test_response_policy.py"))
+    if latency_mode:
+        lane_files.extend(("latency_diagnostic.py", "test_latency_diagnostic.py"))
+    if args.etw_diagnostic:
+        lane_files.extend(("etw_capture.c", "etw_diagnostic.py", "etw-prelude.json", "test_etw_diagnostic.py"))
+    if completion_mode:
+        lane_files.extend(("completion_runtime.py", "completion_pilot.py", "completion_controls.c", "completion_guard.h",
+                           "test_completion_pilot.py"))
     status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, timeout=60)
     other_files = ["scripts/tscli.py", "scripts/corpus.py", "docs/provenance/upstream-sources.md", "package.json",
                    "package-lock.json", "tree-sitter.json"]
-    identity = {"cc": str(lab.cc), "cc_sha256": sha(lab.cc), "supervisor_sha256": sha(lab.supervisor),
+    identity = {"cc": str(lab.cc), "cc_sha256": sha(lab.cc),
+                "hosted_run": {"id": os.environ.get("GITHUB_RUN_ID"), "attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+                               "job": os.environ.get("GITHUB_JOB")},
+                "runner_image": {"os": os.environ.get("ImageOS"), "version": os.environ.get("ImageVersion"),
+                                 "runner_arch": os.environ.get("RUNNER_ARCH")},
+                "supervisor_sha256": sha(lab.supervisor) if lab.supervisor else None,
+                "supervisor_kind": "windows_job" if sys.platform == "win32" else "posix_process_group",
                 "lane_sources": {**{f: sha(HERE / f) for f in lane_files}, **{f: sha(ROOT / f) for f in other_files}},
                 "git_clean": status.returncode == 0 and not status.stdout.strip(),
                 "selftest": selftest, "candidate": {f: sha(ROOT / f) for f in (
@@ -348,17 +939,69 @@ def main():
                 "probes": {n: sha(p) for n, (p, _) in probes.items()},
                 "git_head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True,
                                            timeout=60).stdout.strip(),
-                "runtime": "0.27.0", "support": support_versions, "seed": args.seed, "gates": selected}
+                "protocol": "v4.1", "runtime": "0.27.0", "support": support_versions, "seed": args.seed, "gates": selected}
+    if not (completion_mode or latency_mode or args.characterize):
+        identity.update(protocol=response_policy.PROTOCOL, response_policy=response_policy.IDENTITY)
+        if os.environ.get("TSQ_RESPONSE_EXPECTED_COMMIT") and (
+                not identity["git_clean"] or identity["git_head"] != os.environ["TSQ_RESPONSE_EXPECTED_COMMIT"]
+                or os.environ.get("GITHUB_REPOSITORY") != "wotjr1649/tree-sitter-brightscript"
+                or os.environ.get("GITHUB_REF") != "refs/heads/session/10-v014-latency-diagnosis"
+                or os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch" or os.environ.get("GITHUB_RUN_ATTEMPT") != "1"
+                or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted" or os.environ.get("GITHUB_JOB") != "completion"
+                or os.environ.get("RUNNER_ARCH") != {"win32": "X64", "linux": "X64", "darwin": "ARM64"}.get(sys.platform)):
+            raise RuntimeError("response preflight requires the clean preassigned commit")
     (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
-    r = Runner(lab, probes, query, roots={"cand": ROOT, "h": refs["h"]})
+    r = Runner(lab, probes, query, roots={"cand": ROOT, "h": refs["h"]}, runtime_build="separate-scheduled-v4.1")
+    if completion_mode:
+        if os.environ.get("GITHUB_ACTIONS") == "true" and (
+                not identity["git_clean"] or identity["git_head"] != os.environ.get("TSQ_COMPLETION_EXPECTED_COMMIT")):
+            raise RuntimeError("completion pilot requires the clean preassigned commit")
+        import completion_pilot
+        experiment = completion_pilot.gap_diagnostic if args.completion_gap_diagnostic else completion_pilot.run
+        return experiment(r, identity, Path(args.runtime), rt, cand, probe)
+    if args.etw_diagnostic:
+        if not identity["git_clean"] or identity["git_head"] != os.environ.get("TSQ_ETW_EXPECTED_COMMIT"):
+            raise RuntimeError("ETW hosted diagnostic requires the clean preassigned commit")
+        identity["unchanged_probe_sha256"] = unchanged_probes
+        return etw_diagnosis(r, identity)
+    if latency_mode:
+        import latency_diagnostic
+        plan = ({"cases": latency_diagnostic.WITNESSES, "budgets": [0], "repetitions": 5000,
+                 "builds": ["cand"], "runs": 10000} if args.latency_witness else
+                {"cases": latency_diagnostic.CASES, "budgets": [0, 100, 200], "repetitions": 4,
+                 "builds": latency_diagnostic.BUILDS, "runs": 240})
+        identity.update(protocol="latency-witness-v1" if args.latency_witness else "latency-diagnostic-v1",
+                        gates=[], unchanged_probe_sha256=unchanged_probes, diagnostic_plan=plan)
+        (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
+        r.runtime_build = "diagnostic-only-not-qualification"
+        return (latency_diagnostic.witness if args.latency_witness else latency_diagnostic.run)(r, lab.out)
+    if args.characterize:
+        import characterize
+        baseline = characterize.BASELINE
+        for rel, digest in identity["candidate"].items():
+            data = subprocess.run(["git", "show", f"{baseline}:{rel}"], cwd=ROOT, capture_output=True,
+                                  check=True, timeout=60).stdout
+            if hashlib.sha256(data).hexdigest() != digest:
+                raise RuntimeError(f"characterization requires frozen v0.1.3 product: {rel}")
+        identity.update(characterization_baseline=baseline, characterization_phase=6,
+                        control={"ops": ["CANCEL_FIRST", "CANCEL_HALF"], "warmup": 1,
+                                 "plain_samples": 5, "allocator_samples": 1, "native_runs": 98,
+                                 "byte_target": "ceil(input bytes / 2)", "scheduling": "phase3 scheduled"})
+        (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
+        r.runtime_build = "separate-scheduled-progressed-cancellation"
+        return characterize.run(r, identity, lab.out)
+    response_policy.require_identity(identity)
+    r.runtime_build = f"separate-scheduled-{response_policy.PROTOCOL}-stock-runtime"
     results = []
     plan = {"B5-01-MEMORY": lambda: gates.b5_01_memory(r), "B5-02-LIFECYCLE": lambda: gates.b5_02_lifecycle(r),
-            "A5-01-COST": lambda: gates.a5_01_cost(r, args.seed), "CANCEL": lambda: gates.cancel(r),
-            "CANCEL-OVERSHOOT": lambda: gates.overshoot(r), "MAX-CALLBACK-GAP": lambda: gates.gaps_and_cleanup(r),
+            "A5-01-COST": lambda: gates_v4.performance(r, args.seed),
+            "CANCEL": lambda: response_policy.evaluate(r, gates_v4.cancel),
+            "CANCEL-OVERSHOOT": lambda: response_policy.evaluate(r, gates.overshoot),
+            "MAX-CALLBACK-GAP": lambda: response_policy.evaluate(r, gates.gaps_and_cleanup),
             "LARGE-INPUT": lambda: gates.large_input(r), "QUERY-MALFORMED": lambda: gates.query_malformed(r),
-            "VALID-PARSE": lambda: gates.valid_parse(r, args.seed), "SEM-PUBLIC": lambda: gates.sem_public(r, args.seed),
+            "VALID-PARSE": lambda: gates_v4.performance(r, args.seed, valid=True), "SEM-PUBLIC": lambda: gates.sem_public(r, args.seed),
             "INCREMENTAL-REPAIR": lambda: gates.incremental_repair(r), "RESUME-RESET": lambda: gates.resume_and_two(r),
-            "SUPPORT": lambda: gates.support(r, support_versions), "REGRESSION-SWEEP": lambda: gates.sweep(r),
+            "SUPPORT": lambda: gates.support(r, support_versions), "REGRESSION-SWEEP": lambda: gates_v4.sweep(r, args.seed),
             "ABS-MEMORY": lambda: gates.abs_memory(lab.runs), "RECOVERY-LOCALITY": lambda: gates.recovery_locality(r)}
     for g in selected:
         out = plan[g]()

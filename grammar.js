@@ -49,11 +49,16 @@ function directive(word, precedence = 0) {
 }
 
 function commaSep1(rule) {
-  return seq(rule, repeat(seq(',', rule)));
+  return seq(rule, repeat4(seq(',', rule)));
 }
 
 function commaSep(rule) {
   return optional(commaSep1(rule));
+}
+
+// Reduce hidden repetition nodes; every count is 4k plus a suffix of 0..3.
+function repeat4(rule) {
+  return seq(repeat(seq(rule, rule, rule, rule)), optional(seq(rule, optional(seq(rule, optional(rule))))));
 }
 
 module.exports = grammar({
@@ -82,7 +87,7 @@ module.exports = grammar({
     // BS-LEX-005, 008-011, BS-STMT-033 (grammar-design §2, §7): the last
     // statement needs no terminator. `_error_token_forms` never occurs (its
     // first token is never produced, ADR-0008); it only keeps raw token names.
-    source_file: $ => seq(repeat($._line), optional($.statement), optional($._error_token_forms)),
+    source_file: $ => seq(repeat4($._line), optional($.statement), optional($._error_token_forms)),
 
     _line: $ => choice(seq($.statement, $._line_end), $._line_end),
 
@@ -298,11 +303,19 @@ module.exports = grammar({
     // expression grammar allows (LIST precedence is below every operator).
     print_statement: $ => seq(choice(kw('print'), '?'), optional($._print_items)),
 
-    // A balanced repetition (A5-01): a hidden rule whose body is a repetition
-    // is its own binary tree. The error-recovery scanner keeps malformed item
-    // runs from growing the recovery stack (B4-01, ADR-0008). Items name the
-    // expression kinds directly, without an `expression` wrapper node per item.
-    _print_items: $ => repeat1($._print_item),
+    // Four-item groups reduce hidden repetition nodes and deletion allocations.
+    // Every positive item count is 4k + r, r in 1..4; public items stay unchanged.
+    // The error-recovery scanner bounds malformed runs (B4-01, ADR-0008).
+    // Items name expression kinds directly, without an `expression` wrapper.
+    _print_items: $ => seq(
+      repeat(seq($._print_item, $._print_item, $._print_item, $._print_item)),
+      choice(
+        $._print_item,
+        seq($._print_item, $._print_item),
+        seq($._print_item, $._print_item, $._print_item),
+        seq($._print_item, $._print_item, $._print_item, $._print_item),
+      ),
+    ),
 
     _print_item: $ => prec(PREC.LIST, choice($._print_expression, ',', ';')),
 
@@ -457,7 +470,7 @@ module.exports = grammar({
     array_literal: $ => seq(
       alias($.open_bracket, '['),
       repeat($._newline),
-      optional(seq($.expression, repeat(seq($._sep, $.expression)), optional($._sep))),
+      optional(seq($.expression, repeat4(seq($._sep, $.expression)), optional($._sep))),
       ']',
     ),
 

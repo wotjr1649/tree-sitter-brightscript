@@ -4,14 +4,16 @@
  * @license MIT
  *
  * Linked statically with the stock Tree-sitter runtime and this grammar's
- * parser and scanner; run only under scripts/qualify/supervisor.c.
+ * parser and scanner; run only under the qualification supervisor.
  * Built twice: plain, and with -DMEASURE_ALLOC (a counting allocator through
  * the public ts_set_allocator hook; its timings are never used as timings).
  *
  *   probe RUN <op> <input> <query> <budget_ms>
- *       op: PARSE | LIFECYCLE | QUERY_ONLY | NAV_CURSOR | NAV_FIELD | NAV_INDEX
+ *       op: PARSE | LIFECYCLE | QUERY_ONLY | NAV_CURSOR | NAV_FIELD | NAV_INDEX | CANCEL_FIRST | CANCEL_HALF
  *       budget_ms > 0 installs a progress callback that asks to cancel once
- *       the budget has elapsed; 0 installs one that never cancels.
+ *       the budget has elapsed; 0 installs one that never cancels, except
+ *       CANCEL_FIRST (first callback) and CANCEL_HALF (first callback whose
+ *       current byte offset reaches ceil(input bytes / 2)); both use budget 0.
  *   probe DUMP <input>          preorder CST: N depth type field start end flags
  *   probe DUMPLIST <list>       DUMP for every path in the list file
  *   probe CAPTURES <input> <query>
@@ -22,11 +24,26 @@
  * Output is one JSON object per line; a run that reaches its end prints
  * {"final":true,...}. Only public API calls are used.
  */
+#ifdef _WIN32
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0601
+#endif
 #include <windows.h>
 #include <psapi.h>
+#else
+#include <sys/resource.h>
+#include <time.h>
+#endif
+#ifdef __APPLE__
+#include <pthread.h>
+#include <pthread/qos.h>
+#endif
 #include <stdarg.h>
 #include <stdint.h>
 #include <stddef.h>
+#ifndef _WIN32
+typedef size_t SIZE_T;
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,17 +51,107 @@
 
 const TSLanguage *tree_sitter_brightscript(void);
 
+/* Scheduled condition adopted by v4 after the phase 3/5 diagnostic controls. */
+static int record_scheduling(void) {
+#ifdef _WIN32
+  DWORD_PTR process_mask, system_mask;
+  GROUP_AFFINITY actual;
+  if (!GetProcessAffinityMask(GetCurrentProcess(), &process_mask, &system_mask) || !process_mask) return 95;
+  DWORD_PTR selected = 0;
+#ifdef TSQ_SCHEDULED
+  selected = process_mask & (~process_mask + 1);
+  if (!SetThreadAffinityMask(GetCurrentThread(), selected)) return 95;
+#endif
+  if (!GetThreadGroupAffinity(GetCurrentThread(), &actual) || (selected && actual.Mask != selected)) return 95;
+  printf("{\"event\":\"scheduling\",\"process_mask\":%llu,\"selected_mask\":%llu,\"actual_mask\":%llu,\"group\":%u}\n",
+         (unsigned long long)process_mask, (unsigned long long)selected, (unsigned long long)actual.Mask,
+         (unsigned)actual.Group);
+#elif defined(__APPLE__)
+  qos_class_t before, after;
+  int relative;
+  if (pthread_get_qos_class_np(pthread_self(), &before, &relative)) return 95;
+#ifdef TSQ_SCHEDULED
+  if (pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0)) return 95;
+#endif
+  if (pthread_get_qos_class_np(pthread_self(), &after, &relative)) return 95;
+#ifdef TSQ_SCHEDULED
+  if (after != QOS_CLASS_USER_INITIATED || relative != 0) return 95;
+#endif
+  printf("{\"event\":\"scheduling\",\"qos_before\":%u,\"qos_after\":%u,\"relative_priority\":%d}\n",
+         (unsigned)before, (unsigned)after, relative);
+#else
+  puts("{\"event\":\"scheduling\",\"mechanism\":\"unchanged\"}");
+#endif
+  return 0;
+}
+
+#ifdef _WIN32
 static LARGE_INTEGER frequency;
+#ifdef TSQ_ETW_MARKERS
+static uint64_t mark_tick, mark_last, mark_gap_start, mark_gap_end;
+static uint32_t mark_byte, mark_gap_from, mark_gap_to;
+static void mark_gap(uint32_t byte) {
+  if (mark_tick - mark_last > mark_gap_end - mark_gap_start) {
+    mark_gap_start = mark_last; mark_gap_end = mark_tick;
+    mark_gap_from = mark_byte; mark_gap_to = byte;
+  }
+  mark_last = mark_tick; mark_byte = byte;
+}
+#endif
 static double clock_ms(void) {
   LARGE_INTEGER c;
   QueryPerformanceCounter(&c);
+#ifdef TSQ_ETW_MARKERS
+  mark_tick = (uint64_t)c.QuadPart;
+#endif
   return c.QuadPart * 1000.0 / frequency.QuadPart;
 }
+#else
+static double clock_ms(void) {
+  struct timespec t;
+  if (clock_gettime(CLOCK_MONOTONIC, &t)) exit(93);
+  return (double)t.tv_sec * 1000.0 + (double)t.tv_nsec / 1000000.0;
+}
+#endif
 
 /* ------------------------------------------------------------- allocator */
+#if defined(TSQ_DIAGNOSTIC_CLOCKS) || defined(TSQ_ETW_MARKERS)
+/* Diagnostic-only CPU observations. Never used for qualification decisions. */
+static double cpu_ms(void) {
+#ifdef _WIN32
+  FILETIME created, exited, kernel, user;
+  if (!GetThreadTimes(GetCurrentThread(), &created, &exited, &kernel, &user)) exit(97);
+  return ((((uint64_t)kernel.dwHighDateTime << 32) | kernel.dwLowDateTime) +
+          (((uint64_t)user.dwHighDateTime << 32) | user.dwLowDateTime)) / 10000.0;
+#else
+  struct rusage usage;
+  if (getrusage(RUSAGE_SELF, &usage)) exit(97);
+  return (usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) * 1000.0 +
+         (usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1000.0;
+#endif
+}
+#endif
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+static double diag_start_cpu, diag_last_cpu, diag_last_wall, diag_gap_wall, diag_gap_cpu;
+static uint32_t diag_last_byte, diag_gap_from, diag_gap_to;
+static uint64_t diag_gap_ordinal;
+static unsigned diag_gap_edge;
+static void observe_gap(double wall, double cpu, uint32_t byte, uint64_t ordinal, unsigned edge) {
+  if (wall - diag_last_wall > diag_gap_wall) {
+    diag_gap_wall = wall - diag_last_wall;
+    diag_gap_cpu = cpu - diag_last_cpu;
+    diag_gap_from = diag_last_byte; diag_gap_to = byte;
+    diag_gap_ordinal = ordinal; diag_gap_edge = edge;
+  }
+  diag_last_wall = wall; diag_last_cpu = cpu; diag_last_byte = byte;
+}
+#endif
+
 static uint64_t live_bytes, peak_bytes, total_bytes, allocations;
 static int parse_active;
 static double parse_start, budget_ms;
+static uint64_t callback_target;
+static uint32_t byte_target, request_byte, max_byte_before_request;
 static double budget_cross_ms = -1;
 static int cross_at_callback;
 static uint64_t live_at_budget, peak_after_budget;
@@ -53,8 +160,8 @@ static uint64_t live_at_budget, peak_after_budget;
 typedef union { size_t size; max_align_t alignment; } Header;
 static void account(void) {
   if (live_bytes > peak_bytes) peak_bytes = live_bytes;
-  if (parse_active && budget_ms > 0) {
-    if (budget_cross_ms < 0 && clock_ms() - parse_start >= budget_ms) {
+  if (parse_active) {
+    if (budget_ms > 0 && budget_cross_ms < 0 && clock_ms() - parse_start >= budget_ms) {
       budget_cross_ms = clock_ms() - parse_start;
       live_at_budget = live_bytes;
       peak_after_budget = live_bytes;
@@ -118,12 +225,24 @@ static TSParser *new_parser(void) {
 }
 
 static void memory_now(SIZE_T *ws, SIZE_T *commit) {
+#ifdef _WIN32
   PROCESS_MEMORY_COUNTERS_EX c;
   c.cb = sizeof c;
   if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS *)&c, sizeof c)) {
     *ws = c.WorkingSetSize;
     *commit = c.PrivateUsage;
   }
+#else
+  struct rusage r;
+  if (getrusage(RUSAGE_SELF, &r)) exit(94);
+  /* The POSIX lane's process-memory metric is peak RSS, not Windows private commit. */
+  *ws = *commit = (SIZE_T)r.ru_maxrss *
+#ifdef __APPLE__
+      1;
+#else
+      1024;
+#endif
+#endif
 }
 
 /* ----------------------------------------------------------------- digests */
@@ -187,14 +306,23 @@ static int same(const Buf *a, const Buf *b) { return a->n == b->n && !memcmp(a->
 static double first_callback = -1, last_callback = -1, request_ms = -1, max_gap = 0;
 static uint64_t callbacks;
 static bool progress(TSParseState *state) {
-  (void)state;
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+  double cpu = cpu_ms();
+#endif
   double t = clock_ms() - parse_start;
+#ifdef TSQ_ETW_MARKERS
+  mark_gap(state->current_byte_offset);
+#endif
   if (first_callback < 0) first_callback = t;
   else if (t - last_callback > max_gap) max_gap = t - last_callback;
   last_callback = t;
   callbacks++;
-  if (budget_ms > 0 && t >= budget_ms) {
-    if (request_ms < 0) request_ms = t;
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+  observe_gap(t, cpu, state->current_byte_offset, callbacks, callbacks == 1 ? 0 : 1);
+#endif
+  if ((callback_target && callbacks >= callback_target) ||
+      (byte_target && state->current_byte_offset >= byte_target) || (budget_ms > 0 && t >= budget_ms)) {
+    if (request_ms < 0) { request_ms = t; request_byte = state->current_byte_offset; }
     /* The budget crossing is also taken here, so a parse that allocates nothing after the budget
        still has one. No allocation happened since the budget instant, so the live bytes here are at
        most those at that instant, and the growth measured from them is not smaller. */
@@ -206,6 +334,7 @@ static bool progress(TSParseState *state) {
     }
     return true;
   }
+  if (state->current_byte_offset > max_byte_before_request) max_byte_before_request = state->current_byte_offset;
   return false;
 }
 
@@ -223,6 +352,9 @@ static int run(const char *op, const char *input_path, const char *query_path, d
   char *source = read_file(input_path, &length);
   Input input = {source, length, 0};
   budget_ms = budget;
+  callback_target = !strcmp(op, "CANCEL_FIRST") ? 1 : 0;
+  byte_target = !strcmp(op, "CANCEL_HALF") ? (length + 1) / 2 : 0;
+  if ((callback_target || !strcmp(op, "CANCEL_HALF")) && budget != 0) { free(source); return 96; }
   TSParser *parser = new_parser();
   SIZE_T ws_idle = 0, commit_idle = 0, ws_return = 0, commit_return = 0;
   memory_now(&ws_idle, &commit_idle);
@@ -232,10 +364,31 @@ static int run(const char *op, const char *input_path, const char *query_path, d
 
   TSParseOptions options = {NULL, progress};
   parse_active = 1;
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+  diag_start_cpu = diag_last_cpu = cpu_ms();
+#endif
+#ifdef TSQ_ETW_MARKERS
+  double mark_start_cpu = cpu_ms();
+#endif
   parse_start = clock_ms();
+#ifdef TSQ_ETW_MARKERS
+  uint64_t mark_parse_start = mark_last = mark_tick;
+#endif
   TSTree *tree = ts_parser_parse_with_options(parser, NULL, (TSInput){&input, read_input, TSInputEncodingUTF8, NULL}, options);
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+  double return_cpu = cpu_ms();
+#endif
   double parse_ms = clock_ms() - parse_start;
-  parse_active = 0;
+#ifdef TSQ_ETW_MARKERS
+  uint64_t mark_parse_end = mark_tick;
+  mark_gap(tree ? length : mark_byte);
+  double mark_parse_cpu = cpu_ms() - mark_start_cpu;
+#endif
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+  observe_gap(parse_ms, return_cpu, tree ? length : diag_last_byte, callbacks + 1, 2);
+#endif
+  /* The deterministic control also observes allocation growth during parser cleanup. */
+  parse_active = (callback_target || byte_target) && !tree;
   uint64_t live_at_return = live_bytes;
   memory_now(&ws_return, &commit_return);
   double head = first_callback >= 0 ? first_callback : parse_ms;
@@ -244,10 +397,13 @@ static int run(const char *op, const char *input_path, const char *query_path, d
   if (head > edges) edges = head;
   if (tail > edges) edges = tail;
   printf("{\"event\":\"parse\",\"parse_ms\":%.6f,\"cancelled\":%s,\"callbacks\":%llu,\"head_gap_ms\":%.6f,"
-         "\"max_gap_ms\":%.6f,\"tail_gap_ms\":%.6f,\"max_gap_incl_edges_ms\":%.6f,\"budget_ms\":%.6f,"
+         "\"max_gap_ms\":%.6f,\"tail_gap_ms\":%.6f,\"max_gap_incl_edges_ms\":%.6f,\"budget_ms\":%.6f,\"callback_target\":%llu,"
+         "\"byte_target\":%u,\"request_byte\":%u,\"max_byte_before_request\":%u,"
          "\"request_ms\":%.6f,\"budget_cross_ms\":%.6f,\"cross_at_callback\":%s,\"live_at_budget\":%llu,"
          "\"peak_after_budget\":%llu,\"live_at_return\":%llu,\"working_set_at_return\":%llu,\"commit_at_return\":%llu}\n",
          parse_ms, tree ? "false" : "true", (unsigned long long)callbacks, head, max_gap, tail, edges, budget,
+         (unsigned long long)callback_target,
+         byte_target, request_byte, max_byte_before_request,
          request_ms, budget_cross_ms, cross_at_callback ? "true" : "false", (unsigned long long)live_at_budget,
          (unsigned long long)peak_after_budget,
          (unsigned long long)live_at_return, (unsigned long long)ws_return, (unsigned long long)commit_return);
@@ -323,6 +479,11 @@ static int run(const char *op, const char *input_path, const char *query_path, d
         }
         if (done) break;
       }
+#ifdef TSQ_SLOW_NAV
+      /* Diagnostic negative control: same native traversal, known extra measured latency. */
+      double until = clock_ms() + 2.0;
+      while (clock_ms() < until) {}
+#endif
       nav_ms = clock_ms() - t;
       ts_tree_cursor_delete(&c);
       nodes = nav_visits;
@@ -347,14 +508,50 @@ static int run(const char *op, const char *input_path, const char *query_path, d
              "\"child_calls\":%llu,\"digest\":\"%016llx\"}\n", op, nav_ms, (unsigned long long)nav_visits,
              (unsigned long long)nav_fields, (unsigned long long)nav_children, (unsigned long long)tree_digest.h);
   }
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+  double cleanup_start_cpu = cpu_ms();
+#endif
+#ifdef TSQ_ETW_MARKERS
+  double mark_cleanup_cpu = cpu_ms();
+#endif
   double t = clock_ms();
+#ifdef TSQ_ETW_MARKERS
+  uint64_t mark_cleanup_start = mark_tick;
+#endif
   if (tree) ts_tree_delete(tree);
   double tree_delete_ms = clock_ms() - t;
   t = clock_ms();
   ts_parser_delete(parser);
   double parser_delete_ms = clock_ms() - t;
-  printf("{\"event\":\"cleanup\",\"tree_delete_ms\":%.6f,\"parser_delete_ms\":%.6f,\"allocator_live_after\":%llu}\n",
-         tree ? tree_delete_ms : -1.0, parser_delete_ms, (unsigned long long)live_bytes);
+#ifdef TSQ_ETW_MARKERS
+  uint64_t mark_cleanup_end = mark_tick;
+  mark_cleanup_cpu = cpu_ms() - mark_cleanup_cpu;
+  FILETIME created, exited, kernel, user;
+  if (!GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user)) return 97;
+  printf("{\"event\":\"etw_markers\",\"pid\":%lu,\"tid\":%lu,\"creation_filetime\":%llu,"
+         "\"frequency\":%llu,\"parse_start\":%llu,\"parse_end\":%llu,\"cleanup_start\":%llu,\"cleanup_end\":%llu,"
+         "\"gap_start\":%llu,\"gap_end\":%llu,\"gap_from_byte\":%u,\"gap_to_byte\":%u,"
+         "\"parse_cpu_ms\":%.6f,\"cleanup_cpu_ms\":%.6f}\n",
+         GetCurrentProcessId(), GetCurrentThreadId(),
+         (unsigned long long)(((uint64_t)created.dwHighDateTime << 32) | created.dwLowDateTime),
+         (unsigned long long)frequency.QuadPart, (unsigned long long)mark_parse_start, (unsigned long long)mark_parse_end,
+         (unsigned long long)mark_cleanup_start, (unsigned long long)mark_cleanup_end,
+         (unsigned long long)mark_gap_start, (unsigned long long)mark_gap_end, mark_gap_from, mark_gap_to,
+         mark_parse_cpu, mark_cleanup_cpu);
+#endif
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+  double cleanup_cpu = cpu_ms() - cleanup_start_cpu;
+  printf("{\"event\":\"diagnostic\",\"parse_cpu_ms\":%.6f,\"cleanup_cpu_ms\":%.6f,"
+         "\"gap_wall_ms\":%.6f,\"gap_cpu_ms\":%.6f,\"gap_from_byte\":%u,\"gap_to_byte\":%u,"
+         "\"gap_ordinal\":%llu,\"gap_edge\":%u}\n",
+         return_cpu - diag_start_cpu, cleanup_cpu, diag_gap_wall, diag_gap_cpu,
+         diag_gap_from, diag_gap_to, (unsigned long long)diag_gap_ordinal, diag_gap_edge);
+#endif
+  parse_active = 0;
+  printf("{\"event\":\"cleanup\",\"tree_delete_ms\":%.6f,\"parser_delete_ms\":%.6f,\"allocator_live_after\":%llu,"
+         "\"peak_after_budget\":%llu}\n",
+         tree ? tree_delete_ms : -1.0, parser_delete_ms, (unsigned long long)live_bytes,
+         (unsigned long long)peak_after_budget);
   printf("{\"final\":true,\"op\":\"%s\",\"bytes\":%u,\"parse_ms\":%.6f,\"cancelled\":%s,\"has_error\":%d,\"nodes\":%llu,"
          "\"errors\":%llu,\"missing\":%llu,\"max_depth\":%u,\"query_ms\":%.6f,\"captures\":%llu,\"navigation_ms\":%.6f,"
          "\"tree_delete_ms\":%.6f,\"parser_delete_ms\":%.6f,\"allocator_peak_live\":%llu,\"allocator_total\":%llu,"
@@ -606,12 +803,17 @@ static int two(const char *a_path, const char *b_path) {
 }
 
 int main(int argc, char **argv) {
+#ifdef _WIN32
   QueryPerformanceFrequency(&frequency);
+#endif
   setvbuf(stdout, NULL, _IONBF, 0);
 #ifdef MEASURE_ALLOC
   ts_set_allocator(counting_malloc, counting_calloc, counting_realloc, counting_free);
 #endif
-  if (argc == 6 && !strcmp(argv[1], "RUN")) return run(argv[2], argv[3], argv[4], atof(argv[5]));
+  if (argc == 6 && !strcmp(argv[1], "RUN")) {
+    int rc = record_scheduling();
+    return rc ? rc : run(argv[2], argv[3], argv[4], atof(argv[5]));
+  }
   if (argc == 3 && !strcmp(argv[1], "DUMP")) {
     static char buffer[1 << 16];
     setvbuf(stdout, buffer, _IOFBF, sizeof buffer);

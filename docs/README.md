@@ -10,6 +10,7 @@ link to it rather than restate it.
 | [reports/0.1.1-maintenance-release.md](reports/0.1.1-maintenance-release.md) | 보존된 0.1.1 출하·당시 동결 기록; 새 근거와 승계 근거 구분 | 0.1.1 출하 이력을 확인할 때 |
 | [reports/0.1.2-maintenance-candidate.md](reports/0.1.2-maintenance-candidate.md) | 보존된 0.1.2 출하·51개 처분·verifier 수정 | 0.1.2 이력을 확인할 때 |
 | [reports/0.1.3-release-candidate.md](reports/0.1.3-release-candidate.md) | 소스 전용 0.1.3 출하·세 OS CI·자산 검증 | 현재 출하 identity를 확인할 때 |
+| [reports/0.1.4-native-parity-candidate.md](reports/0.1.4-native-parity-candidate.md) | 0.1.4 세 OS native 검증 후보, 실패 및 HOLD 상태 | 0.1.4 작업·출하 판정을 확인할 때 |
 | [reports/session-08-cross-platform-source-validation.md](reports/session-08-cross-platform-source-validation.md) | 출하 후 Windows·Ubuntu·macOS ARM64 소스 검증 후보와 한계 | OS별 CI 근거를 확인할 때 |
 | [design/architecture.md](design/architecture.md) | Pipeline, ownership, layout, principles, decision index | Starting any work |
 | [design/decisions/](design/decisions/) | ADRs: why each architectural decision was made | Changing or questioning a decision |
@@ -21,6 +22,9 @@ link to it rather than restate it.
 | [provenance/upstream-sources.md](provenance/upstream-sources.md) | Dated identities of sources and toolchain | Citing a source; refreshing; selecting the generator |
 | [validation/validation.md](validation/validation.md) | Validation levels (V0–V10), gates, V0 checklist, failure handling, Level 2 policy | Claiming anything; closing a session; preparing a release |
 | [validation/public-replay.md](validation/public-replay.md) | v0.1.2의 offline raw 재판정과 candidate identity 검사 | 공개 verifier를 실행하거나 결과를 해석할 때 |
+| [validation/native-v4-plan.md](validation/native-v4-plan.md) | v0.1.4 HOLD 원인 진단과 재검증 순서, 적대적 설계 검토 결과 | 세 OS native FAIL을 해결할 때 |
+| [validation/native-v5-plan.md](validation/native-v5-plan.md) | 소유자가 선택한 250 ms 응답성 계약과 stock runtime의 새 출하 검증 | v0.1.4 v5 구현·검증·출하를 진행할 때 |
+| [validation/native-v6-plan.md](validation/native-v6-plan.md) | 정상 완료와 실제 취소를 구분하는 250 ms 계약과 새 전체 검증 | 현재 v0.1.4 구현·검증·출하를 진행할 때 |
 | [validation/workload-matrix.md](validation/workload-matrix.md) | Validation sets W01–W14 and the catalogue of every corpus fixture | Writing fixtures; running V2–V10 |
 | [validation/known-regressions.md](validation/known-regressions.md) | Defects of earlier grammars and the checks that prevent them | Reviewing grammar or generation changes |
 | [reports/0.1.0-release-candidate.md](reports/0.1.0-release-candidate.md) | Release-candidate evidence, gate results and verdict for 0.1.0 | Checking what the candidate proves |

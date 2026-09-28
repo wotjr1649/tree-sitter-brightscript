@@ -1,5 +1,15 @@
 # 변경 이력
 
+## 0.1.4 — 검증 후보
+
+출하 전 후보이며, 최종 판정은 [검증 기록](docs/reports/0.1.4-native-parity-candidate.md)에 둔다.
+
+- Windows x64, Ubuntu 24.04 x64, macOS 15 ARM64에서 17개 native 검증 목적을 실행한다.
+- v6는 250 ms 응답성 기준과 stock Tree-sitter 0.27.0을 사용한다. 요청 없는 정상 완료는 실제 취소 증거와 구분한다. FIRST/HALF 실제 취소, 메모리 관측, paired 비용·증가율과 A/A 대조군은 유지하며, 기존 v5 및 100 ms 판정도 보존한다.
+- PRINT 항목, 최상위 문장, 배열·쉼표 목록의 반복을 네 개씩 묶어 숨은 트리의 할당과 정리 비용을 줄인다. public named node schema는 유지한다.
+- 최종 출하는 같은 후보의 OS별 두 독립 작업, 등록 입력의 기능 동등 비교 및 검증 근거 ZIP을 요구한다.
+- 소스 배포를 유지한다. macOS 메모리 감독은 명시된 샘플링 방식이며, 모든 입력·환경의 완벽한 동일성을 주장하지 않는다.
+
 ## 0.1.3 — 2026-09-28
 
 [v0.1.3](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.3)을

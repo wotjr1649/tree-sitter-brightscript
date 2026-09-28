@@ -140,7 +140,24 @@ v0.1.2만의 조건부 승계는 별도로 승인된
 과거 performance와 새 correctness·ASan 한정 replay를 분리하며, 새 동작에는 적용하지 않는다.
 공개 offline verifier 정책은 [public-replay.md](public-replay.md)에 둔다.
 CI guard는 이 verifier의 고정된 `python -I -B -X utf8` 명령만 추가로 허용한다.
-임의 Python flags나 새로운 native launcher 예외는 허용하지 않는다.
+임의 Python flags는 허용하지 않는다. v0.1.4 준비 단계의 추가 예외는
+`native-preflight.yml`에서 실행하는 고정된
+`python scripts/qualify/run.py --preflight --cc /usr/bin/cc --out .work/posix-preflight`
+명령과 같은 workflow의 `--gates B5-01-MEMORY` 단일 native smoke 명령,
+`native-qualification.yml`의 POSIX 및 Windows 고정 전체 게이트 명령이다.
+후자는 세 OS native 실행과 필수 집계 작업을 한 workflow에 둔다. 작업 브랜치의
+모든 push에 반응하고 기본 브랜치 병합 뒤에도 동일한 검사를
+실행한다. `test_tscli.py`는 workflow 이름과 정확한 네 명령을 확인하고 변형된
+인수·경로와 다른 native 실행 명령을 거부한다. 이 workflow는 v0.1.4
+엔지니어링 시험용이며 전체 집계 결과를 확인하기
+전에는 출하 증거가 아니다.
+
+원인 진단용 `native-characterization.yml`에는 동일 entrypoint의 고정
+`--characterize` 명령 두 개만 추가로 허용한다. Windows compiler는
+`C:/mingw64/bin/gcc.exe`, POSIX는 `/usr/bin/cc`, runtime은 `.work/runtime-027`,
+출력은 `.work/native-characterization`이며 다른 인수 조합은 CI guard가
+거부한다. [v4 작업 순서](native-v4-plan.md)에 사전 등록된 소스와 비교 조건만
+측정한다. 진단 workflow의 성공은 실행 완료만 뜻하며 출하 PASS가 아니다.
 
 Every check script runs the CLI only through `scripts/tscli.py` (so the check
 does not depend on the order of CI steps) and starts no other program but git,
@@ -158,7 +175,8 @@ step `shell:`, local actions, `binding.gyp` and `.npmrc` settings (Session 05-1
 delta re-audit C4-01, C4-02).
 One file under `scripts/` is exempt: `scripts/qualify/run.py`, the release
 qualification runner ("Release qualification lane" below), which is not a
-check script, is run by no workflow and reaches the CLI only through
+check script, is run by workflows only through the exact preflight, smoke and
+three-OS full-lane commands above and reaches the CLI only through
 `tscli.py`; it starts git, the C compiler it is given and the programs that
 compiler built. `scripts/test_tscli.py` checks that it is the only exemption.
 The same entrypoint has an explicit `--safety-profile` test route described
@@ -324,7 +342,7 @@ of the four KL-002 rows, and with the method-call pattern in parent form
 (`(call_expression property: (identifier) @function)`) every method, mixed
 and optional chain row.
 
-## Release qualification lane
+## Release qualification lane (historical v3)
 
 The CLI guards above run in hosted CI but cannot measure cancellation,
 callback gaps, tree deletion, allocator memory or the stock runtime without
@@ -387,6 +405,145 @@ chosen after that result; this is a policy revision, not the earlier check. RECO
 the references run the pinned CLI outside the supervisor, with the `--cc`
 compiler and a private parser-library directory per checkout.
 
+### v0.1.4 three-OS native candidate
+
+The active prospective contract is now **v6**, under the owner's explicit
+250 ms choice in [ADR-0011](../design/decisions/ADR-0011-background-response-contract.md)
+and normal-completion/cancellation distinction in
+[ADR-0012](../design/decisions/ADR-0012-cooperative-cancellation-contract.md).
+Follow [native-v6-plan.md](native-v6-plan.md) for exact timing references,
+policy binding and the required preflight/six-job qualification. Stock runtime,
+all 17 purposes, functional/memory/growth/supervision requirements and registered
+inputs remain. The four 100 ms response bounds below are historical v4/v4.1;
+v6 uses 250 ms and retains separate v5/250 ms and v4.1/100 ms judgements.
+Timed normal completion without a request is NOT_TRIGGERED and provides no
+actual-cancellation coverage. Elapsed-budget memory observations and the
+FIRST/HALF actual-cancellation controls remain mandatory. This does not change
+the macOS memory guard's 100 ms controls or any published release evidence.
+
+#### Retained v4/v4.1 contract and qualification procedure
+
+The historical Windows lane above and its failures are retained. The v0.1.4
+candidate previously used protocol v4.1, with the same registered inputs, 17 result
+names and existing numeric bounds
+on `windows-2025-vs2026` x64, `ubuntu-24.04` x64 and `macos-15` ARM64 in
+`.github/workflows/native-qualification.yml`. These are candidate checks,
+not a v0.1.4 release claim. A failed OS job prevents the required aggregation
+job from running. The full record and known FAILs are in
+[the candidate report](../reports/0.1.4-native-parity-candidate.md).
+
+The measurement change is supported by the predeclared nine-job phase 5
+and phase 6 experiments in [native-v4-plan.md](native-v4-plan.md). It does not
+reclassify earlier v3 failures. `gates.py` preserves v3. The v4 baseline below
+is retained; `gates_v4.py` adds only the explicit v4.1 sampling revision that
+follows it:
+
+- Candidate, allocator, H and BEFORE_PRINT probes use the phase 3 scheduled
+  condition: Windows thread affinity to the lowest allowed mask bit, macOS
+  requested/read-back `USER_INITIATED` QoS, Linux unchanged. Support-version
+  crash/cap checks keep their original condition. The slow probe is used
+  only as a measurement control.
+- A5, VALID and all 297 SWEEP families use 16 independent cold rounds,
+  first round warmup, 15 measured; seeded order visits all sizes in a round.
+  Costs use the median of paired ratios; growth uses same-round size ratios.
+  Bounds and floor locations are exactly those registered in phase 5. Keep
+  both estimators and their verdicts. Every round must contain valid work,
+  including the smallest sweep size, even where no time exponent uses it.
+- Each qualification job runs all 103 A/A comparisons and the same-work
+  2 ms slow control once (3,328 executions). All three performance gates
+  require their complete successful result. No invalid sample is replaced.
+  SWEEP memory uses maxima over all 16 records at each size; single-run
+  callback, return, cleanup and memory bounds elsewhere are unchanged.
+- CANCEL retains all 15 timed points and every legacy SAFETY requirement.
+  Each warmup/plain/allocator execution reaching its own budget must cancel;
+  only normal completion strictly before that budget is allowed without
+  cancellation. Any plain execution reaching budget also requires measured
+  post-budget growth in the allocator run. Preserve legacy ACTUAL verdicts.
+  In addition, require FIRST49 and HALF49 for all seven families, with the
+  exact trigger, result, exit, 100 ms plain return/cleanup and less-than-64 MiB
+  allocator growth-through-cleanup rules registered in phases 4 and 6.
+- Every native process identity is unique. The full raw file must fit the
+  existing 64 MiB evidence bound; incomplete or oversized evidence is HOLD.
+
+Protocol v4.1 prospectively supplements CANCEL's allocator observations. Run
+the original 105 timed executions in their original order, then five extra
+allocator executions at each of the 15 points, in registered point order and
+tag order `alloc-extra-1` through `alloc-extra-5`. FIRST49 and HALF49 follow
+unchanged: exactly 278 unique, correctly ordered executions are required.
+The count is fixed before results; every extra execution is judged, with no
+early success, replacement or retry. All six allocator runs use their own
+budget/crossing/cleanup observations; every observed growth must be below
+64 MiB. If any of the six plain runs reaches budget, at least one allocator
+run must actually reach its own budget and measure growth. Otherwise the
+point remains HOLD, even if all six allocator runs finish safely early.
+
+Retain the original v3 judgement and each original seven-sample v4 point
+verdict alongside v4.1. Only missing counterpart growth may be supplied by
+an additional actual observation. All original individual safety/result
+checks, finite timing bounds, complete sample counts and consistency checks
+must pass; a legacy SAFETY failure for another or combined reason still
+fails v4.1. Historical cohort failures are never reclassified. New evidence
+identities and packages require `v4.1`; mixed protocols are rejected.
+
+Release requires two preassigned independently allocated full jobs per OS
+at one frozen candidate, with equal per-OS image/tool identities. Each of all
+six jobs must pass all 17 purposes and repeated W12. Product/harness failures
+are retained, never replaced by a favourable rerun. Changing a candidate or
+method requires a new qualification cohort. The two three-OS cohorts and
+their equal-identity receipt must both be retained in the release evidence.
+`scripts/package_repeated_native_evidence.py --first <cohort-a-root>
+--second <cohort-b-root> --out <new-zip>` verifies both three-OS packages and
+binds them into that receipt. It requires two different Actions run IDs,
+first attempts, the registered native job name, equal per-OS compiler, CLI,
+probe and supervisor hashes, and different raw run files. The release check
+must also match these IDs against the preassigned GitHub runs and their
+successful job conclusions; local JSON identity alone is not hosted attestation.
+Before this workflow reaches `main`, the preassigned pair uses pushes of the
+same commit to `session/10-v014-native-parity` and
+`session/10-v014-native-parity-confirm`. GitHub documents that
+[`workflow_dispatch` requires the default branch](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+Both branch pushes must be registered before either result is inspected.
+
+The POSIX supervisor uses a private environment, a process group, a watchdog
+and bounded output, with a preflight that exercises a descendant which keeps
+the pipe open and one which closes it. Ubuntu applies `RLIMIT_AS` to each
+child and measures peak RSS. The supervisor observes the group leader with
+`waitid(..., WNOWAIT)` and reaps it only after checking live group members;
+an unavailable group-status observation fails the lane. macOS could not apply `RLIMIT_AS` on the hosted
+runner, so it samples the process group's physical footprint using Apple's
+[`libproc` interfaces](https://github.com/apple-oss-distributions/xnu/blob/main/libsyscall/wrappers/libproc/libproc.h)
+and kills the group when the cap is exceeded; a child-memory control checks
+this path. The interface is private and the sampled cap is not a hard kernel
+limit. Windows private commit, Ubuntu RSS and macOS footprint are different
+metrics and must retain their host labels. The process-group controls do not
+cover a child that deliberately creates a new session. No such control is
+silently inferred from a Windows Job-object PASS.
+
+The macOS memory controls retain a full supervisor report in `identity.json`.
+They require a 64 MiB configured cap, a measured group peak above that cap,
+observed overshoot at most 32 MiB, maximum sample gap at most 100 ms and at
+most 100 ms from the memory-limit kill request until the group is observed
+empty. Missing, non-finite, contradictory or incomplete-exit records fail.
+The normal sampling wait is 20 ms; the observed maximum includes scheduling
+delay. The report keeps group footprint and process peak RSS separately.
+These control observations do not bound unseen transient peaks.
+
+Each hosted OS records the W12/V6 native oracle twice and requires stable
+bytes for its 231 inputs. The aggregate job requires the exact 17 gate names,
+2,811 native tree digests, exactly the 1,768 registered native API keys and
+30 incremental results including two planted comparator controls to match
+across the three hosts. It binds the candidate commit, generated files,
+runtime versions, runner image, architecture, compiler and CLI identities.
+Only OS-specific path, timing and memory values are excluded from exact
+functional comparison. The evidence ZIP contains normalized results, raw
+gate/run records and identity manifests, with a host SHA-256 binding for the
+full raw run file and no compiled parser library.
+The key set includes every previous 1,533 key plus 206 A/A, one slow-control,
+14 FIRST and 14 HALF keys; an equal-size replacement set fails. Protocol v4
+is recorded in the identity. Adoption of this contract is not release PASS;
+the Windows PRINT cleanup defect and full candidate qualification still
+require evidence.
+
 ## Maintenance native safety profile (0.1.1)
 
 The explicitly approved test route is:
@@ -400,7 +557,26 @@ direct launcher exemption: `test_tscli.py` still admits only `qualify/run.py`.
 Executable hashes, exact fixed check arguments, new task-contained output and the
 private child environment are checked; `qualify/test_safety.py` exercises rejection.
 
-The default supervisor remains byte-identical to S572 (SHA-256 `000ce1db84540d2195a352bf6c49f19bcd859d4e9f726b3d0f17d23477ef56f5`).
+The 0.1.1–0.1.3 default supervisor was byte-identical to S572 (SHA-256
+`000ce1db84540d2195a352bf6c49f19bcd859d4e9f726b3d0f17d23477ef56f5`).
+The 0.1.4 root-accounting correction uses the same pinned GCC and stock build
+recipe, with one exact replacement image SHA-256
+`c1fc5d7e0ea00ebc72d4ef6e14d915341bb473cc08aaaca7b8ce72cf01cdb847`.
+The initial correction image was `e2ce27725de5471cdefc157a8e5885a6da0e12a7ea36e665b21c551533c5a8e0`;
+the current image additionally reads final root user/kernel CPU time after
+exit using [GetProcessTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes).
+Query failure remains a harness failure. CPU observations do not change any
+wall-time gate. POSIX reports the corresponding existing `wait4` usage.
+After the root signals, only `(ActiveProcesses=1, TotalProcesses=1)` may
+settle inside the existing fixed 3-second cleanup deadline. During settling,
+any observed child is rejected before an empty-job check, including an
+already-exited child. Query errors, inconsistent counts and timeout fail
+closed. The initial counts, pending flag and settling time are retained.
+Microsoft's [Job accounting contract](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information)
+and [process termination contract](https://learn.microsoft.com/en-us/windows/win32/procthread/terminating-a-process)
+were checked on 2026-09-28. Old failure records and published identities are
+unchanged. Windows self-test also executes the ten pure accounting-state
+checks; these do not replace actual process/Job controls.
 Only a separate `TSQ_SAFETY_PROFILE` build admits the test-only upper bounds:
 2 GiB process/job commit, 360 s watchdog and 64 MiB output. Both profiles
 must pass normal, timeout, memory, output, descendant and private-environment

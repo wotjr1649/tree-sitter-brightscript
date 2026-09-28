@@ -117,7 +117,16 @@ def w06():
     lines = lambda items: "\n".join(items)  # noqa: E731
     nest = lambda open_, body, close, depth: (  # noqa: E731
         "\n".join(open_(i) for i in range(depth)) + "\n" + body + "\n" + "\n".join(close for _ in range(depth)))
-    return [
+    boundaries = []
+    for count in range(11):
+        items = ", ".join(("a", "f(1)", "[2]", "{a: 3}")[i % 4] for i in range(count))
+        text = f"x = [{items}]\nf({items})\nx = f({items})\n"
+        if count:
+            text += f"a[{items}] = 1\nx = a[{items}]\ndim a[{items}]\ndim a({items})\n"
+        boundaries.append((f"list-boundary-{count}", text, True))
+        for ending in ("\n", ":", "\r\n"):
+            boundaries.append((f"line-boundary-{count}-{ending.encode().hex()}", ("f(a)" + ending) * count, True))
+    return boundaries + [
         ("array-10000", "a = [\n" + lines(f"  {i}" for i in range(10000)) + "\n]\n", True),
         ("aa-5000", "aa = {\n" + lines(f"  k{i}: {i}" for i in range(5000)) + "\n}\n", True),
         ("colon-2000", " : ".join(f"x{i} = {i}" for i in range(2000)) + "\n", True),

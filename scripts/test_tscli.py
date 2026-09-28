@@ -51,6 +51,35 @@ PUBLIC_REPLAY_COMMAND = ("python -I -B -X utf8 scripts/verify_public.py --bundle
                          "--candidate-source .work/public-replay/source "
                          "--candidate-registration .work/public-replay/verification/candidate-registration.json")
 CI_ALLOWED += "|" + re.escape(PUBLIC_REPLAY_COMMAND)
+POSIX_PREFLIGHT_COMMAND = "python scripts/qualify/run.py --preflight --cc /usr/bin/cc --out .work/posix-preflight"
+CI_ALLOWED += "|" + re.escape(POSIX_PREFLIGHT_COMMAND)
+NATIVE_SMOKE_COMMAND = ("python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 "
+                        "--out .work/native-smoke --gates B5-01-MEMORY")
+CI_ALLOWED += "|" + re.escape(NATIVE_SMOKE_COMMAND)
+NATIVE_FULL_COMMAND = ("python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 "
+                       "--support 0.25.1=.work/runtime-025 --support 0.26.13=.work/runtime-026 "
+                       "--out .work/native-full")
+CI_ALLOWED += "|" + re.escape(NATIVE_FULL_COMMAND)
+NATIVE_WINDOWS_FULL_COMMAND = ("python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe "
+                               "--runtime .work/runtime-027 --support 0.25.1=.work/runtime-025 "
+                               "--support 0.26.13=.work/runtime-026 --out .work/native-full")
+CI_ALLOWED += "|" + re.escape(NATIVE_WINDOWS_FULL_COMMAND)
+ETW_DIAGNOSTIC_COMMAND = ("python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe "
+                          "--runtime .work/runtime-027 --out .work/native-characterization --etw-diagnostic")
+CI_ALLOWED += "|" + re.escape(ETW_DIAGNOSTIC_COMMAND)
+COMPLETION_WINDOWS_COMMAND = ("python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe "
+                              "--runtime .work/runtime-027 --out .work/completion-pilot --completion-pilot")
+COMPLETION_POSIX_COMMAND = ("python scripts/qualify/run.py --cc /usr/bin/cc "
+                            "--runtime .work/runtime-027 --out .work/completion-pilot --completion-pilot")
+CI_ALLOWED += "|" + "|".join(map(re.escape, (COMPLETION_WINDOWS_COMMAND, COMPLETION_POSIX_COMMAND)))
+COMPLETION_GAP_COMMAND = ("python scripts/qualify/run.py --cc /usr/bin/cc "
+                          "--runtime .work/runtime-027 --out .work/completion-gap --completion-gap-diagnostic")
+CI_ALLOWED += "|" + re.escape(COMPLETION_GAP_COMMAND)
+RESPONSE_WINDOWS_COMMAND = ("python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe --runtime .work/runtime-027 "
+                            "--out .work/response-v6 --gates CANCEL,CANCEL-OVERSHOOT,MAX-CALLBACK-GAP")
+RESPONSE_POSIX_COMMAND = ("python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 "
+                          "--out .work/response-v6 --gates CANCEL,CANCEL-OVERSHOOT,MAX-CALLBACK-GAP")
+CI_ALLOWED += "|" + "|".join(map(re.escape, (RESPONSE_WINDOWS_COMMAND, RESPONSE_POSIX_COMMAND)))
 # `run` keys in the spellings recognised here (flow mapping, quoted key, extra spaces, `\x72un`, `\u0072un`);
 # each must be one the parser read. Other escapes are not recognised (validation.md "Identity binding").
 ANY_RUN_KEY = re.compile(r"""(?:^|[\s{,])["']?(?:run|\\x72un|\\u0072un)["']?\s*:""", re.M)
@@ -284,7 +313,7 @@ class VerifiedCli(unittest.TestCase):
 
     def test_only_the_qualification_runner_is_exempt(self):
         # validation.md "Release qualification lane": exactly one more file may start programs, it does (the
-        # exemption is not vacuous), it reaches the CLI only through tscli, and no workflow runs it.
+        # exemption is not vacuous), it reaches the CLI only through tscli, and workflows use pinned commands.
         source = QUALIFY_RUNNER.read_text(encoding="utf-8")
         self.assertNotEqual(launches(source), [])
         self.assertEqual([m.group(0) for m in LAUNCHERS.finditer(source)], [])
@@ -294,9 +323,69 @@ class VerifiedCli(unittest.TestCase):
         self.assertEqual(exempt, [QUALIFY_RUNNER])
         commands = [c for wf in sorted((SCRIPTS.parent / ".github/workflows").glob("*.y*ml"))
                     for c in ci_commands(wf.read_text(encoding="utf-8"))]
-        self.assertFalse([c for c in commands if "qualify" in c])
+        qualification_commands = [(wf.name, c) for wf in sorted((SCRIPTS.parent / ".github/workflows").glob("*.y*ml"))
+                                  for c in ci_commands(wf.read_text(encoding="utf-8")) if "qualify" in c]
+        self.assertEqual(qualification_commands, [("native-characterization.yml", ETW_DIAGNOSTIC_COMMAND),
+                                                  ("native-characterization.yml", COMPLETION_WINDOWS_COMMAND),
+                                                  ("native-characterization.yml", COMPLETION_POSIX_COMMAND),
+                                                  ("native-characterization.yml", COMPLETION_GAP_COMMAND),
+                                                  ("native-characterization.yml", RESPONSE_WINDOWS_COMMAND),
+                                                  ("native-characterization.yml", RESPONSE_POSIX_COMMAND),
+                                                  ("native-preflight.yml", POSIX_PREFLIGHT_COMMAND),
+                                                  ("native-preflight.yml", NATIVE_SMOKE_COMMAND),
+                                                  ("native-qualification.yml", NATIVE_FULL_COMMAND),
+                                                  ("native-qualification.yml", NATIVE_WINDOWS_FULL_COMMAND)])
         self.assertFalse(allowed("python scripts/qualify/run.py --cc x"))
         self.assertFalse(allowed("python scripts/qualify/run.py --safety-profile native"))
+        for command in (ETW_DIAGNOSTIC_COMMAND,):
+            self.assertTrue(allowed(command))
+            for mutant in (command + " --gates CANCEL", command + " --characterize",
+                           command.replace("--etw-diagnostic", "--preflight"),
+                           command.replace("--etw-diagnostic", "--characterize"),
+                           command.replace("--etw-diagnostic", "--etw-compatibility"),
+                           command.replace("--etw-diagnostic", "--gates ABS-MEMORY"),
+                           command + " --latency-diagnostic",
+                           command.replace(".work/native-characterization", "../outside"),
+                           command.replace(".work/runtime-027", "../runtime"),
+                           command.replace("/usr/bin/cc", "cc").replace("C:/mingw64/bin/gcc.exe", "gcc.exe"),
+                           command + "; whoami", command + "\n", command + " # comment",
+                           command + "\nwhoami", command + " && whoami"):
+                self.assertFalse(allowed(mutant), mutant)
+        for command in (COMPLETION_WINDOWS_COMMAND, COMPLETION_POSIX_COMMAND, COMPLETION_GAP_COMMAND):
+            self.assertTrue(allowed(command))
+            for mutant in (command + " --gates CANCEL", command + " --etw-diagnostic", command + " --seed 1",
+                           command.replace("--completion-pilot", "--characterize"),
+                           command.replace("--completion-gap-diagnostic", "--characterize"),
+                           command.replace(".work/completion-pilot", "../outside"),
+                           command.replace(".work/completion-gap", "../outside"),
+                           command.replace(".work/runtime-027", "../runtime"),
+                           command + "; whoami", command + "\nwhoami"):
+                if mutant != command:
+                    self.assertFalse(allowed(mutant), mutant)
+        for command in (RESPONSE_WINDOWS_COMMAND, RESPONSE_POSIX_COMMAND):
+            self.assertTrue(allowed(command))
+            for mutant in (command + " --response-ms 500", command + " --completion-pilot",
+                           command.replace("CANCEL,CANCEL-OVERSHOOT,MAX-CALLBACK-GAP", "CANCEL"),
+                           command.replace(".work/response-v6", "../outside"), command + "; whoami"):
+                self.assertFalse(allowed(mutant), mutant)
+        for altered in (POSIX_PREFLIGHT_COMMAND + " --gates CANCEL",
+                        POSIX_PREFLIGHT_COMMAND.replace("/usr/bin/cc", "cc"),
+                        POSIX_PREFLIGHT_COMMAND.replace(".work/posix-preflight", "../outside"),
+                        POSIX_PREFLIGHT_COMMAND + "; whoami"):
+            self.assertFalse(allowed(altered), altered)
+        for altered in (NATIVE_SMOKE_COMMAND + " --safety-profile native",
+                        NATIVE_SMOKE_COMMAND.replace("B5-01-MEMORY", "CANCEL"),
+                        NATIVE_SMOKE_COMMAND.replace(".work/runtime-027", "../outside"),
+                        NATIVE_SMOKE_COMMAND + " && whoami"):
+            self.assertFalse(allowed(altered), altered)
+        for altered in (NATIVE_FULL_COMMAND + " --gates B5-01-MEMORY",
+                        NATIVE_FULL_COMMAND.replace(".work/runtime-025", "../outside"),
+                        NATIVE_FULL_COMMAND.replace("--out .work/native-full", "--out /tmp/shared")):
+            self.assertFalse(allowed(altered), altered)
+        for altered in (NATIVE_WINDOWS_FULL_COMMAND + " --gates B5-01-MEMORY",
+                        NATIVE_WINDOWS_FULL_COMMAND.replace("C:/mingw64/bin/gcc.exe", "gcc.exe"),
+                        NATIVE_WINDOWS_FULL_COMMAND.replace("--out .work/native-full", "--out C:/shared")):
+            self.assertFalse(allowed(altered), altered)
         # The test-only safety route gets no new launcher exemption.
         safety = (SCRIPTS / "qualify" / "safety.py").read_text(encoding="utf-8")
         self.assertEqual(launches(safety), [])

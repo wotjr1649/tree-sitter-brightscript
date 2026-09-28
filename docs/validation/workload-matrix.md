@@ -62,6 +62,7 @@ implementation; the files themselves are not committed.
 
 | Input | Size |
 |---|---|
+| grouped repetition boundaries: arrays, statement/expression calls, statement/expression indexes, DIM brackets/parentheses; newline/colon/CRLF statement lists | 0–10 elements/lines (nonempty indexes and DIM), 44 inputs |
 | array literal, one element per line | 10,000 elements |
 | AA literal, one entry per line | 5,000 entries |
 | one line of colon-separated assignments | 2,000 statements |

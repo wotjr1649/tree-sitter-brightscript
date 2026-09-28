@@ -1,10 +1,13 @@
 """Release gates of the qualification lane (validation.md, "Release qualification lane").
 
-Bounds are those of protocol v3 (Session 05-2, resume-08) and are never relaxed here. Each gate is a function
+Defaults retain protocol v3 (Session 05-2, resume-08); v5 explicitly supplies its owner-selected response bound.
+All other bounds and the sampling registration remain unchanged. Each gate is a function
 of a runner that measures one (build, op, case, budget) under the supervisor and returns the parsed record;
 it returns {"gate", "status" (PASS, FAIL, NOT_RUN), "points", "notes"}. Censored points (memory cap, watchdog,
 crash, harness failure) count as failures. Stdlib only; starts no program.
 """
+import hashlib
+import json
 import math
 import random
 import statistics
@@ -67,8 +70,14 @@ def timed(r, build, op, case, n, metric, budget=0, warmup=1):
         records.append(rec)
         if not completed(rec):
             return None, records
+        value = metric(rec)
+        if metric in (m_parse, m_query, m_nav) and (number(value) is None or value <= 0):
+            return None, records
         if i >= warmup:
-            values.append(metric(rec))
+            values.append(value)
+    identities = [run_id(rec) for rec in records]
+    if len(set(identities)) != warmup + n or any("None" in identity for identity in identities):
+        return None, records
     return values, records
 
 
@@ -139,6 +148,7 @@ def b5_02_lifecycle(r):
 # ------------------------------------------------------------------ A5-01
 def paired(r, cand, ref, op, case, n, metric, rng):
     """Candidate and reference alternately in random order; 1 warmup + n each."""
+    n = getattr(r, "cost_samples", n)
     vals = {cand: [], ref: []}
     recs = {cand: [], ref: []}
     for i in range(n + 1):
@@ -149,8 +159,14 @@ def paired(r, cand, ref, op, case, n, metric, rng):
             recs[b].append(rec)
             if not completed(rec):
                 return None, recs
+            value = metric(rec)
+            if number(value) is None or value <= 0:
+                return None, recs
             if i > 0:
-                vals[b].append(metric(rec))
+                vals[b].append(value)
+    identities = [run_id(rec) for series in recs.values() for rec in series]
+    if len(set(identities)) != 2 * (n + 1) or any("None" in identity for identity in identities):
+        return None, recs
     return {b: med(v) for b, v in vals.items()}, recs
 
 
@@ -202,6 +218,23 @@ def number(x):
     return x if type(x) in (int, float) and math.isfinite(x) and x >= 0 else None
 
 
+def sampled_memory_control(report):
+    """macOS 64 MiB control: observed overshoot <=32 MiB and kill/observation <=100 ms.
+
+    These are bounds on the control's observations, not on unobserved footprint peaks.
+    """
+    fields = ("configured_job_memory_limit_bytes", "sampled_peak_footprint_bytes", "sampled_overshoot_bytes",
+              "max_sample_gap_ms", "memory_kill_to_group_exit_ms")
+    if any(number(report.get(k)) is None for k in fields):
+        return False
+    cap, peak, over, gap, latency = (report[k] for k in fields)
+    return (report.get("memory_limit_mode") == "group_sampled_kill"
+            and report.get("termination_reason") == "MEMORY_LIMIT_REACHED"
+            and report.get("exit_confirmed") is True and type(report.get("active_processes")) is int
+            and report["active_processes"] == 0 and cap == 64 * MIB and peak > cap
+            and over == peak - cap and over <= 32 * MIB and gap <= 100 and latency <= 100)
+
+
 def budget_run(rec, budget):
     """One execution judged by its own records alone (gate contract CANCEL; Session 05-7-1 C1).
 
@@ -237,7 +270,8 @@ def budget_run(rec, budget):
 
 def run_id(rec):
     """One native execution: the supervisor's process id and creation time."""
-    return f"{rec['report'].get('pid')}@{rec['report'].get('creation_filetime')}"
+    report = rec["report"]
+    return f"{report.get('pid')}@{report.get('creation_filetime', report.get('creation_monotonic_ns'))}"
 
 
 def uninstrumented(rec):
@@ -259,15 +293,23 @@ def result_check(rec, case, length):
     return "OK" if type(f.get("has_error")) is int and f["has_error"] == want else "WRONG_RESULT"
 
 
-def cancel_point(r, case, budget, roles):
+def cancel_point(r, case, budget, roles, *, response_ms=100):
     """One registered point: 1 warmup + 5 uninstrumented runs, then one allocator run, all at `budget`.
 
     SAFETY: no censored, inconsistent or wrong run (warmup and allocator included); the 5 measured runs return within
     budget + 100 ms and clean up within 100 ms; growth after the budget below 64 MiB where measured, and never
     unobserved where a run reached the budget. ACTUAL also: all 5 measured runs cancelled (the warmup is no
     substitute) and the allocator run's growth measured at its own crossing (Session 05-7-2 P572-SEP)."""
-    vals, recs = timed(r, "cand", "PARSE", case, 5, lambda x: x, budget=budget)
+    _, recs = timed(r, "cand", "PARSE", case, 5, lambda x: x, budget=budget)
     a = r.run("cand-alloc", "PARSE", case, budget, tag="alloc")
+    return judge_cancel_point(recs, a, case, budget, roles, response_ms=response_ms)
+
+
+def judge_cancel_point(recs, a, case, budget, roles, *, response_ms=100):
+    """Judge the same seven observations without executing or replacing any run."""
+    identities = [run_id(rec) for rec in recs]
+    vals = (recs[1:] if len(recs) == 6 and all(completed(x) for x in recs)
+            and len(set(identities)) == 6 and not any("None" in i for i in identities) else None)
     actual = "ACTUAL" in roles
     p = {"case": case, "budget": budget, "roles": list(roles), "source_sha": cases.RECORDED["cases"][case],
          "required_count": 5, "run_ids": {"uninstrumented": [run_id(x) for x in recs], "allocator": run_id(a)}}
@@ -299,7 +341,7 @@ def cancel_point(r, case, budget, roles):
             point_status, live_ok = "NOT_RUN_BUDGET_REACHED_UNOBSERVED", False
         else:
             point_status, live_ok = status, status == "NOT_APPLICABLE_BEFORE_BUDGET"
-        safety = not inconsistent and not wrong and max(ret) <= budget + 100 and max(cleanup) <= 100 and live_ok
+        safety = not inconsistent and not wrong and max(ret) <= budget + response_ms and max(cleanup) <= response_ms and live_ok
         natural_before = sum(not x[0] for x in plain)
         if not actual:
             coverage = "NOT_REQUIRED"
@@ -323,8 +365,8 @@ def cancel_point(r, case, budget, roles):
     return p
 
 
-def cancel(r):
-    points = [cancel_point(r, case, budget, roles) for case, budget, roles in CANCEL_POINTS]
+def cancel(r, *, response_ms=100):
+    points = [cancel_point(r, case, budget, roles, response_ms=response_ms) for case, budget, roles in CANCEL_POINTS]
     safety = [(c, b) for c, b, roles in CANCEL_POINTS if "SAFETY" in roles]
     actual = sorted((c, b) for c, b, roles in CANCEL_POINTS if "ACTUAL" in roles)
     registered = (safety == [(c, 200) for c in CANCEL_V3 + CANCEL_ACTUAL]
@@ -336,7 +378,7 @@ def cancel(r):
                    f"families (L-FOREACH, L-ANON at 100 ms, chosen after S571 q1); point set as registered: {registered}"])
 
 
-def overshoot(r):
+def overshoot(r, *, response_ms=100):
     points, ok = [], True
     for case in CANCEL_SET + LARGE_SET:
         for budget in BUDGETS:
@@ -355,9 +397,9 @@ def overshoot(r):
                 for i in range(3):
                     again = r.run("cand", "PARSE", case, budget, tag=f"b{budget}-again{i}")
                     reps.append(again["events"]["parse"]["parse_ms"] - budget if completed(again) else math.inf)
-            late_uncancelled = not pe["cancelled"] and pe["parse_ms"] > budget + 100
+            late_uncancelled = not pe["cancelled"] and pe["parse_ms"] > budget + response_ms
             p = {"case": case, "budget": budget, "cancelled": pe["cancelled"], "overshoot_ms": reps,
-                 "pass": not late_uncancelled and max(reps) <= 100}
+                 "pass": not late_uncancelled and max(reps) <= response_ms}
             ok &= p["pass"]
             points.append(p)
     exercised = [p for p in points if "overshoot_ms" in p]
@@ -366,7 +408,7 @@ def overshoot(r):
                    f"{sum(1 for p in points if 'status' in p)} inputs finished before the smallest budget reached"])
 
 
-def gaps_and_cleanup(r):
+def gaps_and_cleanup(r, *, response_ms=100):
     gap_points, clean_points, gap_ok, clean_ok = [], [], True, True
     for case in CANCEL_SET + LARGE_SET + VALID_1MIB:
         vals, recs = timed(r, "cand", "PARSE", case, 3, lambda x: x)
@@ -377,10 +419,10 @@ def gaps_and_cleanup(r):
             continue
         g = max(v["events"]["parse"]["max_gap_incl_edges_ms"] for v in vals)
         c = max(v["events"]["cleanup"]["tree_delete_ms"] + v["events"]["cleanup"]["parser_delete_ms"] for v in vals)
-        gap_points.append({"case": case, "max_gap_ms": g, "pass": g <= 100})
-        clean_points.append({"case": case, "max_cleanup_ms": c, "pass": c <= 100})
-        gap_ok &= g <= 100
-        clean_ok &= c <= 100
+        gap_points.append({"case": case, "max_gap_ms": g, "pass": g <= response_ms})
+        clean_points.append({"case": case, "max_cleanup_ms": c, "pass": c <= response_ms})
+        gap_ok &= g <= response_ms
+        clean_ok &= c <= response_ms
     return [result("MAX-CALLBACK-GAP", gap_ok, gap_points, ["budget 0, callback installed; 1 warmup + 3, maximum"]),
             result("CLEANUP-ALL", clean_ok, clean_points, ["tree + parser delete; same runs"])]
 
@@ -540,18 +582,21 @@ def sem_public(r, seed):
     rng = random.Random(seed)
     counts = {"valid_equal": 0, "valid_raw_equal": 0, "valid_different": 0, "error_presence_equal": 0,
               "error_presence_mismatch": 0, "incomplete": 0}
-    different, mismatch, mutant_total, mutant_rejected = [], [], 0, 0
+    different, mismatch, mutant_total, mutant_rejected, native_tree_digests = [], [], 0, 0, []
     for i in range(0, len(items), 150):
         chunk = items[i:i + 150]
         paths = [r.write_input(f"tree-compare/{i + j:05d}.brs", data) for j, (_, data, _) in enumerate(chunk)]
         listing = r.write_list(f"tree-compare/list-{i:05d}.txt", paths)
         old = parse_dump(r.probe("h", ["DUMPLIST", listing], f"sem-h-{i:05d}"))
         new = parse_dump(r.probe("cand", ["DUMPLIST", listing], f"sem-c-{i:05d}"))
-        for (name, _, _), path in zip(chunk, paths):
+        for (name, data, _), path in zip(chunk, paths):
             a, b = old.get(str(path)), new.get(str(path))
             if not a or not b or not a["complete"] or not b["complete"]:
                 counts["incomplete"] += 1
                 continue
+            tree_bytes = json.dumps(b["root"], ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            native_tree_digests.append({"name": name, "input_sha256": hashlib.sha256(data).hexdigest(),
+                                        "tree_sha256": hashlib.sha256(tree_bytes).hexdigest()})
             ea, eb = bool(a["root"][4] & 16), bool(b["root"][4] & 16)
             if ea or eb:
                 counts["error_presence_equal" if ea == eb else "error_presence_mismatch"] += 1
@@ -572,6 +617,7 @@ def sem_public(r, seed):
     ok = (counts["valid_different"] == 0 and counts["error_presence_mismatch"] == 0 and counts["incomplete"] == 0
           and mutant_total > 0 and mutant_rejected == mutant_total)
     return result("SEM-PUBLIC", ok, [{"counts": counts, "different": different[:50], "error_presence_mismatch": mismatch[:50],
+                                      "native_tree_digests": native_tree_digests,
                                       "mutants": {"total": mutant_total, "rejected": mutant_rejected}}],
                   ["corpus 228/228 and W03-W05, W07, W09 are checked by the repository scripts (tscli.py test and others)"])
 

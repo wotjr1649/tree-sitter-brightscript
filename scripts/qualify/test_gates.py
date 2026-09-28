@@ -272,7 +272,7 @@ MUTANTS = {
         "not (tree_ms == -1 and cancelled or number(tree_ms) is not None\n" + " " * 58 + "and not cancelled)", "False"),
     "flag types not checked": ("or type(cancelled) is not bool or type(at_callback) is not bool", ""),
     "coverage not required": ('pass_=safety and coverage in ("TRIGGERED", "NOT_REQUIRED"))', "pass_=safety)"),
-    "return bound fixed at 300 ms": ("max(ret) <= budget + 100", "max(ret) <= 300"),
+    "return bound fixed at 300 ms": ("max(ret) <= budget + response_ms", "max(ret) <= 300"),
     "warmup not checked": ("for j, c, m in zip(judged, checks, mixed))",
                            "for j, c, m in zip(judged[1:], checks[1:], mixed[1:]))"),
     "result state not checked": ('wrong = checks.count("WRONG_RESULT")', "wrong = 0"),
@@ -303,6 +303,24 @@ VERDICT_EQUIVALENT = {
 
 
 class CancelJudgement(unittest.TestCase):
+    def test_sampled_memory_control_rejects_incomplete_or_slow_observation(self):
+        good = {"configured_job_memory_limit_bytes": 64 * MIB, "sampled_peak_footprint_bytes": 70 * MIB,
+                "sampled_overshoot_bytes": 6 * MIB, "max_sample_gap_ms": 21.0,
+                "memory_kill_to_group_exit_ms": 22.0, "memory_limit_mode": "group_sampled_kill",
+                "termination_reason": "MEMORY_LIMIT_REACHED", "exit_confirmed": True, "active_processes": 0}
+        self.assertTrue(gates.sampled_memory_control(good))
+        for key in good:
+            missing = dict(good)
+            del missing[key]
+            self.assertFalse(gates.sampled_memory_control(missing), key)
+        for edit in ({"memory_kill_to_group_exit_ms": 100.001}, {"max_sample_gap_ms": 100.001},
+                     {"sampled_peak_footprint_bytes": 97 * MIB, "sampled_overshoot_bytes": 33 * MIB},
+                     {"sampled_overshoot_bytes": 0}, {"memory_kill_to_group_exit_ms": NAN},
+                     {"sampled_peak_footprint_bytes": INF}, {"max_sample_gap_ms": -1},
+                     {"active_processes": 1}, {"active_processes": False}, {"exit_confirmed": 1},
+                     {"termination_reason": "COMPLETED"}, {"memory_kill_to_group_exit_ms": None}):
+            self.assertFalse(gates.sampled_memory_control({**good, **edit}), edit)
+
     def test_matrix(self):
         got = evaluate(gates)
         for cid, _, _, _, _, want_pass, want_memory in MATRIX:
