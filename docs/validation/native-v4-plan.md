@@ -789,3 +789,12 @@ gap. CPU observations do not supply a release timing substitute or identify a
 particular OS scheduling cause. If it does not reproduce, record the cause as
 unresolved and stop the unchanged diagnostic. Neither outcome replaces the
 failed pilot or starts an unchanged full qualification rerun.
+
+The [completed follow-up](../reports/0.1.4-native-parity-candidate.md#macos-gap-follow-up-diagnosis-complete-candidate-failure-unresolved)
+observed a stock interval of wall 103.925 ms / process CPU 0.425 ms, while the
+candidate's prior 154.694 ms failure did not reproduce. Its stop condition is
+now reached. Preserve the completed diagnosis and failed first pilot; no
+further identical diagnostic or unchanged qualification cohort is registered.
+The remaining candidate failure has no established correction. Resume only
+with new evidence supporting a correction or a justified product/runtime
+contract decision, retaining all old failures and the independent review gate.
