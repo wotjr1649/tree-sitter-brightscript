@@ -768,6 +768,7 @@ def main():
     ap.add_argument("--latency-witness", action="store_true")
     ap.add_argument("--etw-diagnostic", action="store_true")
     ap.add_argument("--etw-compatibility", action="store_true")
+    ap.add_argument("--completion-pilot", action="store_true")
     ap.add_argument("--support", action="append", default=[])
     ap.add_argument("--gates", default=",".join(ALL_GATES))
     ap.add_argument("--seed", type=int, default=5707)
@@ -776,6 +777,22 @@ def main():
         raise SystemExit("characterization has a fixed plan and cannot select gates, support or preflight")
     etw_mode = args.etw_diagnostic or args.etw_compatibility
     latency_mode = args.latency_diagnostic or args.latency_witness or etw_mode
+    if args.completion_pilot:
+        if (latency_mode or args.characterize or args.preflight or args.support
+                or args.gates != ",".join(ALL_GATES) or args.seed != 5707):
+            raise SystemExit("completion pilot has a fixed registration and cannot select other modes")
+        work_root = (ROOT / ".work").resolve()
+        if not work_root.is_relative_to(ROOT.resolve()) or not Path(args.out).resolve().is_relative_to(work_root):
+            raise SystemExit("completion pilot output must remain in the task workspace .work directory")
+        if os.environ.get("GITHUB_ACTIONS") == "true" and (
+                os.environ.get("GITHUB_REPOSITORY") != "wotjr1649/tree-sitter-brightscript"
+                or os.environ.get("GITHUB_REF") != "refs/heads/session/10-v014-latency-diagnosis"
+                or os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch"
+                or os.environ.get("GITHUB_RUN_ATTEMPT") != "1"
+                or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"
+                or os.environ.get("RUNNER_ARCH") != {"win32": "X64", "linux": "X64", "darwin": "ARM64"}.get(sys.platform)
+                or os.environ.get("GITHUB_JOB") != "completion"):
+            raise SystemExit("completion pilot requires the preassigned first-attempt hosted job")
     if latency_mode and (args.characterize or args.preflight or args.support or args.gates != ",".join(ALL_GATES)
                          or sum((args.latency_diagnostic, args.latency_witness, args.etw_diagnostic,
                                  args.etw_compatibility)) != 1):
@@ -894,6 +911,9 @@ def main():
         lane_files.extend(("latency_diagnostic.py", "test_latency_diagnostic.py"))
     if args.etw_diagnostic:
         lane_files.extend(("etw_capture.c", "etw_diagnostic.py", "etw-prelude.json", "test_etw_diagnostic.py"))
+    if args.completion_pilot:
+        lane_files.extend(("completion_runtime.py", "completion_pilot.py", "completion_controls.c", "completion_guard.h",
+                           "test_completion_pilot.py"))
     status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, timeout=60)
     other_files = ["scripts/tscli.py", "scripts/corpus.py", "docs/provenance/upstream-sources.md", "package.json",
                    "package-lock.json", "tree-sitter.json"]
@@ -916,6 +936,12 @@ def main():
                 "protocol": "v4.1", "runtime": "0.27.0", "support": support_versions, "seed": args.seed, "gates": selected}
     (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
     r = Runner(lab, probes, query, roots={"cand": ROOT, "h": refs["h"]}, runtime_build="separate-scheduled-v4.1")
+    if args.completion_pilot:
+        if os.environ.get("GITHUB_ACTIONS") == "true" and (
+                not identity["git_clean"] or identity["git_head"] != os.environ.get("TSQ_COMPLETION_EXPECTED_COMMIT")):
+            raise RuntimeError("completion pilot requires the clean preassigned commit")
+        import completion_pilot
+        return completion_pilot.run(r, identity, Path(args.runtime), rt, cand, probe)
     if args.etw_diagnostic:
         if not identity["git_clean"] or identity["git_head"] != os.environ.get("TSQ_ETW_EXPECTED_COMMIT"):
             raise RuntimeError("ETW hosted diagnostic requires the clean preassigned commit")

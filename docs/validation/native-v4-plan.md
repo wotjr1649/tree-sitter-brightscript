@@ -730,3 +730,42 @@ sample. Before that cohort, establish a behavior-preserving correction on
 the supported runtime, or resolve a separately reviewed product/runtime
 scope decision. The latter is not itself a PASS and does not replace failed
 evidence. The final six-job requirement remains unchanged.
+
+### Owner-approved runtime candidate investigation
+
+The owner subsequently authorized creating, reviewing and validating an
+isolated runtime correction candidate. This authorizes investigation, not
+silent adoption of a patched runtime as stock 0.27.0. Product source and
+runtime manifests stay unchanged during the diagnostic. A release that
+requires a patch needs a concrete compatibility, distribution and maintenance
+decision after the candidate evidence is available.
+
+The first hosted completion-checkpoint pilot compares the exact stock runtime
+with `0.27.0+completion-checkpoint-candidate1`; hashes and the deterministic
+source transformation are in `scripts/qualify/completion_runtime.py`.
+It adds actual cancellable checkpoints around final stack condensation only
+when all alternatives have halted, retaining the finished tree for resume.
+No fabricated callbacks, grammar changes or relaxed limits are permitted.
+
+Before dispatch, independently review the implementation, run local positive
+and adverse controls, and preassign the exact clean commit in issue 11.
+One manual first-attempt matrix has Windows x64, Ubuntu 24.04 x64 and macOS 15
+ARM64 jobs, each bounded to 30 minutes. It uses the existing isolated native
+supervisor, 512 MiB and 15-second measurement bounds; no ETW session runs.
+Publish only the five exact evidence files listed in the workflow.
+
+The fixed pilot includes 192 registered RUN rows (five stress cases, eight
+alternating timing pairs, timed/deterministic cancellation and API checks),
+33 exact recovery comparisons, all 2,811 registered native tree comparisons,
+the existing incremental/resume gates on both builds, and 52 guarded state
+transitions plus native use-after-free/double-free negative controls.
+Every record must be individually valid before aggregation or comparison;
+every candidate failure counts. Stock safety failures remain separate baseline
+results. Preserve missing own-budget growth as missing, never zero.
+Candidate plain parse samples retain 100 ms maximum gap and cleanup bounds;
+timed/first/half cancellation reuse the existing per-record safety rules.
+This small pilot is not the full v4.1 sample contract or release qualification.
+The prior long-expression QUERY_ONLY watchdogs remain unresolved and excluded
+from any claim of complete API coverage. No first-attempt failure is replaced
+by a continuation or rerun. A successful pilot may justify a candidate decision;
+it cannot supply any of the final six qualification jobs.

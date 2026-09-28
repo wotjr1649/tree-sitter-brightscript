@@ -1,4 +1,4 @@
-name: Windows bounded ETW latency diagnosis
+name: Bounded native runtime diagnosis
 
 on:
   workflow_dispatch:
@@ -7,13 +7,21 @@ on:
         description: Exact reviewed commit preassigned in issue 11
         type: string
         required: true
+      experiment:
+        description: Preassigned bounded experiment
+        type: choice
+        required: true
+        default: completion
+        options:
+          - completion
+          - etw
 
 permissions:
   contents: read
 
 jobs:
   characterize:
-    if: github.run_attempt == 1 && github.sha == inputs.expected_commit && github.ref == 'refs/heads/session/10-v014-latency-diagnosis'
+    if: inputs.experiment == 'etw' && github.run_attempt == 1 && github.sha == inputs.expected_commit && github.ref == 'refs/heads/session/10-v014-latency-diagnosis'
     runs-on: windows-2025-vs2026
     timeout-minutes: 30
     steps:
@@ -48,5 +56,53 @@ jobs:
             .work/native-characterization/commands.jsonl
             .work/native-characterization/etw-lifecycle.json
             .work/native-characterization/etw-summary.json
+          if-no-files-found: error
+          retention-days: 14
+  completion:
+    if: inputs.experiment == 'completion' && github.run_attempt == 1 && github.sha == inputs.expected_commit && github.ref == 'refs/heads/session/10-v014-latency-diagnosis'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025-vs2026, ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: tree-sitter/tree-sitter
+          ref: 6070dbfefd326bd735e5683eb128cc1b57dad0c0
+          path: .work/runtime-027
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - run: npm ci
+      - name: Compare stock and completion candidate on Windows
+        if: runner.os == 'Windows'
+        env:
+          TSQ_COMPLETION_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+        run: python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe --runtime .work/runtime-027 --out .work/completion-pilot --completion-pilot
+      - name: Compare stock and completion candidate on POSIX
+        if: runner.os != 'Windows'
+        env:
+          TSQ_COMPLETION_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+        run: python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 --out .work/completion-pilot --completion-pilot
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: completion-pilot-${{ matrix.os }}
+          path: |
+            .work/completion-pilot/identity.json
+            .work/completion-pilot/runs.jsonl
+            .work/completion-pilot/commands.jsonl
+            .work/completion-pilot/completion-pilot.json
+            .work/completion-pilot/controls-result.txt
           if-no-files-found: error
           retention-days: 14

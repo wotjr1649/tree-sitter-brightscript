@@ -140,7 +140,7 @@ def paired_estimates(left, right):
             "left_median_ms": lm, "right_median_ms": rm}
 
 
-def work_signature(rec, op, case):
+def work_signature(rec, op, case, *, expected_error=None):
     """Validate each native result, including warmup, before using its metric."""
     f, pe = rec.get("final") or {}, rec.get("events", {}).get("parse", {})
     report = rec.get("report", {})
@@ -153,7 +153,8 @@ def work_signature(rec, op, case):
              and type(report.get("active_processes")) is int and report["active_processes"] == 0
              and f.get("final") is True and f.get("op") == op and f.get("cancelled") is False
              and pe.get("cancelled") is False and pe.get("budget_ms") == 0
-             and type(f.get("has_error")) is int and f["has_error"] == int(case.startswith("SW-"))
+             and type(f.get("has_error")) is int
+             and f["has_error"] == (int(case.startswith("SW-")) if expected_error is None else expected_error)
              and type(f.get("bytes")) is int and f["bytes"] > 0
              and gates.number(pe.get("parse_ms")) is not None and pe["parse_ms"] > 0
              and type(f.get("parse_ms")) in (int, float) and f["parse_ms"] == pe["parse_ms"])

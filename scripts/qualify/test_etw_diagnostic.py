@@ -64,9 +64,9 @@ class EtwDiagnostic(unittest.TestCase):
         self.assertIn("  workflow_dispatch:", text)
         self.assertNotIn("  push:", text)
         self.assertIn("github.sha == inputs.expected_commit", text)
-        self.assertIn("    if: github.run_attempt == 1", text)
+        self.assertIn("    if: inputs.experiment == 'etw' && github.run_attempt == 1", text)
         self.assertIn("    timeout-minutes: 30", text)
-        self.assertEqual(text.count("uses: actions/upload-artifact@"), 1)
+        self.assertEqual(text.count("uses: actions/upload-artifact@"), 2)
 
     def test_compatibility_has_one_session_and_no_parser(self):
         from types import SimpleNamespace

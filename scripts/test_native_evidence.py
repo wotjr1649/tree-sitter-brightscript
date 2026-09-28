@@ -15,6 +15,7 @@ from package_repeated_native_evidence import HOSTS, repeated
 from qualify.test_latency_diagnostic import WitnessRecords
 from qualify.test_gates_v4 import V4Judgement
 from qualify.test_etw_diagnostic import EtwDiagnostic
+from qualify.test_completion_pilot import CompletionPilot
 
 
 def sha(data):
