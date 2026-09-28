@@ -42,14 +42,17 @@ static void properties(Properties *v, const GUID *guid) {
   v->p.EnableFlags = FLAGS;
 }
 
-/* Only Microsoft's documented Thread_V2 layouts are registered. Unknown
- * versions/lengths fail closed; no provider text or opaque data is copied. */
+/* Thread_V2 plus the observed CSwitch v5/28-byte shape only. Microsoft's
+ * PerfView d1ad99bb87ac8b0a2230f193edf95d9238cca05c CSwitchTraceData uses
+ * offsets 0/4/14 for these fields in versions >2 as well. The v5 tail is
+ * neither interpreted nor copied. Unknown versions/lengths fail closed. */
 static int decode(const EVENT_RECORD *e, Row *r) {
   if (memcmp(&e->EventHeader.ProviderId, &thread_guid, sizeof(GUID))) return 0;
   unsigned op = e->EventHeader.EventDescriptor.Opcode;
   if (op != 36 && op != 50) return 0;
-  if (e->EventHeader.EventDescriptor.Version != 2) return -1;
-  if (e->UserDataLength != (op == 36 ? 24 : 8)) return -2;
+  unsigned version = e->EventHeader.EventDescriptor.Version;
+  if (version != 2 && !(op == 36 && version == 5)) return -1;
+  if (e->UserDataLength != (op == 36 ? (version == 5 ? 28 : 24) : 8)) return -2;
   if (!e->UserData) return -3;
   if (e->EventHeader.TimeStamp.QuadPart <= 0) return -4;
   const unsigned char *p = e->UserData;
@@ -119,7 +122,7 @@ static int cleanup(const wchar_t *dir) {
 }
 
 static int selftest(void) {
-  EVENT_RECORD e = {0}; unsigned char bytes[24] = {0}; Row r;
+  EVENT_RECORD e = {0}; unsigned char bytes[28] = {0}; Row r;
   e.EventHeader.ProviderId = thread_guid;
   e.EventHeader.TimeStamp.QuadPart = 123;
   e.EventHeader.EventDescriptor.Version = 2;
@@ -138,6 +141,15 @@ static int selftest(void) {
   e.EventHeader.EventDescriptor.Opcode = 36; e.UserDataLength = 25; if (decode(&e, &r) != -2) return 12;
   e.UserDataLength = 24; e.UserData = NULL; if (decode(&e, &r) != -3) return 13;
   e.UserData = bytes; e.EventHeader.TimeStamp.QuadPart = 0; if (decode(&e, &r) != -4) return 14;
+  e.EventHeader.TimeStamp.QuadPart = 123; e.EventHeader.EventDescriptor.Version = 5;
+  e.UserDataLength = 28; bytes[14] = 2; memset(bytes + 24, 0xee, 4);
+  if (decode(&e, &r) != 1 || r.next != 3 || r.previous != 5 || r.state != 2 || r.reserved) return 16;
+  e.UserDataLength = 27; if (decode(&e, &r) != -2) return 17;
+  e.UserDataLength = 29; if (decode(&e, &r) != -2) return 18;
+  e.UserDataLength = 28; e.EventHeader.EventDescriptor.Version = 6; if (decode(&e, &r) != -1) return 19;
+  e.EventHeader.EventDescriptor.Version = 5; e.EventHeader.EventDescriptor.Opcode = 50;
+  e.UserDataLength = 8; if (decode(&e, &r) != -1) return 20;
+  e.EventHeader.EventDescriptor.Opcode = 36; e.UserDataLength = 24;
   e.EventHeader.TimeStamp.QuadPart = 123; e.EventHeader.EventDescriptor.Version = 255;
   event_record(&e);
   if (malformed != 1 || rejected_reason != 1 || rejected_opcode != 36 || rejected_version != 255 ||

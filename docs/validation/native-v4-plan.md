@@ -655,3 +655,12 @@ native evidence controls (21 tests), CLI controls (12), V0 and diff checks
 passed. The one-second request does not guarantee every event shape appears;
 no rejection would leave the earlier decoder failure unexplained. Rejection
 collects its descriptor while preserving the failed capture verdict.
+
+Compatibility run `36388250168` identified the first rejected shape as
+CSwitch `(opcode=36, version=5, length=28)`; its session was cleaned up within
+1.0535505 seconds, with no parser executions or raw publication. The
+[retained receipt and primary implementation basis](../reports/0.1.4-native-parity-candidate.md#compatibility-run-7413acb--first-rejection-identified)
+support adding that exact shape, without admitting arbitrary future versions
+or interpreting its added tail. Local positive/negative codec controls pass;
+hosted validation of the correction remains unrun. The authorized compatibility
+job is complete and is not repeated automatically.
