@@ -598,11 +598,13 @@ def main():
                 objs.append(o)
         return objs
 
-    def probe(name, grammar, runtime, runtime_root, alloc=False, scheduled=False):
+    def probe(name, grammar, runtime, runtime_root, alloc=False, scheduled=False, slow=False):
         exe = lab.out / "build" / (f"probe-{name}.exe" if sys.platform == "win32" else f"probe-{name}")
         flags = ["-DMEASURE_ALLOC"] if alloc else []
         if scheduled:
             flags.append("-DTSQ_SCHEDULED")
+        if slow:
+            flags.append("-DTSQ_SLOW_NAV")
         platform_link = ["-lpsapi", "-Wl,--no-insert-timestamp"] if sys.platform == "win32" else []
         lab.compile(f"probe-{name}", ["-O2", "-Wall", "-Wextra", *flags, "-I", Path(runtime_root) / "lib/include",
                                       HERE / "probe.c", *grammar, *runtime, *platform_link], exe)
@@ -613,10 +615,12 @@ def main():
     refs = {n: reference_grammar(lab, n) for n in ("h", "bp")}
     ref_objs = {n: grammar_objects(n, d / "src") for n, d in refs.items()}
     query = ROOT / "queries/highlights.scm"
-    probes = {"cand": (probe("cand", cand, rt, args.runtime), query),
-              "cand-alloc": (probe("cand-alloc", cand, rt, args.runtime, alloc=True), query),
-              "h": (probe("h", ref_objs["h"], rt, args.runtime), refs["h"] / "queries/highlights.scm"),
-              "bp": (probe("bp", ref_objs["bp"], rt, args.runtime), refs["bp"] / "queries/highlights.scm")}
+    probes = {"cand": (probe("cand", cand, rt, args.runtime, scheduled=args.characterize), query),
+              "cand-alloc": (probe("cand-alloc", cand, rt, args.runtime, alloc=True, scheduled=args.characterize), query),
+              "h": (probe("h", ref_objs["h"], rt, args.runtime, scheduled=args.characterize), refs["h"] / "queries/highlights.scm"),
+              "bp": (probe("bp", ref_objs["bp"], rt, args.runtime, scheduled=args.characterize), refs["bp"] / "queries/highlights.scm")}
+    if args.characterize:
+        probes["slow"] = (probe("slow", cand, rt, args.runtime, scheduled=True, slow=True), query)
     support_versions = []
     for spec in args.support:
         version, root = spec.split("=", 1)
@@ -625,7 +629,7 @@ def main():
     lane_files = ["run.py", "gates.py", "cases.py", "probe.c", "supervisor.c", "benign.c", "benign_posix.c", "recorded-inputs.json",
                   "runtime-0.27.0.sha256", "runtime-0.25.1.sha256", "runtime-0.26.13.sha256"]
     if args.characterize:
-        lane_files.append("characterize.py")
+        lane_files.extend(("characterize.py", "test_characterize.py", "test_gates.py"))
     status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, timeout=60)
     other_files = ["scripts/tscli.py", "scripts/corpus.py", "docs/provenance/upstream-sources.md", "package.json",
                    "package-lock.json", "tree-sitter.json"]
@@ -654,12 +658,12 @@ def main():
                                   check=True, timeout=60).stdout
             if hashlib.sha256(data).hexdigest() != digest:
                 raise RuntimeError(f"characterization requires frozen v0.1.3 product: {rel}")
-        identity.update(characterization_baseline=baseline, characterization_phase=4,
-                        control={"op": "CANCEL_FIRST", "budget_ms": 0, "callback_target": 1,
-                                 "warmup": 1, "plain_samples": 5, "allocator_samples": 1,
-                                 "allocation_window": "first callback through parser cleanup",
-                                 "scheduling": "default"})
+        identity.update(characterization_baseline=baseline, characterization_phase=5,
+                        control={"warmup_rounds": 1, "measured_rounds": 15, "native_runs": 6816,
+                                 "cost_estimator": "median of paired candidate/reference ratios",
+                                 "scheduling": "phase3 scheduled", "slow_nav_delay_ms": 2})
         (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
+        r.runtime_build = "separate-scheduled-paired-rounds"
         return characterize.run(r, identity, lab.out)
     results = []
     plan = {"B5-01-MEMORY": lambda: gates.b5_01_memory(r), "B5-02-LIFECYCLE": lambda: gates.b5_02_lifecycle(r),

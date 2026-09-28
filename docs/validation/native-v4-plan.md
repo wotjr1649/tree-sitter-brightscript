@@ -192,3 +192,78 @@ growth negative control rejects that defect. Independent static re-review
 closed the finding. Native confirmation on all three OS remains required.
 The existing v3 SAFETY/ACTUAL implementation and verdicts are unchanged;
 phase 4 does not promote its control into a v4 release gate.
+
+[Phase 4, 36365332865](https://github.com/wotjr1649/tree-sitter-brightscript/actions/runs/36365332865)
+at `d03c312` passed all nine jobs: 441/441 native executions, with equal
+per-OS image/compiler/product/probe/harness identities and clean checkouts.
+Each OS contributed 126 plain runs and 21 allocator runs. Maximum plain
+request-to-return / cleanup times (ms) were Windows 0.0076 / 0.0476,
+Ubuntu 0.000201 / 0.006853, and macOS 0.001 / 0.007. Each OS's maximum
+post-callback growth through cleanup was 64 bytes. Every run confirmed exit
+and zero remaining descendants. This closes this diagnostic control's
+cross-platform native evidence; it does not close the remaining release gates.
+
+## Phase 5: preserve the pairing in the estimator
+
+Phase 3's failing macOS A/A raw values show both aliases changing from roughly
+0.12 ms to roughly 0.28 ms during the same point. Exploratory calculation of
+per-pair ratios suggests a cause to test: the existing alternating measurement
+design loses its pair relationship when it divides two independent medians.
+These are different estimands, not an arithmetic bug. No old trial is
+reclassified. Independent adversarial design review approved this diagnostic
+after its growth sample counts and floor rules were made explicit.
+
+Before any new observation, fix the experiment as follows:
+
+- Frozen v0.1.3 product and phase 3 scheduled condition, three jobs per OS,
+  at most 60 minutes and 64 MiB raw evidence per job. No in-process batching.
+- For each family/operation, execute 16 rounds. Round 0 is warmup; all 15
+  remaining rounds count. In each round, seeded shuffle visits every size
+  once; at each size another seeded shuffle orders candidate/reference.
+  The seed is 5707 plus the registered trial number. No invalid observation
+  may be removed, replaced or reassigned to another round.
+- Cost is `median(candidate_i / reference_i) <= 1.5`. A/A uses
+  `max(r, 1/r) <= 1.5` for that median `r`. Preserve the old ratio of medians,
+  its verdict, every pair ratio, order, unique process IDs and raw values.
+  Keep the existing cost floor: a reference median below 0.1 ms makes the
+  bound inapplicable but never excuses invalid data or unequal work.
+- Growth uses the ratio of the two sizes in the same round, followed by
+  `log(median(ratios)) / log(size ratio)`. The middle-size observation is
+  shared by two contrasts, so these contrasts are correlated; no extra
+  middle-size execution is introduced. Use the original last-three sizes
+  for A5 (bound 1.5) and VALID (bound 1.2). A5 retains its large-size median
+  0.1 ms applicability floor. VALID has no growth floor.
+- The three registered diagnostic sweep families retain sizes 100, 400,
+  4000 and 20000, once per round, and contrasts 400/20000 and 4000/20000.
+  Preserve the aggregate small-size floor by scaling every small sample by
+  `max(median(small), 0.1) / median(small)` before taking paired ratios.
+  Record both estimators and the scale; bound remains 1.5. This diagnoses
+  growth only and does not replace the full sweep's memory gate.
+- A/A covers all 16 A5 cases with four operations and all 39 VALID parse
+  cases. Candidate/reference cost and growth use the same complete sets.
+  A separate native negative control adds a measured 2 ms busy delay to
+  NAV_CURSOR on `A501J-k01000`, using the same traversal and work digest.
+  It counts as detection only with valid equal work and a paired ratio above
+  1.5, never because identity, termination or work validation failed.
+- Exactly 6,816 native executions per job, including warmups and the slow
+  control. Global uniqueness concerns actual executions; a growth contrast
+  referring to an existing observation does not constitute a new execution.
+  Any missing, nonpositive, non-finite, censored, duplicate or contradictory
+  observation makes its comparison invalid. Preserve failed trials.
+
+Judge controls cover label exchange, common unit scaling, shared speed
+changes, candidate-only slowdown, the 1.5 boundary, missing/duplicate rounds
+and floor rules. Normal qualification builds contain no delay or scheduling
+treatment. Maximum latency, cancellation and memory requirements are unchanged.
+If any new cohort's A/A, equal-work, slow or completeness control fails, do not
+adopt this method or automatically change its estimator/sample count. Even
+if controls pass, performance verdicts and v4 adoption require separate review;
+the diagnostic always records release HOLD.
+
+Implementation review found and closed missing supervisor-state and duplicate
+event/final timing validation. Negative controls now reject those missing or
+contradictory fields. Local judge tests passed 8/8, including exact execution
+counts and floor locations. A separate Windows native 64-execution screen
+measured identical-binary paired ratio 0.99786 and detected the same-work
+2 ms control at ratio 21.8559; raw rejudgement with the strengthened validator
+passed. These local controls do not replace the new hosted cohort.

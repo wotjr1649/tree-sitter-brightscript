@@ -19,7 +19,7 @@ jobs:
         os: [windows-2025-vs2026, ubuntu-24.04, macos-15]
         trial: [1, 2, 3]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 60
     env:
       TSQ_TRIAL: ${{ matrix.trial }}
     steps:

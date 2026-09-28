@@ -398,6 +398,11 @@ static int run(const char *op, const char *input_path, const char *query_path, d
         }
         if (done) break;
       }
+#ifdef TSQ_SLOW_NAV
+      /* Diagnostic negative control: same native traversal, known extra measured latency. */
+      double until = clock_ms() + 2.0;
+      while (clock_ms() < until) {}
+#endif
       nav_ms = clock_ms() - t;
       ts_tree_cursor_delete(&c);
       nodes = nav_visits;
