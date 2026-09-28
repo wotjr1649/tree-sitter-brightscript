@@ -695,3 +695,28 @@ that execution's gap. Non-reproduction or incomplete capture leaves the cause
 unresolved. Ordered stock/traced groups do not establish overhead or affinity
 causality. Historical failures, the earlier complete diagnostic and release
 HOLD remain preserved.
+
+The preassigned `519f18d` follow-up completed all 5,911 registrations and
+classified a same-execution 100.6212 ms L-ANON gap as scheduled 97.6292 ms
+and ready 2.9920 ms. The
+[retained result](../reports/0.1.4-native-parity-candidate.md#targeted-etw-run-519f18d--same-execution-gap-classified)
+records coverage, bounds, normal exits and the independent interpretation
+review. This fulfills the follow-up's diagnostic purpose, not the release
+gate. Exact runtime-operation attribution and a verified correction remain
+open. Do not repeat the unchanged ETW campaign after this completion.
+
+### Product requirement clarification: background analysis
+
+The owner identified background code analysis and indexing as the primary
+consumer use case. The inherited 100 ms response criteria were adopted by
+the earlier Gate A; the examined canonical history does not derive that
+number from a consuming application's required cancellation deadline.
+The owner also confirmed that no required cancellation/termination time has
+yet been set. Record that requirement as unspecified; do not invent a new
+numerical bound from the observed failure times.
+This clarification does not change any current gate, authorize a threshold
+increase or convert a failure into PASS. A future product-contract proposal
+must state the required end-to-end cancellation deadline and ownership of
+the worker/supervisor, alongside throughput, scaling and memory objectives.
+The 17 agreed validation purposes remain in scope. Cross-OS functional
+agreement does not imply an identical maximum wall time on hosted VMs.
