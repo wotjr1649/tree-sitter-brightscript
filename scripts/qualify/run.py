@@ -578,14 +578,11 @@ def main():
         raise SystemExit("--runtime is required for qualification")
     lab.supervised_builds = True
 
-    def runtime_objects(version, root, amalgamated=False):
+    def runtime_objects(version, root):
         units = verify_runtime(root, version)
-        if amalgamated:
-            units = [Path(root) / "lib/src/lib.c"]
         objs = []
         for u in units:
-            tag = f"rt-{version}" + ("-amalgamated" if amalgamated else "")
-            o = lab.out / "build" / tag / (u.stem + ".o")
+            o = lab.out / "build" / f"rt-{version}" / (u.stem + ".o")
             o.parent.mkdir(parents=True, exist_ok=True)
             lab.compile(f"rt-{version}-{u.stem}", ["-O2", "-I", Path(root) / "lib/include", "-I", Path(root) / "lib/src",
                                                    "-c", u], o)
@@ -601,9 +598,11 @@ def main():
                 objs.append(o)
         return objs
 
-    def probe(name, grammar, runtime, runtime_root, alloc=False):
+    def probe(name, grammar, runtime, runtime_root, alloc=False, scheduled=False):
         exe = lab.out / "build" / (f"probe-{name}.exe" if sys.platform == "win32" else f"probe-{name}")
         flags = ["-DMEASURE_ALLOC"] if alloc else []
+        if scheduled:
+            flags.append("-DTSQ_SCHEDULED")
         platform_link = ["-lpsapi", "-Wl,--no-insert-timestamp"] if sys.platform == "win32" else []
         lab.compile(f"probe-{name}", ["-O2", "-Wall", "-Wextra", *flags, "-I", Path(runtime_root) / "lib/include",
                                       HERE / "probe.c", *grammar, *runtime, *platform_link], exe)
@@ -655,17 +654,16 @@ def main():
                                   check=True, timeout=60).stdout
             if hashlib.sha256(data).hexdigest() != digest:
                 raise RuntimeError(f"characterization requires frozen v0.1.3 product: {rel}")
-        art = runtime_objects("0.27.0", args.runtime, amalgamated=True)
-        aprobes = {"cand": (probe("cand-amalgamated", cand, art, args.runtime), query),
-                   "cand-alloc": (probe("cand-alloc-amalgamated", cand, art, args.runtime, alloc=True), query),
-                   **{n: (probe(f"{n}-amalgamated", ref_objs[n], art, args.runtime), q)
+        aprobes = {"cand": (probe("cand-scheduled", cand, rt, args.runtime, scheduled=True), query),
+                   "cand-alloc": (probe("cand-alloc-scheduled", cand, rt, args.runtime, alloc=True, scheduled=True), query),
+                   **{n: (probe(f"{n}-scheduled", ref_objs[n], rt, args.runtime, scheduled=True), q)
                       for n, q in (("h", refs["h"] / "queries/highlights.scm"),
                                    ("bp", refs["bp"] / "queries/highlights.scm"))}}
-        identity.update(characterization_baseline=baseline,
-                        amalgamated_probes={n: sha(p) for n, (p, _) in aprobes.items()})
+        identity.update(characterization_baseline=baseline, characterization_phase=2,
+                        scheduled_probes={n: sha(p) for n, (p, _) in aprobes.items()})
         (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
-        ar = Runner(lab, aprobes, query, roots=r.roots, runtime_build="amalgamated")
-        characterize.run({"separate": r, "amalgamated": ar}, identity, lab.out, args.seed)
+        ar = Runner(lab, aprobes, query, roots=r.roots, runtime_build="separate-scheduled")
+        characterize.run({"default": r, "scheduled": ar}, identity, lab.out, args.seed)
         return 0
     results = []
     plan = {"B5-01-MEMORY": lambda: gates.b5_01_memory(r), "B5-02-LIFECYCLE": lambda: gates.b5_02_lifecycle(r),

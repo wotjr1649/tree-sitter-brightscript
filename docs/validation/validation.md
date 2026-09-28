@@ -156,7 +156,7 @@ CI guard는 이 verifier의 고정된 `python -I -B -X utf8` 명령만 추가로
 `--characterize` 명령 두 개만 추가로 허용한다. Windows compiler는
 `C:/mingw64/bin/gcc.exe`, POSIX는 `/usr/bin/cc`, runtime은 `.work/runtime-027`,
 출력은 `.work/native-characterization`이며 다른 인수 조합은 CI guard가
-거부한다. [v4 작업 순서](native-v4-plan.md)에 등록된 소스와 두 빌드 방식만
+거부한다. [v4 작업 순서](native-v4-plan.md)에 사전 등록된 소스와 비교 조건만
 측정한다. 진단 workflow의 성공은 실행 완료만 뜻하며 출하 PASS가 아니다.
 
 Every check script runs the CLI only through `scripts/tscli.py` (so the check

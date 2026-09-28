@@ -81,3 +81,45 @@ The build alternative comes from upstream Tree-sitter 0.27.0's
 [`AMALGAMATED` option](https://github.com/tree-sitter/tree-sitter/blob/v0.27.0/CMakeLists.txt).
 The project does not modify the stock runtime or assume that the alternative
 is faster. Diagnosis can legitimately conclude that a cause remains open.
+
+## Phase 1 results and phase 2 registration
+
+[Phase 1, 36361881253](https://github.com/wotjr1649/tree-sitter-brightscript/actions/runs/36361881253)
+completed all nine jobs at `7b55d27`. Each OS's three jobs had equal image,
+compiler and input identities. Ubuntu passed all five selected gates in both
+builds. Windows failed PRINT cleanup in all six measurements (107.6–123.1 ms).
+macOS retained A5, valid-parse or ACTUAL cancellation failures in both build
+modes. The amalgamation hypothesis did not resolve the failures.
+
+A local four-item PRINT grouping experiment preserved corpus 228/228 and
+SEM-PUBLIC 2,811/2,811. Its 1 MiB PRINT allocations fell from 1,572,892 to
+524,326 and peak live bytes from 147,066,304 to 54,792,840; cleanup was 28.8 ms
+against the local frozen baseline's 67.1 ms. Its A5 gate failed, so it was not
+adopted. The experimental grammar and raw results remain in the local trial
+record. The product sources were regenerated back to the frozen baseline.
+
+Phase 2 compares the default condition with a diagnostic-only scheduled
+condition, on the same frozen sources and three independent jobs per OS.
+On Windows the probe pins its own thread to the lowest allowed process-mask
+bit and verifies the thread mask. On macOS it requests `USER_INITIATED` QoS
+with relative priority zero and verifies the requested class by readback.
+Linux is unchanged. API errors stop the probe. Neither treatment changes
+other processes or host settings; QoS does not prove use of a performance core.
+Candidate, H and BEFORE_PRINT receive the same condition. This is a separate
+experiment and does not change the default qualification condition.
+
+Before each profile's original measurements, all A5 case/operation pairs get
+an A/A control: two aliases of exactly the same binary and query, alternating
+in seeded order, one warmup plus five samples each. Every result/work signature
+must agree and the larger median divided by the smaller must be at most 1.5.
+Missing, censored, nonpositive or non-finite observations fail. A failed A/A
+control means that condition has not established repeatable comparison.
+Growth remains an independent performance verdict under the original bounds;
+a growth failure alone is not evidence of measurement invalidity. All trials
+and individual raw values are retained. A/A success does not qualify a release
+or retrospectively resolve a default-condition failure.
+
+API contracts checked for the experiment:
+[SetThreadAffinityMask](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setthreadaffinitymask),
+[GetThreadGroupAffinity](https://learn.microsoft.com/en-us/windows/win32/api/processtopologyapi/nf-processtopologyapi-getthreadgroupaffinity),
+[Apple pthread QoS](https://github.com/apple-oss-distributions/libpthread/blob/main/include/pthread/qos.h).

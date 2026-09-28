@@ -23,11 +23,18 @@
  * {"final":true,...}. Only public API calls are used.
  */
 #ifdef _WIN32
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0601
+#endif
 #include <windows.h>
 #include <psapi.h>
 #else
 #include <sys/resource.h>
 #include <time.h>
+#endif
+#ifdef __APPLE__
+#include <pthread.h>
+#include <pthread/qos.h>
 #endif
 #include <stdarg.h>
 #include <stdint.h>
@@ -41,6 +48,40 @@ typedef size_t SIZE_T;
 #include <tree_sitter/api.h>
 
 const TSLanguage *tree_sitter_brightscript(void);
+
+/* Diagnostic-only scheduling treatment; the default qualification build never sets it. */
+static int record_scheduling(void) {
+#ifdef _WIN32
+  DWORD_PTR process_mask, system_mask;
+  GROUP_AFFINITY actual;
+  if (!GetProcessAffinityMask(GetCurrentProcess(), &process_mask, &system_mask) || !process_mask) return 95;
+  DWORD_PTR selected = 0;
+#ifdef TSQ_SCHEDULED
+  selected = process_mask & (~process_mask + 1);
+  if (!SetThreadAffinityMask(GetCurrentThread(), selected)) return 95;
+#endif
+  if (!GetThreadGroupAffinity(GetCurrentThread(), &actual) || (selected && actual.Mask != selected)) return 95;
+  printf("{\"event\":\"scheduling\",\"process_mask\":%llu,\"selected_mask\":%llu,\"actual_mask\":%llu,\"group\":%u}\n",
+         (unsigned long long)process_mask, (unsigned long long)selected, (unsigned long long)actual.Mask,
+         (unsigned)actual.Group);
+#elif defined(__APPLE__)
+  qos_class_t before, after;
+  int relative;
+  if (pthread_get_qos_class_np(pthread_self(), &before, &relative)) return 95;
+#ifdef TSQ_SCHEDULED
+  if (pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0)) return 95;
+#endif
+  if (pthread_get_qos_class_np(pthread_self(), &after, &relative)) return 95;
+#ifdef TSQ_SCHEDULED
+  if (after != QOS_CLASS_USER_INITIATED || relative != 0) return 95;
+#endif
+  printf("{\"event\":\"scheduling\",\"qos_before\":%u,\"qos_after\":%u,\"relative_priority\":%d}\n",
+         (unsigned)before, (unsigned)after, relative);
+#else
+  puts("{\"event\":\"scheduling\",\"mechanism\":\"unchanged\"}");
+#endif
+  return 0;
+}
 
 #ifdef _WIN32
 static LARGE_INTEGER frequency;
@@ -641,7 +682,10 @@ int main(int argc, char **argv) {
 #ifdef MEASURE_ALLOC
   ts_set_allocator(counting_malloc, counting_calloc, counting_realloc, counting_free);
 #endif
-  if (argc == 6 && !strcmp(argv[1], "RUN")) return run(argv[2], argv[3], argv[4], atof(argv[5]));
+  if (argc == 6 && !strcmp(argv[1], "RUN")) {
+    int rc = record_scheduling();
+    return rc ? rc : run(argv[2], argv[3], argv[4], atof(argv[5]));
+  }
   if (argc == 3 && !strcmp(argv[1], "DUMP")) {
     static char buffer[1 << 16];
     setvbuf(stdout, buffer, _IOFBF, sizeof buffer);
