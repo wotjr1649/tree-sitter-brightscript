@@ -251,6 +251,7 @@ class Lab:
             status, usage, reason, stored, pipe_open, exited, waited = None, None, "COMPLETED", 0, True, False, False
             descendant_pipe = False
             peak_sampled, last_sample, max_sample_gap, samples_after_exit = 0, start, 0, 0
+            memory_kill_requested, memory_group_exit = None, None
             group_cleared = False
             try:
                 while pipe_open or not exited:
@@ -278,6 +279,7 @@ class Lab:
                             exited = True
                         if peak_sampled > cap and reason == "COMPLETED":
                             reason = "MEMORY_LIMIT_REACHED"
+                            memory_kill_requested = time.monotonic()
                             try:
                                 os.killpg(proc.pid, signal.SIGKILL)
                             except ProcessLookupError:
@@ -328,6 +330,8 @@ class Lab:
                     else:
                         raise RuntimeError(f"POSIX process group did not exit for {cid}")
                 group_cleared = True
+                if memory_kill_requested is not None:
+                    memory_group_exit = time.monotonic()
                 _, status, usage = os.wait4(proc.pid, 0)
                 waited = True
                 proc.returncode = os.waitstatus_to_exitcode(status)
@@ -350,6 +354,11 @@ class Lab:
                   "peak_working_set_bytes": peak, "peak_commit_bytes": peak,
                   "memory_metric": "group_sampled_phys_footprint_bytes" if sys.platform == "darwin" else "peak_rss_bytes",
                   "memory_limit_mode": "group_sampled_kill" if sys.platform == "darwin" else "kernel_rlimit_as",
+                  "sampled_peak_footprint_bytes": peak_sampled if sys.platform == "darwin" else None,
+                  "sampled_overshoot_bytes": max(0, peak_sampled - cap) if sys.platform == "darwin" else None,
+                  "memory_kill_to_group_exit_ms": ((memory_group_exit - memory_kill_requested) * 1000
+                                                   if memory_group_exit is not None else None),
+                  "process_peak_rss_bytes": usage.ru_maxrss if sys.platform == "darwin" else usage.ru_maxrss * 1024,
                   "max_sample_gap_ms": max_sample_gap * 1000, "configured_job_memory_limit_bytes": cap,
                   "samples_after_exit": samples_after_exit if sys.platform == "darwin" else None,
                   "image_path": str(Path(argv[0]).resolve()), "exit_confirmed": waited,
@@ -505,7 +514,10 @@ def self_test(lab):
                                       report["peak_working_set_bytes"] <= 96 * 2**20 and
                                       report.get("max_sample_gap_ms", float("inf")) <= 100),
               "private-env": report["termination_reason"] == "COMPLETED" and "PRIVATE_ENV_COMPLETED" in text}[mode]
-        results.append({"mode": mode, "pass": ok, "detail": text[-120:] if not ok else ""})
+        if sys.platform == "darwin" and report["termination_reason"] == "MEMORY_LIMIT_REACHED":
+            ok &= gates.sampled_memory_control(report)
+        results.append({"mode": mode, "pass": ok, "detail": text[-120:] if not ok else "",
+                        "report": report})
     if env_before is None:
         os.environ.pop("S05_PRIVATE_CANARY")
     else:

@@ -430,6 +430,15 @@ metrics and must retain their host labels. The process-group controls do not
 cover a child that deliberately creates a new session. No such control is
 silently inferred from a Windows Job-object PASS.
 
+The macOS memory controls retain a full supervisor report in `identity.json`.
+They require a 64 MiB configured cap, a measured group peak above that cap,
+observed overshoot at most 32 MiB, maximum sample gap at most 100 ms and at
+most 100 ms from the memory-limit kill request until the group is observed
+empty. Missing, non-finite, contradictory or incomplete-exit records fail.
+The normal sampling wait is 20 ms; the observed maximum includes scheduling
+delay. The report keeps group footprint and process peak RSS separately.
+These control observations do not bound unseen transient peaks.
+
 Each hosted OS records the W12/V6 native oracle twice and requires stable
 bytes for its 231 inputs. The aggregate job requires the exact 17 gate names,
 2,811 native tree digests, 1,533 deterministic native API signatures and

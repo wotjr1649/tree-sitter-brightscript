@@ -204,6 +204,23 @@ def number(x):
     return x if type(x) in (int, float) and math.isfinite(x) and x >= 0 else None
 
 
+def sampled_memory_control(report):
+    """macOS 64 MiB control: observed overshoot <=32 MiB and kill/observation <=100 ms.
+
+    These are bounds on the control's observations, not on unobserved footprint peaks.
+    """
+    fields = ("configured_job_memory_limit_bytes", "sampled_peak_footprint_bytes", "sampled_overshoot_bytes",
+              "max_sample_gap_ms", "memory_kill_to_group_exit_ms")
+    if any(number(report.get(k)) is None for k in fields):
+        return False
+    cap, peak, over, gap, latency = (report[k] for k in fields)
+    return (report.get("memory_limit_mode") == "group_sampled_kill"
+            and report.get("termination_reason") == "MEMORY_LIMIT_REACHED"
+            and report.get("exit_confirmed") is True and type(report.get("active_processes")) is int
+            and report["active_processes"] == 0 and cap == 64 * MIB and peak > cap
+            and over == peak - cap and over <= 32 * MIB and gap <= 100 and latency <= 100)
+
+
 def budget_run(rec, budget):
     """One execution judged by its own records alone (gate contract CANCEL; Session 05-7-1 C1).
 
