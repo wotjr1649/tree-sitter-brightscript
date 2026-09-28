@@ -531,3 +531,13 @@ guard tests, six original gate tests, ten characterization tests, V0 and
 diff checks. A compiler-path error before the first local trial launched no
 probe and is retained separately from the judgement failure. No hosted pilot
 or full-qualification result is claimed by these local observations.
+
+The preassigned [hosted pilot 36381377616](https://github.com/wotjr1649/tree-sitter-brightscript/actions/runs/36381377616)
+at `bcc5755` passed on all three OS, 278 executions each. Exact raw replay of
+all 834 records and source/hosted identity checks passed. Common CI and POSIX
+preflight also passed. All 15 original sampling points already passed on
+each host, so this pilot did not reproduce the earlier missing counterpart.
+Independent review confirms HOLD: neither this pilot nor the completed
+non-reproducing Windows diagnostics establishes a latency cause or correction.
+No new full pair is registered. The current result and evidence needed to
+reopen are recorded in the [candidate report](../reports/0.1.4-native-parity-candidate.md#v41-cancel-pilot-bcc5755--pass-within-its-scope).
