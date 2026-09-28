@@ -524,7 +524,12 @@ The 0.1.1–0.1.3 default supervisor was byte-identical to S572 (SHA-256
 `000ce1db84540d2195a352bf6c49f19bcd859d4e9f726b3d0f17d23477ef56f5`).
 The 0.1.4 root-accounting correction uses the same pinned GCC and stock build
 recipe, with one exact replacement image SHA-256
-`e2ce27725de5471cdefc157a8e5885a6da0e12a7ea36e665b21c551533c5a8e0`.
+`c1fc5d7e0ea00ebc72d4ef6e14d915341bb473cc08aaaca7b8ce72cf01cdb847`.
+The initial correction image was `e2ce27725de5471cdefc157a8e5885a6da0e12a7ea36e665b21c551533c5a8e0`;
+the current image additionally reads final root user/kernel CPU time after
+exit using [GetProcessTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes).
+Query failure remains a harness failure. CPU observations do not change any
+wall-time gate. POSIX reports the corresponding existing `wait4` usage.
 After the root signals, only `(ActiveProcesses=1, TotalProcesses=1)` may
 settle inside the existing fixed 3-second cleanup deadline. During settling,
 any observed child is rejected before an empty-job check, including an

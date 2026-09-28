@@ -12,6 +12,7 @@ from check_oracle_pair import compare as compare_oracles
 from compare_native_evidence import compare as compare_hosts
 from package_native_evidence import package
 from package_repeated_native_evidence import HOSTS, repeated
+from qualify.test_latency_diagnostic import WitnessRecords
 
 
 def sha(data):

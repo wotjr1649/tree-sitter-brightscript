@@ -64,10 +64,9 @@ NATIVE_WINDOWS_FULL_COMMAND = ("python scripts/qualify/run.py --cc C:/mingw64/bi
                                "--runtime .work/runtime-027 --support 0.25.1=.work/runtime-025 "
                                "--support 0.26.13=.work/runtime-026 --out .work/native-full")
 CI_ALLOWED += "|" + re.escape(NATIVE_WINDOWS_FULL_COMMAND)
-LATENCY_DIAGNOSTIC_COMMAND = ("python scripts/qualify/run.py --latency-diagnostic --cc /usr/bin/cc "
-                              "--runtime .work/runtime-027 --out .work/native-characterization")
-LATENCY_DIAGNOSTIC_WINDOWS_COMMAND = LATENCY_DIAGNOSTIC_COMMAND.replace("/usr/bin/cc", "C:/mingw64/bin/gcc.exe")
-CI_ALLOWED += "|" + re.escape(LATENCY_DIAGNOSTIC_COMMAND) + "|" + re.escape(LATENCY_DIAGNOSTIC_WINDOWS_COMMAND)
+LATENCY_WITNESS_COMMAND = ("python scripts/qualify/run.py --latency-witness --cc C:/mingw64/bin/gcc.exe "
+                           "--runtime .work/runtime-027 --out .work/native-characterization")
+CI_ALLOWED += "|" + re.escape(LATENCY_WITNESS_COMMAND)
 # `run` keys in the spellings recognised here (flow mapping, quoted key, extra spaces, `\x72un`, `\u0072un`);
 # each must be one the parser read. Other escapes are not recognised (validation.md "Identity binding").
 ANY_RUN_KEY = re.compile(r"""(?:^|[\s{,])["']?(?:run|\\x72un|\\u0072un)["']?\s*:""", re.M)
@@ -313,19 +312,20 @@ class VerifiedCli(unittest.TestCase):
                     for c in ci_commands(wf.read_text(encoding="utf-8"))]
         qualification_commands = [(wf.name, c) for wf in sorted((SCRIPTS.parent / ".github/workflows").glob("*.y*ml"))
                                   for c in ci_commands(wf.read_text(encoding="utf-8")) if "qualify" in c]
-        self.assertEqual(qualification_commands, [("native-characterization.yml", LATENCY_DIAGNOSTIC_COMMAND),
-                                                  ("native-characterization.yml", LATENCY_DIAGNOSTIC_WINDOWS_COMMAND),
+        self.assertEqual(qualification_commands, [("native-characterization.yml", LATENCY_WITNESS_COMMAND),
                                                   ("native-preflight.yml", POSIX_PREFLIGHT_COMMAND),
                                                   ("native-preflight.yml", NATIVE_SMOKE_COMMAND),
                                                   ("native-qualification.yml", NATIVE_FULL_COMMAND),
                                                   ("native-qualification.yml", NATIVE_WINDOWS_FULL_COMMAND)])
         self.assertFalse(allowed("python scripts/qualify/run.py --cc x"))
         self.assertFalse(allowed("python scripts/qualify/run.py --safety-profile native"))
-        for command in (LATENCY_DIAGNOSTIC_COMMAND, LATENCY_DIAGNOSTIC_WINDOWS_COMMAND):
+        for command in (LATENCY_WITNESS_COMMAND,):
             self.assertTrue(allowed(command))
             for mutant in (command + " --gates CANCEL", command + " --characterize",
-                           command.replace("--latency-diagnostic", "--preflight"),
-                           command.replace("--latency-diagnostic", "--characterize"),
+                           command.replace("--latency-witness", "--preflight"),
+                           command.replace("--latency-witness", "--characterize"),
+                           command.replace("--latency-witness", "--latency-diagnostic"),
+                           command + " --latency-diagnostic",
                            command.replace(".work/native-characterization", "../outside"),
                            command.replace(".work/runtime-027", "../runtime"),
                            command.replace("/usr/bin/cc", "cc").replace("C:/mingw64/bin/gcc.exe", "gcc.exe"),

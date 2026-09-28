@@ -200,7 +200,7 @@ def prepare(args):
     lab.compile("supervisor-stock", base, lab.supervisor)
     stock_sha = run.sha(lab.supervisor)
     # v0.1.4 root-accounting correction; the historical S572 identity is retained in validation.md.
-    if stock_sha != "e2ce27725de5471cdefc157a8e5885a6da0e12a7ea36e665b21c551533c5a8e0":
+    if stock_sha != "c1fc5d7e0ea00ebc72d4ef6e14d915341bb473cc08aaaca7b8ce72cf01cdb847":
         raise RuntimeError("stock supervisor differs from the verified v0.1.4 image")
     stock_tests = run.self_test(lab)
     stock_tests.append(lab.supervisor_refusal("stock-refuses-safety-cap", CAP, 1000, 1024))

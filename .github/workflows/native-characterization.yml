@@ -1,4 +1,4 @@
-name: Native latency diagnosis
+name: Windows latency witness
 
 on:
   workflow_dispatch:
@@ -15,11 +15,7 @@ permissions:
 
 jobs:
   characterize:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-2025-vs2026, ubuntu-24.04, macos-15]
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-2025-vs2026
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,16 +35,12 @@ jobs:
         with:
           python-version: "3.14"
       - run: npm ci
-      - name: Diagnose POSIX latency
-        if: runner.os != 'Windows'
-        run: python scripts/qualify/run.py --latency-diagnostic --cc /usr/bin/cc --runtime .work/runtime-027 --out .work/native-characterization
-      - name: Diagnose Windows latency
-        if: runner.os == 'Windows'
-        run: python scripts/qualify/run.py --latency-diagnostic --cc C:/mingw64/bin/gcc.exe --runtime .work/runtime-027 --out .work/native-characterization
+      - name: Record the fixed Windows witnesses
+        run: python scripts/qualify/run.py --latency-witness --cc C:/mingw64/bin/gcc.exe --runtime .work/runtime-027 --out .work/native-characterization
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: latency-${{ matrix.os }}
+          name: latency-witness-windows
           path: |
             .work/native-characterization/identity.json
             .work/native-characterization/latency-diagnostic.json

@@ -195,6 +195,9 @@ cleanup:
     } else {
       ended = TRUE;
       if (!GetExitCodeProcess(process.hProcess, &exit_code)) { failure = GetLastError(); reason = "HARNESS_FAILURE"; }
+      if (!GetProcessTimes(process.hProcess, &created, &exited, &kernel, &user)) {
+        failure = GetLastError(); reason = "HARNESS_FAILURE";
+      }
       memory.cb = sizeof memory;
       if (!GetProcessMemoryInfo(process.hProcess, (PROCESS_MEMORY_COUNTERS *)&memory, sizeof memory)) {
         failure = GetLastError(); reason = "HARNESS_FAILURE";
@@ -257,6 +260,7 @@ cleanup:
       "\"peak_commit_bytes\":%llu,\"job_peak_commit_bytes\":%llu,\"active_processes\":%lu,"
       "\"exit_active_processes\":%lu,\"exit_total_processes\":%lu,"
       "\"root_accounting_pending\":%s,\"accounting_settle_ms\":%.3f,"
+      "\"user_cpu_ms\":%.6f,\"kernel_cpu_ms\":%.6f,"
       "\"total_processes\":%lu,\"configured_process_memory_limit_bytes\":%llu,"
       "\"configured_job_memory_limit_bytes\":%llu,\"limit_flags\":%lu,\"image_path\":",
       process.dwProcessId, GetCurrentProcessId(), (unsigned long long)creation,
@@ -266,6 +270,8 @@ cleanup:
       (unsigned long long)memory.PeakWorkingSetSize, (unsigned long long)limits.PeakProcessMemoryUsed,
       (unsigned long long)limits.PeakJobMemoryUsed, accounting.ActiveProcesses,
       exit_active_processes, exit_total_processes, root_accounting_pending ? "true" : "false", accounting_settle_ms,
+      (((uint64_t)user.dwHighDateTime << 32) | user.dwLowDateTime) / 10000.0,
+      (((uint64_t)kernel.dwHighDateTime << 32) | kernel.dwLowDateTime) / 10000.0,
       total_processes,
       (unsigned long long)limits.ProcessMemoryLimit, (unsigned long long)limits.JobMemoryLimit,
       limits.BasicLimitInformation.LimitFlags);

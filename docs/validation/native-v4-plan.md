@@ -447,3 +447,40 @@ was 88.871563 ms. This establishes substantial CPU work in the instrumented
 EOF interval, not the cause of the earlier Windows outliers. The previous
 failures remain open; successful diagnostic completion does not justify
 another unchanged final qualification attempt.
+
+### Short Windows witnesses with final root CPU observation
+
+The retained Windows sweep contains two small-input outliers:
+`SW-y203d205b-2920else20-colon-k00400` has 16 samples with median 1.02595 ms,
+maximum 190.8754 ms and interior gap 189.8284 ms; `SW-3f20-5b12c-eof-k00400`
+has median 0.9431 ms, maximum 128.017 ms and gap 127.0413 ms. Their original
+CPU usage was not recorded. They motivate a lower-overhead observation plan;
+they do not prove the cause of earlier L-ANON/V-LONGEXPR failures.
+
+After independent design review, a single Windows job alternates these two
+unchanged witnesses 5,000 times each at budget zero with the original plain
+probe: 10,000 executions, 20-minute job limit, no automatic extension or
+retry. The supervisor reads final root user/kernel CPU after confirmed exit;
+the original probe is unchanged and the previous binary identity check
+remains mandatory. CPU query errors fail closed. Retain every raw record,
+process/image/tool identity, UTC start and elapsed campaign duration.
+
+Only complete observations can inform interpretation. A gap much larger
+than total root CPU supports time not accounted for by CPU execution, subject
+to counter granularity; a larger CPU total cannot determine what happened
+inside that gap. Neither outcome identifies a particular system service or
+relabels a historical failure. Non-reproduction remains inconclusive. The
+fixed workflow command receives the same exact allowlist and argument-
+mutation checks; no new launcher is exempted.
+
+Implementation review found and closed one P2: the initial completeness
+check did not require successful execution of the intended PARSE workload.
+The validator now reuses the registered result/error-state check and binds
+both input hashes, byte lengths, budget zero, non-cancellation, supervisor
+exit, and exact event/final timings. Non-finite values and a gap exceeding
+parse time are rejected. Positive and planted-defect controls join the
+existing native-evidence tests in common CI. The local campaign already in
+progress at that finding retains its original source and completion record;
+its stronger post-run audit is separate from execution by the corrected
+validator. The final-CPU supervisor passed stock/extended safety controls,
+including normal/sleep CPU observations, before prospective hosted use.
