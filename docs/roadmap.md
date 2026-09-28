@@ -2,18 +2,19 @@
 
 ## Current maturity
 
-v0.1.3 was released on 2026-09-28 KST
-([release record](reports/0.1.3-release-candidate.md)). It preserves grammar,
-scanner, query and public-tree behaviour and adds Windows x64, Ubuntu x64 and
-macOS 15 ARM64 CI evidence. The earlier
+v0.1.4 was released on 2026-09-28 KST
+([release record](reports/0.1.4-release.md)). All 17 native purposes passed in
+two independent jobs per supported OS: Windows x64, Ubuntu 24.04 x64 and
+macOS 15 ARM64. Registered functional outcomes agree exactly across six jobs;
+source-only distribution now includes a nonbinary evidence ZIP. The earlier
 [Session 08 source validation](reports/session-08-cross-platform-source-validation.md)
 was post-v0.1.2 evidence; it did not change that release's identity.
 The [maintenance freeze](maintenance.md) takes effect after final documentation
 CI and handoff; only its concrete triggers reopen triage.
-The explicitly requested [v0.1.4 native parity candidate](reports/0.1.4-native-parity-candidate.md)
-is on a separate session branch and remains HOLD while its three-OS native
-qualification and review are incomplete. It does not change the published
-v0.1.3 identity.
+The [v0.1.4 candidate investigation](reports/0.1.4-native-parity-candidate.md)
+preserves earlier HOLD/FAIL results. The final v6 contract uses the owner's
+250 ms response and cooperative-completion choices. Published v0.1.3 and
+earlier identities remain unchanged.
 
 The phases below record the original development roadmap, not automatic next tasks.
 Past holds and failed campaigns remain in [qualification history](reports/0.1.0-integrated-qualification.md).

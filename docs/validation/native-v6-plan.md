@@ -1,5 +1,10 @@
 # Native protocol v6 qualification
 
+Qualification and publication completed for candidate `82784b8`; the
+[publication receipt](../reports/0.1.4-release.md) records the source/tag identity
+and public asset verification. Maintenance closure follows final documentation
+CI and handoff.
+
 This prospective plan applies [ADR-0012](../design/decisions/ADR-0012-cooperative-cancellation-contract.md),
 the owner's explicit normal-completion/cancellation distinction. The four
 250 ms allowances, stock runtime and all other v5 requirements remain.
