@@ -1,4 +1,4 @@
-"""Owner-selected v5 response requirements; historical judges default to 100 ms."""
+"""Owner-selected v6 cooperative completion; retain complete v5 and 100 ms judgements."""
 import hashlib
 import json
 from itertools import islice
@@ -7,7 +7,8 @@ from pathlib import Path
 import gates
 import gates_v4
 
-PROTOCOL = "v5"
+PROTOCOL = "v6"
+V5_SHA256 = "9056d84a249e809b3c11feaad07881f3bfa043201b852e94549a009bb64e0381"
 LIMIT_MS = 250
 CONTRACT = {
     "callback_gap_ms": LIMIT_MS,
@@ -17,7 +18,9 @@ CONTRACT = {
 }
 SPEC = {"protocol": PROTOCOL, "limits_ms": CONTRACT,
         "overshoot_collection": "v3: three extra runs at 80..120 ms or above 100 ms",
-        "actual_cancellation": "CANCEL registered timed points and FIRST/HALF controls",
+        "actual_cancellation": "every issued timed cancellation request and all FIRST/HALF controls",
+        "timed_normal_completion": "no request, correct result, plain return <= B+250; NOT_TRIGGERED, never cancellation coverage",
+        "timed_memory": "elapsed budget still requires observed growth in the fixed six allocator samples; missing observation fails",
         "overshoot_semantics": "return within budget + allowance; natural completion is not actual-cancellation evidence"}
 SHA256 = hashlib.sha256(json.dumps(SPEC, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 IDENTITY = {"spec": SPEC, "sha256": SHA256}
@@ -26,20 +29,22 @@ GATES = {"CANCEL", "CANCEL-OVERSHOOT", "MAX-CALLBACK-GAP", "CLEANUP-ALL"}
 
 def require_identity(identity):
     if identity.get("protocol") != PROTOCOL or identity.get("response_policy") != IDENTITY:
-        raise ValueError("unapproved or missing v5 response policy")
+        raise ValueError("unapproved or missing v6 response policy")
 
 
 def require_results(results):
     for result in results:
         if result["gate"] in GATES:
             legacy = result.get("legacy_v4_1_100ms", {})
+            v5 = result.get("legacy_v5_250ms", {})
             if (result.get("response_policy_sha256") != SHA256 or legacy.get("gate") != result["gate"]
-                    or legacy.get("status") not in ("PASS", "FAIL")):
+                    or legacy.get("status") not in ("PASS", "FAIL") or v5.get("gate") != result["gate"]
+                    or v5.get("status") not in ("PASS", "FAIL") or v5.get("response_policy_sha256") != V5_SHA256):
                 raise ValueError("response gate policy or historical judgement missing")
 
 
 def require_raw_results(path, results):
-    """Recompute both complete verdicts from the registered response segment; no native execution."""
+    """Recompute active and both historical verdicts from the raw segment; no native execution."""
     path = Path(path)
     if not path.is_file() or path.is_symlink() or path.stat().st_size > 64 * 2**20:
         raise ValueError("missing, linked or oversized response raw records")
@@ -109,7 +114,7 @@ class Recording:
         record = self.runner.run(*args, **kwargs)
         self.records.append(record)  # Full return records; lab.runs compacts budget-zero rows.
         if not valid_record(record):
-            raise ValueError("invalid v5 response measurement; raw execution retained")
+            raise ValueError("invalid response measurement; raw execution retained")
         return record
 
 
@@ -128,24 +133,31 @@ class Replay:
 
 
 def evaluate(runner, judge):
-    """Collect once; retain independent 250 ms and historical 100 ms verdicts."""
+    """Collect once; retain v6, historical v5 at 250 ms and v4.1 at 100 ms."""
     recording = Recording(runner)
-    current = judge(recording, response_ms=LIMIT_MS)
+    options = {"allow_natural": True} if judge is gates_v4.cancel else {}
+    current = judge(recording, response_ms=LIMIT_MS, **options)
+    v5_replay = Replay(recording.records)
+    v5_result = judge(v5_replay, response_ms=LIMIT_MS)
     replay = Replay(recording.records)
     historical = judge(replay)  # Default remains exactly the historical 100 ms policy.
-    if len(replay.runs) != len(recording.records):
+    if len(replay.runs) != len(recording.records) or len(v5_replay.runs) != len(recording.records):
         raise ValueError("historical response replay did not consume every execution")
     active = current if isinstance(current, list) else [current]
     old = historical if isinstance(historical, list) else [historical]
-    if [x["gate"] for x in active] != [x["gate"] for x in old]:
+    v5 = v5_result if isinstance(v5_result, list) else [v5_result]
+    if [x["gate"] for x in active] != [x["gate"] for x in old] or [x["gate"] for x in v5] != [x["gate"] for x in old]:
         raise ValueError("response gate registration changed")
-    for result, previous in zip(active, old):
+    for result, prior_v5, previous in zip(active, v5, old):
         if result["gate"] == "CANCEL-OVERSHOOT":
             judged = [overshoot_record(x) for x in recording.records]
             result["individual_runs"] = judged
+            prior_v5["individual_runs"] = judged
             if not all(x["pass"] for x in judged):
-                result["status"] = "FAIL"
-        result.update(response_policy_sha256=SHA256, legacy_v4_1_100ms=previous)
-        result["notes"].append("v5: owner-selected 250 ms response policy; historical 100 ms verdict retained separately")
+                result["status"] = prior_v5["status"] = "FAIL"
+        prior_v5.update(response_policy_sha256=V5_SHA256, legacy_v4_1_100ms=previous)
+        prior_v5["notes"].append("v5: owner-selected 250 ms response policy; historical 100 ms verdict retained separately")
+        result.update(response_policy_sha256=SHA256, legacy_v4_1_100ms=previous, legacy_v5_250ms=prior_v5)
+        result["notes"].append("v6: bounded natural completion is NOT_TRIGGERED; actual requests, FIRST/HALF and memory remain required")
     require_results(active)
     return current

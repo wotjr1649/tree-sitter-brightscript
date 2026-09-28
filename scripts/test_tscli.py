@@ -76,9 +76,9 @@ COMPLETION_GAP_COMMAND = ("python scripts/qualify/run.py --cc /usr/bin/cc "
                           "--runtime .work/runtime-027 --out .work/completion-gap --completion-gap-diagnostic")
 CI_ALLOWED += "|" + re.escape(COMPLETION_GAP_COMMAND)
 RESPONSE_WINDOWS_COMMAND = ("python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe --runtime .work/runtime-027 "
-                            "--out .work/response-v5 --gates CANCEL,CANCEL-OVERSHOOT,MAX-CALLBACK-GAP")
+                            "--out .work/response-v6 --gates CANCEL,CANCEL-OVERSHOOT,MAX-CALLBACK-GAP")
 RESPONSE_POSIX_COMMAND = ("python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 "
-                          "--out .work/response-v5 --gates CANCEL,CANCEL-OVERSHOOT,MAX-CALLBACK-GAP")
+                          "--out .work/response-v6 --gates CANCEL,CANCEL-OVERSHOOT,MAX-CALLBACK-GAP")
 CI_ALLOWED += "|" + "|".join(map(re.escape, (RESPONSE_WINDOWS_COMMAND, RESPONSE_POSIX_COMMAND)))
 # `run` keys in the spellings recognised here (flow mapping, quoted key, extra spaces, `\x72un`, `\u0072un`);
 # each must be one the parser read. Other escapes are not recognised (validation.md "Identity binding").
@@ -366,7 +366,7 @@ class VerifiedCli(unittest.TestCase):
             self.assertTrue(allowed(command))
             for mutant in (command + " --response-ms 500", command + " --completion-pilot",
                            command.replace("CANCEL,CANCEL-OVERSHOOT,MAX-CALLBACK-GAP", "CANCEL"),
-                           command.replace(".work/response-v5", "../outside"), command + "; whoami"):
+                           command.replace(".work/response-v6", "../outside"), command + "; whoami"):
                 self.assertFalse(allowed(mutant), mutant)
         for altered in (POSIX_PREFLIGHT_COMMAND + " --gates CANCEL",
                         POSIX_PREFLIGHT_COMMAND.replace("/usr/bin/cc", "cc"),

@@ -24,6 +24,7 @@ link to it rather than restate it.
 | [validation/public-replay.md](validation/public-replay.md) | v0.1.2의 offline raw 재판정과 candidate identity 검사 | 공개 verifier를 실행하거나 결과를 해석할 때 |
 | [validation/native-v4-plan.md](validation/native-v4-plan.md) | v0.1.4 HOLD 원인 진단과 재검증 순서, 적대적 설계 검토 결과 | 세 OS native FAIL을 해결할 때 |
 | [validation/native-v5-plan.md](validation/native-v5-plan.md) | 소유자가 선택한 250 ms 응답성 계약과 stock runtime의 새 출하 검증 | v0.1.4 v5 구현·검증·출하를 진행할 때 |
+| [validation/native-v6-plan.md](validation/native-v6-plan.md) | 정상 완료와 실제 취소를 구분하는 250 ms 계약과 새 전체 검증 | 현재 v0.1.4 구현·검증·출하를 진행할 때 |
 | [validation/workload-matrix.md](validation/workload-matrix.md) | Validation sets W01–W14 and the catalogue of every corpus fixture | Writing fixtures; running V2–V10 |
 | [validation/known-regressions.md](validation/known-regressions.md) | Defects of earlier grammars and the checks that prevent them | Reviewing grammar or generation changes |
 | [reports/0.1.0-release-candidate.md](reports/0.1.0-release-candidate.md) | Release-candidate evidence, gate results and verdict for 0.1.0 | Checking what the candidate proves |

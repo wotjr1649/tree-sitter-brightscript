@@ -1,5 +1,9 @@
 # Native protocol v5 qualification
 
+Historical plan. [Protocol v6](native-v6-plan.md) prospectively supersedes only
+the timed CANCEL normal-completion condition after the owner's explicit choice;
+all v5 observations and FAILs retain their original meaning.
+
 Status: owner-approved 250 ms requirement; implementation/qualification pending.
 Tracking: issue #11, PR #10, milestone #2, branch `session/10-v014-native-parity`.
 Decision: [ADR-0011](../design/decisions/ADR-0011-background-response-contract.md).

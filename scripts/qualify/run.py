@@ -991,7 +991,7 @@ def main():
         r.runtime_build = "separate-scheduled-progressed-cancellation"
         return characterize.run(r, identity, lab.out)
     response_policy.require_identity(identity)
-    r.runtime_build = "separate-scheduled-v5-stock-runtime"
+    r.runtime_build = f"separate-scheduled-{response_policy.PROTOCOL}-stock-runtime"
     results = []
     plan = {"B5-01-MEMORY": lambda: gates.b5_01_memory(r), "B5-02-LIFECYCLE": lambda: gates.b5_02_lifecycle(r),
             "A5-01-COST": lambda: gates_v4.performance(r, args.seed),

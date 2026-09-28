@@ -127,5 +127,6 @@ README holding every contract.
 | Tree stability, versioning | [tree-schema.md](../specs/tree-schema.md) |
 | Validation gates, Level 2 policy | [validation.md](../validation/validation.md) |
 | Background-analysis response requirements | [ADR-0011](decisions/ADR-0011-background-response-contract.md), [v5 plan](../validation/native-v5-plan.md) |
+| Cooperative cancellation and normal completion | [ADR-0012](decisions/ADR-0012-cooperative-cancellation-contract.md), [v6 plan](../validation/native-v6-plan.md) |
 | Validation workloads, fixture catalogue, known regressions | [workload-matrix.md](../validation/workload-matrix.md), [known-regressions.md](../validation/known-regressions.md) |
 | Git workflow | `AGENTS.md` |

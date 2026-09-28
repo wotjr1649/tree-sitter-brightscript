@@ -1,4 +1,4 @@
-"""Prospective v5 controls; synthetic records do not qualify native execution."""
+"""Prospective v6 controls; synthetic records do not qualify native execution."""
 import copy
 import hashlib
 import json
@@ -18,6 +18,8 @@ class CancellationRecords(Cancellation):
         r = super().run(*args, **kwargs)
         p, f = r["events"]["parse"], r["final"]
         p.update(head_gap_ms=.5, max_gap_ms=.5, tail_gap_ms=.5, max_gap_incl_edges_ms=.5)
+        if r["op"] == "PARSE":
+            p.update(callback_target=0, byte_target=0, request_ms=p["budget_cross_ms"] if p["cancelled"] else -1.)
         f["max_gap_incl_edges_ms"] = .5
         if r["build"] == "cand":
             r["events"]["cleanup"]["parser_delete_ms"] = f["parser_delete_ms"] = 175.
@@ -45,11 +47,80 @@ class PlainRecords:
         return r
 
 
+class NaturalBoundary(CancellationRecords):
+    """A normal deadline-edge return with a separately measured allocator counterpart."""
+    def run(self, *args, **kwargs):
+        r = super().run(*args, **kwargs)
+        if r["case"] == "L-ANON-1MiB" and r["budget"] == 200:
+            p, c, f = r["events"]["parse"], r["events"]["cleanup"], r["final"]
+            if r["tag"] == "rep1":
+                p.update(parse_ms=200.8, tail_gap_ms=2.1, max_gap_incl_edges_ms=2.1)
+                f.update(parse_ms=200.8, max_gap_incl_edges_ms=2.1)
+            elif r["tag"] == "alloc" and self.defect != "no-growth-counterpart":
+                p.update(parse_ms=201., cancelled=True, budget_cross_ms=200., cross_at_callback=True,
+                         request_ms=200., live_at_budget=1000, peak_after_budget=1001)
+                c.update(tree_delete_ms=-1., peak_after_budget=1001)
+                f.update(parse_ms=201., cancelled=True, has_error=-1, tree_delete_ms=-1.)
+        return r
+
+
 class ResponsePolicy(unittest.TestCase):
+    def test_cooperative_boundary_preserves_actual_coverage_and_memory(self):
+        r = NaturalBoundary()
+        result = policy.evaluate(r, gates_v4.cancel)
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["legacy_v5_250ms"]["status"], "FAIL")
+        self.assertEqual(result["timed_outcomes"]["NATURAL_WITHIN_RETURN_BOUND"], 1)
+        self.assertTrue(result["first_callback_control"]["pass"] and result["progressed_control"]["pass"])
+        natural = next(j for p in result["points"] for j in p["judged"] if j["status"] == "NATURAL_WITHIN_RETURN_BOUND")
+        self.assertEqual(natural["cancellation_coverage"], "NOT_TRIGGERED")
+        self.assertTrue(natural["reached"])
+        self.assertEqual(len(r.runs), 278)
+        missing = policy.evaluate(NaturalBoundary("no-growth-counterpart"), gates_v4.cancel)
+        self.assertEqual(missing["status"], "FAIL")
+        self.assertTrue(any(not p["growth_observed"] for p in missing["points"]))
+
+    def test_cooperative_requests_and_boundaries_fail_closed(self):
+        rows = NaturalBoundary()
+        natural = rows.run("cand", "PARSE", "L-ANON-1MiB", 200, tag="rep1")
+
+        def judge(r, allocator=False):
+            return gates_v4.timed_record(r, r["case"], r["budget"], allocator,
+                                         response_ms=250, allow_natural=True)
+
+        self.assertTrue(judge(natural)["pass"])
+        self.assertFalse(judge(natural, True)["pass"])  # No allocator crossing is never measured growth.
+        for callback_time, passed in ((200.000001, True), (200.000002, False)):
+            r = copy.deepcopy(natural)
+            r["events"]["parse"]["tail_gap_ms"] = r["final"]["parse_ms"] - callback_time
+            self.assertEqual(judge(r)["pass"], passed)
+        for elapsed, passed in ((450., True), (450.001, False)):
+            r = copy.deepcopy(natural)
+            r["events"]["parse"].update(parse_ms=elapsed, tail_gap_ms=elapsed - 199.)
+            r["final"]["parse_ms"] = elapsed
+            self.assertEqual(judge(r)["pass"], passed)
+        for key, value in (("request_ms", 200.), ("request_ms", None), ("request_ms", float("nan")),
+                           ("cross_at_callback", True), ("callbacks", True), ("callback_target", False),
+                           ("tail_gap_ms", .1)):
+            r = copy.deepcopy(natural)
+            r["events"]["parse"][key] = value
+            self.assertFalse(judge(r)["pass"], (key, value))
+        requested = record(budget=200)
+        requested["events"]["parse"].update(callback_target=0, byte_target=0)
+        self.assertTrue(judge(requested)["pass"])
+        for elapsed, passed in ((450., True), (450.001, False)):
+            r = copy.deepcopy(requested)
+            r["events"]["parse"]["parse_ms"] = r["final"]["parse_ms"] = elapsed
+            self.assertEqual(judge(r)["pass"], passed)
+        for key, value in (("request_ms", -1.), ("request_ms", 199.), ("request_ms", 202.), ("callbacks", 0)):
+            r = copy.deepcopy(requested)
+            r["events"]["parse"][key] = value
+            self.assertFalse(judge(r)["pass"], (key, value))
+
     def test_exact_policy_and_mutations(self):
         good = {"protocol": policy.PROTOCOL, "response_policy": copy.deepcopy(policy.IDENTITY)}
         policy.require_identity(good)
-        for protocol in ("v4", "v4.1", "v6", None):
+        for protocol in ("v4", "v4.1", "v5", None):
             with self.assertRaises(ValueError):
                 policy.require_identity(dict(good, protocol=protocol))
         for limit in (100, 249, 251, 500):
@@ -101,7 +172,7 @@ class ResponsePolicy(unittest.TestCase):
 
     def test_invalid_records_and_replay_registration_fail_closed(self):
         for value in (float("nan"), float("inf"), -1.):
-            with self.assertRaisesRegex(ValueError, "invalid v5"):
+            with self.assertRaisesRegex(ValueError, "invalid response"):
                 policy.evaluate(PlainRecords(defect=value), gates.gaps_and_cleanup)
         r = record()
         r["report"]["active_processes"] = False

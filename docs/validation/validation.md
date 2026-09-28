@@ -407,13 +407,18 @@ compiler and a private parser-library directory per checkout.
 
 ### v0.1.4 three-OS native candidate
 
-The active prospective contract is now **v5**, under the owner's explicit
-250 ms choice in [ADR-0011](../design/decisions/ADR-0011-background-response-contract.md).
-Follow [native-v5-plan.md](native-v5-plan.md) for exact timing references,
+The active prospective contract is now **v6**, under the owner's explicit
+250 ms choice in [ADR-0011](../design/decisions/ADR-0011-background-response-contract.md)
+and normal-completion/cancellation distinction in
+[ADR-0012](../design/decisions/ADR-0012-cooperative-cancellation-contract.md).
+Follow [native-v6-plan.md](native-v6-plan.md) for exact timing references,
 policy binding and the required preflight/six-job qualification. Stock runtime,
 all 17 purposes, functional/memory/growth/supervision requirements and registered
 inputs remain. The four 100 ms response bounds below are historical v4/v4.1;
-v5 uses 250 ms and retains separate historical judgements. This does not change
+v6 uses 250 ms and retains separate v5/250 ms and v4.1/100 ms judgements.
+Timed normal completion without a request is NOT_TRIGGERED and provides no
+actual-cancellation coverage. Elapsed-budget memory observations and the
+FIRST/HALF actual-cancellation controls remain mandatory. This does not change
 the macOS memory guard's 100 ms controls or any published release evidence.
 
 #### Retained v4/v4.1 contract and qualification procedure

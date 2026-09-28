@@ -79,7 +79,7 @@ class NativeEvidence(unittest.TestCase):
         zero = "0" * 64
         return {"commit": "a" * 40, "candidate": {"src/parser.c": zero, "grammar.js": zero},
                 "lane_sources": {"run.py": zero},
-                "protocol": "v5", "response_policy": response_policy.IDENTITY, "runtime": "0.27.0", "support": ["0.25.1", "0.26.13"], "seed": 5707,
+                "protocol": "v6", "response_policy": response_policy.IDENTITY, "runtime": "0.27.0", "support": ["0.25.1", "0.26.13"], "seed": 5707,
                 "gate_statuses": list(REQUIRED_GATES), "oracle_cases": 231,
                 "oracle_workload": {"cases": 231, "sha256": zero}, "oracle_content_sha256": zero,
                 "native_trees": [{"name": f"case-{i}", "input_sha256": zero, "tree_sha256": zero}
@@ -129,7 +129,7 @@ class NativeEvidence(unittest.TestCase):
             with self.assertRaises(ValueError):
                 compare_hosts(*paths)
             paths[0].write_text(original, encoding="utf-8")
-            for protocol, limit in (("v4.1", 250), ("v5", 100), ("v5", 500)):
+            for protocol, limit in (("v4.1", 250), ("v5", 250), ("v6", 100), ("v6", 500)):
                 changed = json.loads(original)
                 changed["common"]["protocol"] = protocol
                 policy = changed["common"]["response_policy"]
@@ -161,7 +161,7 @@ class NativeEvidence(unittest.TestCase):
             q.mkdir()
             common = self.common()
             identity = {"git_clean": True, "git_head": common["commit"], "candidate": common["candidate"],
-                        "lane_sources": common["lane_sources"], "runtime": common["runtime"], "protocol": "v5", "response_policy": response_policy.IDENTITY,
+                        "lane_sources": common["lane_sources"], "runtime": common["runtime"], "protocol": "v6", "response_policy": response_policy.IDENTITY,
                         "support": common["support"], "seed": common["seed"], "cc_sha256": "0" * 64,
                         "runner_image": {"os": "win25", "version": "test", "runner_arch": "X64"},
                         "supervisor_kind": "windows_job", "probes": {"cand": "0" * 64}}
@@ -241,7 +241,7 @@ class NativeEvidence(unittest.TestCase):
                 runner_image = {"os": platform, "version": "test", "runner_arch": runner_arch}
                 identity = {"git_clean": True, "git_head": common["commit"], "candidate": common["candidate"],
                             "runner_image": runner_image, "lane_sources": common["lane_sources"],
-                            "protocol": "v5", "response_policy": response_policy.IDENTITY, "runtime": common["runtime"], "support": common["support"], "seed": common["seed"],
+                            "protocol": "v6", "response_policy": response_policy.IDENTITY, "runtime": common["runtime"], "support": common["support"], "seed": common["seed"],
                             "cc_sha256": "0" * 64, "probes": {"cand": "0" * 64},
                             "supervisor_sha256": "0" * 64 if platform == "win32" else None,
                             "supervisor_kind": "test-supervisor"}
@@ -280,9 +280,9 @@ class NativeEvidence(unittest.TestCase):
             target = roots[2]
             gate_path, evidence_path = target / "native-full/gates.json", target / "native-evidence.json"
             original_gate, original_evidence = gate_path.read_bytes(), evidence_path.read_bytes()
-            for name in response_policy.GATES:
+            for name, historical in [(g, "legacy_v4_1_100ms") for g in response_policy.GATES] + [("CANCEL", "legacy_v5_250ms")]:
                 changed = json.loads(original_gate)
-                legacy = changed["results"][REQUIRED_GATES.index(name)]["legacy_v4_1_100ms"]
+                legacy = changed["results"][REQUIRED_GATES.index(name)][historical]
                 del legacy["points"]
                 gate_path.write_text(json.dumps(changed), encoding="utf-8")
                 changed_evidence = json.loads(original_evidence)
@@ -333,7 +333,7 @@ class NativeEvidence(unittest.TestCase):
             with zipfile.ZipFile(combined) as archive:
                 self.assertEqual(set(archive.namelist()), {"manifest.json", "cohort-1.zip", "cohort-2.zip"})
                 self.assertEqual(json.loads(archive.read("manifest.json"))["os_jobs"], 6)
-                self.assertEqual(json.loads(archive.read("manifest.json"))["protocol"], "v5")
+                self.assertEqual(json.loads(archive.read("manifest.json"))["protocol"], "v6")
                 self.assertEqual(json.loads(archive.read("manifest.json"))["response_policy"], response_policy.IDENTITY)
             target = cohorts[1] / HOSTS[0]
             changed_paths = [target / name for name in ("native-full/identity.json", "native-full/gates.json",

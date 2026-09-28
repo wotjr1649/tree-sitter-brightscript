@@ -15,7 +15,7 @@ on:
         options:
           - completion
           - completion-gap
-          - response-v5
+          - response-v6
           - etw
 
 permissions:
@@ -61,7 +61,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   completion:
-    if: (inputs.experiment == 'completion' || inputs.experiment == 'completion-gap' || inputs.experiment == 'response-v5') && github.run_attempt == 1 && github.sha == inputs.expected_commit && github.ref == 'refs/heads/session/10-v014-latency-diagnosis'
+    if: (inputs.experiment == 'completion' || inputs.experiment == 'completion-gap' || inputs.experiment == 'response-v6') && github.run_attempt == 1 && github.sha == inputs.expected_commit && github.ref == 'refs/heads/session/10-v014-latency-diagnosis'
     strategy:
       fail-fast: false
       matrix:
@@ -101,16 +101,16 @@ jobs:
         env:
           TSQ_COMPLETION_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
         run: python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 --out .work/completion-gap --completion-gap-diagnostic
-      - name: Preflight v5 response policy on Windows
-        if: inputs.experiment == 'response-v5' && runner.os == 'Windows'
+      - name: Preflight v6 response policy on Windows
+        if: inputs.experiment == 'response-v6' && runner.os == 'Windows'
         env:
           TSQ_RESPONSE_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
-        run: python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe --runtime .work/runtime-027 --out .work/response-v5 --gates CANCEL,CANCEL-OVERSHOOT,MAX-CALLBACK-GAP
-      - name: Preflight v5 response policy on POSIX
-        if: inputs.experiment == 'response-v5' && runner.os != 'Windows'
+        run: python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe --runtime .work/runtime-027 --out .work/response-v6 --gates CANCEL,CANCEL-OVERSHOOT,MAX-CALLBACK-GAP
+      - name: Preflight v6 response policy on POSIX
+        if: inputs.experiment == 'response-v6' && runner.os != 'Windows'
         env:
           TSQ_RESPONSE_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
-        run: python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 --out .work/response-v5 --gates CANCEL,CANCEL-OVERSHOOT,MAX-CALLBACK-GAP
+        run: python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 --out .work/response-v6 --gates CANCEL,CANCEL-OVERSHOOT,MAX-CALLBACK-GAP
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
@@ -125,9 +125,9 @@ jobs:
             .work/completion-gap/runs.jsonl
             .work/completion-gap/commands.jsonl
             .work/completion-gap/completion-gap.json
-            .work/response-v5/identity.json
-            .work/response-v5/gates.json
-            .work/response-v5/runs.jsonl
-            .work/response-v5/commands.jsonl
+            .work/response-v6/identity.json
+            .work/response-v6/gates.json
+            .work/response-v6/runs.jsonl
+            .work/response-v6/commands.jsonl
           if-no-files-found: error
           retention-days: 14

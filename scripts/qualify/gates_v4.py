@@ -86,7 +86,7 @@ def sweep(r, seed):
     return result
 
 
-def timed_record(rec, case, budget, allocator, *, response_ms=100):
+def timed_record(rec, case, budget, allocator, *, response_ms=100, allow_natural=False):
     """A late natural return never supplies cancellation evidence, including warmup and allocator."""
     report, final = rec.get("report", {}), rec.get("final") or {}
     pe, cl = rec.get("events", {}).get("parse", {}), rec.get("events", {}).get("cleanup", {})
@@ -97,7 +97,8 @@ def timed_record(rec, case, budget, allocator, *, response_ms=100):
              and report["active_processes"] == 0 and type(report.get("pid")) is int and report["pid"] > 0
              and type(report.get("creation_filetime", report.get("creation_monotonic_ns"))) is int
              and report.get("creation_filetime", report.get("creation_monotonic_ns")) > 0
-             and status not in ("MEASUREMENT_INCONSISTENT", "NOT_RUN_BUDGET_REACHED_UNOBSERVED")
+             and status != "MEASUREMENT_INCONSISTENT"
+             and (status != "NOT_RUN_BUDGET_REACHED_UNOBSERVED" or allow_natural and not allocator)
              and gates.result_check(rec, case, len(gates.cases.generate(case))) == "OK"
              and final.get("final") is True and final.get("op") == "PARSE"
              and all(type(final.get(k)) in (int, float) and final[k] == value for k, value in (
@@ -110,14 +111,40 @@ def timed_record(rec, case, budget, allocator, *, response_ms=100):
         return {"pass": False, "status": "MEASUREMENT_INCONSISTENT"}
     cancelled = pe["cancelled"]
     passed = (cancelled if reached else not cancelled and parse_ms < budget)
+    request, latency = pe.get("request_ms"), None
+    if allow_natural:
+        callbacks, tail, cross = pe.get("callbacks"), gates.number(pe.get("tail_gap_ms")), pe.get("budget_cross_ms")
+        coherent = (type(request) in (int, float) and (request == -1 or gates.number(request) is not None)
+                    and type(callbacks) is int and callbacks >= 0 and tail is not None and tail <= parse_ms
+                    and all(type(pe.get(k)) is int and pe[k] == 0 for k in ("callback_target", "byte_target")))
+        if coherent and request == -1:
+            # Both printed times have six decimal places; this is only derived-clock consistency.
+            coherent = (not cancelled and not pe["cross_at_callback"]
+                        and (callbacks == 0 or parse_ms - tail <= budget + .000001))
+        elif coherent:
+            coherent = (cancelled and callbacks > 0 and gates.number(cross) is not None
+                        and budget <= cross <= request <= parse_ms
+                        and (not pe["cross_at_callback"] or cross == request))
+            latency = parse_ms - request
+        if not coherent:
+            return {"pass": False, "status": "MEASUREMENT_INCONSISTENT"}
+        passed = True  # Correct normal completion is safety evidence, never cancellation coverage.
     passed &= growth is None or growth < 64 * gates.MIB
     if not allocator:
         passed &= parse_ms <= budget + response_ms and cleanup <= response_ms
-    return {"pass": passed, "status": "CANCELLED" if cancelled else "NATURAL_BEFORE_BUDGET" if not reached else
-            "LATE_NATURAL", "reached": reached, "growth": growth, "parse_ms": parse_ms, "cleanup_ms": cleanup}
+        if allow_natural and latency is not None:
+            passed &= latency <= response_ms
+    result = {"pass": passed, "status": "CANCELLED" if cancelled else "NATURAL_BEFORE_BUDGET" if not reached else
+              ("NATURAL_WITHIN_RETURN_BOUND" if parse_ms <= budget + response_ms else "NATURAL_OVER_RETURN_BOUND")
+              if allow_natural else "LATE_NATURAL",
+              "reached": reached, "growth": growth, "parse_ms": parse_ms, "cleanup_ms": cleanup}
+    if allow_natural:
+        result.update(request_ms=request, return_after_request_ms=latency,
+                      cancellation_coverage="TRIGGERED" if cancelled else "NOT_TRIGGERED")
+    return result
 
 
-def cancel(r, *, response_ms=100):
+def cancel(r, *, response_ms=100, allow_natural=False):
     start = len(r.lab.runs)
     legacy = gates.cancel(r)
     original_tags = [("cand", f"rep{i}") for i in range(6)] + [("cand-alloc", "alloc")]
@@ -127,7 +154,8 @@ def cancel(r, *, response_ms=100):
         series = [x for x in r.lab.runs[start:] if x["case"] == case and x["budget"] == budget]
         current = gates.judge_cancel_point(series[:-1], series[-1], case, budget, roles, response_ms=response_ms)
         current_points.append(current)
-        judged = [timed_record(x, case, budget, x["build"] == "cand-alloc", response_ms=response_ms) for x in series]
+        judged = [timed_record(x, case, budget, x["build"] == "cand-alloc", response_ms=response_ms,
+                               allow_natural=allow_natural) for x in series]
         registered = [(x["build"], x["op"], x["tag"]) for x in series] == [(b, "PARSE", t) for b, t in original_tags]
         originals[case, budget] = (registered and current["safety"] == "PASS" and all(p["pass"] for p in judged)
                                    and (not any(p.get("reached") for p in judged[:6]) or judged[6].get("growth") is not None))
@@ -139,7 +167,8 @@ def cancel(r, *, response_ms=100):
     extra_tags = [("cand-alloc", f"alloc-extra-{i}") for i in range(1, 6)]
     for (case, budget, _), old in zip(gates.CANCEL_POINTS, current_points):
         series = [x for x in records if x["case"] == case and x["budget"] == budget]
-        judged = [timed_record(x, case, budget, x["build"] == "cand-alloc", response_ms=response_ms) for x in series]
+        judged = [timed_record(x, case, budget, x["build"] == "cand-alloc", response_ms=response_ms,
+                               allow_natural=allow_natural) for x in series]
         registered = [(x["build"], x["tag"]) for x in series] == original_tags + extra_tags
         required = any(p.get("reached") for p in judged[:6])
         growth_observed = registered and (not required or any(p.get("reached") and p.get("growth") is not None
@@ -174,4 +203,7 @@ def cancel(r, *, response_ms=100):
     result.update(complete=complete, legacy=legacy, first_callback_control=first, progressed_control=half)
     if response_ms != 100:
         result.update(response_limit_ms=response_ms, original_sampling_points=current_points)
+    if allow_natural:
+        result["timed_outcomes"] = {status: sum(j["status"] == status for p in points for j in p["judged"])
+                                    for status in ("CANCELLED", "NATURAL_BEFORE_BUDGET", "NATURAL_WITHIN_RETURN_BOUND")}
     return result
