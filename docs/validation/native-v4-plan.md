@@ -6,6 +6,22 @@ remains HOLD. This plan follows an independent adversarial review on
 Tracking: [issue #11](https://github.com/wotjr1649/tree-sitter-brightscript/issues/11)
 in the existing v0.1.4 milestone and PR #10.
 
+## Follow-up after the frozen pair failed
+
+The `f05d744` pair and every failed purpose remain in the candidate report.
+The parent-record retention fix has separate raw-replay and allocation
+evidence. Product screens next target hidden repetition allocations in
+file-level lines, array elements and the five comma-list call sites. The
+same full native gates and first-attempt pair remain mandatory.
+
+Local controls compare all list suffixes through two four-unit boundaries
+against the frozen parser. A `_terminator` inline experiment did not reduce
+allocation counts and was discarded. Grouping assignment heads reduced the
+pending-stack footprint, but changed 12 existing recovery goldens; that
+experiment was discarded and its FAIL log retained. No golden was updated.
+The list-only candidate restores every existing recovery golden. New hosted
+measurements are still needed for the Ubuntu callback/cancellation failures.
+
 ## Invariants
 
 - Preserve all 17 native purposes and the registered source inputs.

@@ -49,11 +49,16 @@ function directive(word, precedence = 0) {
 }
 
 function commaSep1(rule) {
-  return seq(rule, repeat(seq(',', rule)));
+  return seq(rule, repeat4(seq(',', rule)));
 }
 
 function commaSep(rule) {
   return optional(commaSep1(rule));
+}
+
+// Reduce hidden repetition nodes; every count is 4k plus a suffix of 0..3.
+function repeat4(rule) {
+  return seq(repeat(seq(rule, rule, rule, rule)), optional(seq(rule, optional(seq(rule, optional(rule))))));
 }
 
 module.exports = grammar({
@@ -82,7 +87,7 @@ module.exports = grammar({
     // BS-LEX-005, 008-011, BS-STMT-033 (grammar-design §2, §7): the last
     // statement needs no terminator. `_error_token_forms` never occurs (its
     // first token is never produced, ADR-0008); it only keeps raw token names.
-    source_file: $ => seq(repeat($._line), optional($.statement), optional($._error_token_forms)),
+    source_file: $ => seq(repeat4($._line), optional($.statement), optional($._error_token_forms)),
 
     _line: $ => choice(seq($.statement, $._line_end), $._line_end),
 
@@ -465,7 +470,7 @@ module.exports = grammar({
     array_literal: $ => seq(
       alias($.open_bracket, '['),
       repeat($._newline),
-      optional(seq($.expression, repeat(seq($._sep, $.expression)), optional($._sep))),
+      optional(seq($.expression, repeat4(seq($._sep, $.expression)), optional($._sep))),
       ']',
     ),
 

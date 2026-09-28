@@ -845,7 +845,13 @@ measures bound that work without changing any valid tree.
 4. **Fewer hidden nodes.** `_line`, `_line_end`, `_try_line`, `_print_item`,
    `_print_expression` and `_sep` are inlined, and PRINT items carry no
    `expression` wrapper (§6), which reduces the memory and the deletion time
-   of large valid files (S08-M01).
+   of large valid files (S08-M01). File-level lines, array separator/element
+   pairs and comma/element pairs use groups of four followed by zero to three
+   remaining units (`repeat4`). This preserves every repetition count and the
+   public nodes, fields and order while reducing hidden repetition allocations.
+   The five grammar rules using comma lists retain their original nonempty index/DIM
+   and optional argument-list rules. W06 includes counts 0–10 at these
+   boundaries; the native cost and recovery gates still apply.
 5. **Body starts.** The body of a loop, function, CATCH or directive is the
    hidden `_body`, aliased `block`, which begins with `_body_start`: a
    terminator or, only during recovery, `_recovery_newline`. A malformed
