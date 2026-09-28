@@ -51,7 +51,7 @@ typedef size_t SIZE_T;
 
 const TSLanguage *tree_sitter_brightscript(void);
 
-/* Diagnostic-only scheduling treatment; the default qualification build never sets it. */
+/* Scheduled condition adopted by v4 after the phase 3/5 diagnostic controls. */
 static int record_scheduling(void) {
 #ifdef _WIN32
   DWORD_PTR process_mask, system_mask;

@@ -1,6 +1,7 @@
 """Small positive and planted-difference controls for cross-OS evidence comparison."""
 import hashlib
 import json
+import shutil
 import tempfile
 import unittest
 import zipfile
@@ -10,6 +11,7 @@ from build_native_evidence import REQUIRED_GATES, build, signatures, registered_
 from check_oracle_pair import compare as compare_oracles
 from compare_native_evidence import compare as compare_hosts
 from package_native_evidence import package
+from package_repeated_native_evidence import HOSTS, repeated
 
 
 def sha(data):
@@ -177,6 +179,7 @@ class NativeEvidence(unittest.TestCase):
                             "runner_image": runner_image, "lane_sources": common["lane_sources"],
                             "protocol": "v4", "runtime": common["runtime"], "support": common["support"], "seed": common["seed"],
                             "cc_sha256": "0" * 64, "probes": {"cand": "0" * 64},
+                            "supervisor_sha256": "0" * 64 if platform == "win32" else None,
                             "supervisor_kind": "test-supervisor"}
                 gates = [{"gate": gate, "status": "PASS", "points": []} for gate in REQUIRED_GATES]
                 gates[REQUIRED_GATES.index("SEM-PUBLIC")]["points"] = [
@@ -200,6 +203,7 @@ class NativeEvidence(unittest.TestCase):
                             "runs_sha256": sha((host_root / "native-full/runs.jsonl").read_bytes()),
                             "cli_binary_sha256": "0" * 64, "cc_sha256": "0" * 64,
                             "probe_sha256": {"cand": "0" * 64}, "supervisor_kind": "test-supervisor",
+                            "supervisor_sha256": identity["supervisor_sha256"],
                             "memory_metric": "host-memory"}}
                 (host_root / "native-evidence.json").write_text(json.dumps(evidence), encoding="utf-8")
             first, second = root / "first.zip", root / "second.zip"
@@ -208,6 +212,75 @@ class NativeEvidence(unittest.TestCase):
             self.assertEqual(sha(first.read_bytes()), sha(second.read_bytes()))
             with zipfile.ZipFile(first) as archive:
                 self.assertEqual(len(archive.namelist()), 19)
+            cohorts = [root / name for name in ("cohort-a", "cohort-b")]
+            for cohort, run_id in zip(cohorts, ("101", "202")):
+                for source, name in zip(roots, HOSTS):
+                    target = cohort / name
+                    shutil.copytree(source, target)
+                    hosted = {"id": run_id, "attempt": "1", "job": "native-qualification"}
+                    identity_path = target / "native-full/identity.json"
+                    gate_path = target / "native-full/gates.json"
+                    evidence_path = target / "native-evidence.json"
+                    identity = json.loads(identity_path.read_text())
+                    identity["hosted_run"] = hosted
+                    identity_path.write_text(json.dumps(identity))
+                    gate_record = json.loads(gate_path.read_text())
+                    gate_record["identity"] = identity
+                    gate_path.write_text(json.dumps(gate_record))
+                    evidence = json.loads(evidence_path.read_text())
+                    evidence["host"].update(hosted_run=hosted, identity_sha256=sha(identity_path.read_bytes()),
+                                            gates_sha256=sha(gate_path.read_bytes()))
+                    evidence_path.write_text(json.dumps(evidence))
+            with self.assertRaisesRegex(ValueError, "same hosted run"):
+                repeated(cohorts[0], cohorts[0], root / "duplicate-cohort.zip")
+            with self.assertRaisesRegex(ValueError, "duplicate raw file"):
+                repeated(*cohorts, root / "relabeled-cohort.zip")
+            for name in HOSTS:
+                target = cohorts[1] / name
+                raw_path = target / "native-full/runs.jsonl"
+                lines = raw_path.read_text().splitlines()
+                timed = json.loads(lines[-1])
+                timed["report"]["pid"] = 202  # synthetic independent report, excluded from exact behavior
+                lines[-1] = json.dumps(timed)
+                raw_path.write_text("\n".join(lines) + "\n")
+                evidence_path = target / "native-evidence.json"
+                evidence = json.loads(evidence_path.read_text())
+                evidence["host"]["runs_sha256"] = sha(raw_path.read_bytes())
+                evidence_path.write_text(json.dumps(evidence))
+            combined = repeated(*cohorts, root / "six-jobs.zip")
+            repeated(*cohorts, root / "six-jobs-again.zip")
+            self.assertEqual(sha(combined.read_bytes()), sha((root / "six-jobs-again.zip").read_bytes()))
+            with zipfile.ZipFile(combined) as archive:
+                self.assertEqual(set(archive.namelist()), {"manifest.json", "cohort-1.zip", "cohort-2.zip"})
+                self.assertEqual(json.loads(archive.read("manifest.json"))["os_jobs"], 6)
+            target = cohorts[1] / HOSTS[0]
+            changed_paths = [target / name for name in ("native-full/identity.json", "native-full/gates.json",
+                                                       "native-evidence.json")]
+            originals = [path.read_bytes() for path in changed_paths]
+            identity, gate_record, evidence = [json.loads(data) for data in originals]
+            identity["supervisor_sha256"] = "1" * 64
+            changed_paths[0].write_text(json.dumps(identity))
+            gate_record["identity"] = identity
+            changed_paths[1].write_text(json.dumps(gate_record))
+            evidence["host"].update(supervisor_sha256="1" * 64, identity_sha256=sha(changed_paths[0].read_bytes()),
+                                    gates_sha256=sha(changed_paths[1].read_bytes()))
+            changed_paths[2].write_text(json.dumps(evidence))
+            with self.assertRaisesRegex(ValueError, "image or tool"):
+                repeated(*cohorts, root / "mixed-supervisors.zip")
+            for path, data in zip(changed_paths, originals):
+                path.write_bytes(data)
+            evidence_path = cohorts[1] / HOSTS[-1] / "native-evidence.json"
+            original = evidence_path.read_text()
+            evidence = json.loads(original)
+            evidence["host"]["runner_image"]["version"] = "different"
+            evidence_path.write_text(json.dumps(evidence))
+            with self.assertRaisesRegex(ValueError, "image or tool"):
+                repeated(*cohorts, root / "mixed-images.zip")
+            evidence_path.write_text(original)
+            gate_path = cohorts[1] / HOSTS[-1] / "native-full/gates.json"
+            gate_path.write_text("{}")
+            with self.assertRaisesRegex(ValueError, "raw gate identity"):
+                repeated(*cohorts, root / "tampered-cohort.zip")
             mac_gates = roots[2] / "native-full/gates.json"
             original_gates = mac_gates.read_text(encoding="utf-8")
             mac_gates.write_text("{}", encoding="utf-8")

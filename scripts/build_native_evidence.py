@@ -138,10 +138,12 @@ def build(qualification, oracle_a, oracle_b):
         },
         "host": {
             "platform": oracle_id["platform"], "architecture": platform.machine().lower(),
+            "hosted_run": identity.get("hosted_run"),
             "runner_image": identity["runner_image"],
             "cc_sha256": identity["cc_sha256"],
             "cli_binary_sha256": oracle_id["cli_binary_sha256"],
             "supervisor_kind": identity["supervisor_kind"],
+            "supervisor_sha256": identity.get("supervisor_sha256"),
             "probe_sha256": identity["probes"],
             "memory_metric": first_run["report"].get("memory_metric", "windows_private_commit"),
             "identity_sha256": hashlib.sha256((q / "identity.json").read_bytes()).hexdigest(),

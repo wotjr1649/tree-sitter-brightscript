@@ -638,6 +638,8 @@ def main():
     other_files = ["scripts/tscli.py", "scripts/corpus.py", "docs/provenance/upstream-sources.md", "package.json",
                    "package-lock.json", "tree-sitter.json"]
     identity = {"cc": str(lab.cc), "cc_sha256": sha(lab.cc),
+                "hosted_run": {"id": os.environ.get("GITHUB_RUN_ID"), "attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+                               "job": os.environ.get("GITHUB_JOB")},
                 "runner_image": {"os": os.environ.get("ImageOS"), "version": os.environ.get("ImageVersion"),
                                  "runner_arch": os.environ.get("RUNNER_ARCH")},
                 "supervisor_sha256": sha(lab.supervisor) if lab.supervisor else None,

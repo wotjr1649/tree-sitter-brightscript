@@ -42,9 +42,11 @@ def verified_files(root, platform, common):
             or identity["runtime"] != common["runtime"] or identity["support"] != common["support"]
             or identity["seed"] != common["seed"]
             or identity["runner_image"] != host["runner_image"]
+            or identity.get("hosted_run") != host.get("hosted_run")
             or identity["cc_sha256"] != host["cc_sha256"]
             or identity["probes"] != host["probe_sha256"]
             or identity["supervisor_kind"] != host["supervisor_kind"]
+            or identity.get("supervisor_sha256") != host.get("supervisor_sha256")
             or [g["gate"] for g in gates["results"]] != list(REQUIRED_GATES)
             or any(g["status"] != "PASS" for g in gates["results"])):
         raise ValueError(f"{platform} raw gate identity mismatch")

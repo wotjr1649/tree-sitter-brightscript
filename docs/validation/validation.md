@@ -454,6 +454,13 @@ six jobs must pass all 17 purposes and repeated W12. Product/harness failures
 are retained, never replaced by a favourable rerun. Changing a candidate or
 method requires a new qualification cohort. The two three-OS cohorts and
 their equal-identity receipt must both be retained in the release evidence.
+`scripts/package_repeated_native_evidence.py --first <cohort-a-root>
+--second <cohort-b-root> --out <new-zip>` verifies both three-OS packages and
+binds them into that receipt. It requires two different Actions run IDs,
+first attempts, the registered native job name, equal per-OS compiler, CLI,
+probe and supervisor hashes, and different raw run files. The release check
+must also match these IDs against the preassigned GitHub runs and their
+successful job conclusions; local JSON identity alone is not hosted attestation.
 
 The POSIX supervisor uses a private environment, a process group, a watchdog
 and bounded output, with a preflight that exercises a descendant which keeps
