@@ -1,10 +1,14 @@
 """Synthetic judgement controls for v4, not parser performance evidence."""
 import copy
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 import gates
 import gates_v4
 from test_characterize import cancellation_record
+from run import Runner, retained_run
 
 
 class Records:
@@ -91,6 +95,32 @@ class Cancellation:
 
 
 class V4Judgement(unittest.TestCase):
+    def test_retention_preserves_full_raw_return_and_both_process_id_types(self):
+        for clock in ("creation_filetime", "creation_monotonic_ns"):
+            with tempfile.TemporaryDirectory() as directory:
+                class Lab:
+                    out, runs = Path(directory), []
+
+                    def supervise(self, cid, argv):
+                        report = {"pid": 42, clock: 123, "peak_commit_bytes": 1000,
+                                  "termination_reason": "COMPLETED", "exit_code_raw": 0,
+                                  "exit_confirmed": True, "active_processes": 0}
+                        events = [{"event": "parse", "parse_ms": 1.}, {"final": True, "bytes": 1}]
+                        return report, "\n".join(json.dumps(x) for x in events)
+
+                lab = Lab()
+                (lab.out / "inputs").mkdir()
+                runner = Runner(lab, {"cand": ("image", "query")}, "query")
+                record = runner.run("cand", "PARSE", "A501J-k01000", 0)
+                raw = json.loads((lab.out / "runs.jsonl").read_text())
+                self.assertEqual(record, raw)
+                self.assertIn("events", raw)
+                self.assertNotIn("events", lab.runs[0])
+                self.assertEqual(lab.runs[0]["report"], {"pid": 42, clock: 123, "peak_commit_bytes": 1000})
+                self.assertEqual(gates.run_id(lab.runs[0]), gates.run_id(record))
+                timed = dict(record, budget=200)
+                self.assertIs(retained_run(timed), timed)
+
     def test_complete_performance_plan_and_cache_isolation(self):
         r = Records()
         for gate in (gates_v4.performance(r, 5707), gates_v4.performance(r, 5707, valid=True), gates_v4.sweep(r, 5707)):

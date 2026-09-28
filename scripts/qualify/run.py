@@ -391,6 +391,20 @@ class Lab:
         return {"id":cid,"pass":ok}
 
 
+def retained_run(rec):
+    """Keep only fields used after a budget-zero run; full evidence stays in runs.jsonl.
+
+    Linux fork/exec peak RSS also includes the inherited Python image. Retaining
+    every full record here needlessly inflates that image throughout a long lane.
+    Timed cancellation still needs its complete per-run events for judgement.
+    """
+    if rec["budget"]:
+        return rec
+    return {"build": rec["build"], "case": rec["case"],
+            "report": {k: rec["report"][k] for k in (
+                "pid", "creation_filetime", "creation_monotonic_ns", "peak_commit_bytes") if k in rec["report"]}}
+
+
 class Runner:
     """What the gates call: measurements of built probes on generated inputs."""
 
@@ -440,7 +454,7 @@ class Runner:
                "runtime_build": self.runtime_build,
                "completed": report["termination_reason"] == "COMPLETED" and report["exit_code_raw"] == 0,
                "events": events, "final": final}
-        self.lab.runs.append(rec)
+        self.lab.runs.append(retained_run(rec))
         with (self.lab.out / "runs.jsonl").open("a", encoding="utf-8", newline="\n") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         identity = gates.run_id(rec)

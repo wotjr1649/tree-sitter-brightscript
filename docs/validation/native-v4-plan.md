@@ -356,3 +356,11 @@ screen, including exact replay of 6,931 records. Details and remaining limits
 are in the [candidate report](../reports/0.1.4-native-parity-candidate.md#print-candidate-under-v4).
 This supports submitting it to full hosted qualification; it is not a
 replacement for the six required final jobs.
+
+The first frozen v4 pair at `f05d744` failed; its six-job result and the
+subsequent inherited-RSS diagnosis are retained in the
+[candidate report](../reports/0.1.4-native-parity-candidate.md#frozen-v4-pair-f05d744--fail-retained).
+Reducing redundant Python record retention preserves every raw byte and
+judge input. Its local controls and six-job offline replays pass, but native
+Linux confirmation is pending. Remaining single-run cleanup, callback and
+late-natural-cancellation failures require separate root-cause work.
