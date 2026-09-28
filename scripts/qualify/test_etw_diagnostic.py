@@ -58,12 +58,12 @@ class EtwDiagnostic(unittest.TestCase):
         text = (Path(__file__).resolve().parents[2] / ".github/workflows/native-characterization.yml").read_text()
         block = re.search(r"          path: \|\n((?:            [^\n]+\n)+)", text).group(1)
         self.assertEqual([x.strip() for x in block.splitlines()], [".work/native-characterization/" + name for name in (
-            "identity.json", "commands.jsonl", "etw-lifecycle.json")])
+            "identity.json", "runs.jsonl", "commands.jsonl", "etw-lifecycle.json", "etw-summary.json")])
         self.assertIn("  workflow_dispatch:", text)
         self.assertNotIn("  push:", text)
         self.assertIn("github.sha == inputs.expected_commit", text)
         self.assertIn("    if: github.run_attempt == 1", text)
-        self.assertIn("    timeout-minutes: 10", text)
+        self.assertIn("    timeout-minutes: 30", text)
         self.assertEqual(text.count("uses: actions/upload-artifact@"), 1)
 
     def test_compatibility_has_one_session_and_no_parser(self):

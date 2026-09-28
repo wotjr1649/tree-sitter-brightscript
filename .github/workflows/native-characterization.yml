@@ -1,4 +1,4 @@
-name: Windows bounded ETW compatibility diagnosis
+name: Windows bounded ETW latency diagnosis
 
 on:
   workflow_dispatch:
@@ -15,25 +15,38 @@ jobs:
   characterize:
     if: github.run_attempt == 1 && github.sha == inputs.expected_commit && github.ref == 'refs/heads/session/10-v014-latency-diagnosis'
     runs-on: windows-2025-vs2026
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: tree-sitter/tree-sitter
+          ref: 6070dbfefd326bd735e5683eb128cc1b57dad0c0
+          path: .work/runtime-027
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
-      - name: Record the one authorized compatibility diagnostic
+      - run: npm ci
+      - name: Record the bounded ETW latency diagnostic
         env:
           TSQ_ETW_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
-        run: python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe --out .work/native-characterization --etw-compatibility
+        run: python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe --runtime .work/runtime-027 --out .work/native-characterization --etw-diagnostic
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: windows-etw-compatibility-evidence
+          name: windows-etw-derived-evidence
           path: |
             .work/native-characterization/identity.json
+            .work/native-characterization/runs.jsonl
             .work/native-characterization/commands.jsonl
             .work/native-characterization/etw-lifecycle.json
+            .work/native-characterization/etw-summary.json
           if-no-files-found: error
           retention-days: 14

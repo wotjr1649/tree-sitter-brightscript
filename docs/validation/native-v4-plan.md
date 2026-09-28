@@ -664,3 +664,12 @@ support adding that exact shape, without admitting arbitrary future versions
 or interpreting its added tail. Local positive/negative codec controls pass;
 hosted validation of the correction remains unrun. The authorized compatibility
 job is complete and is not repeated automatically.
+
+After the v5 correction, the owner authorized continued cause-specific fixes
+and additional diagnostics until the diagnostic succeeds. Each execution
+retains the original 30-minute Windows job, 120-second cumulative trace/
+cleanup, 64 MiB capture-buffer and raw-nonpublication limits. Each candidate
+is independently reviewed, checked locally, preassigned by exact commit and
+explicitly dispatched. A new execution requires a material correction or new
+discriminating evidence; unchanged lucky retries and historical FAIL replacement
+remain prohibited. Diagnostic success alone does not release the parser.

@@ -65,7 +65,7 @@ NATIVE_WINDOWS_FULL_COMMAND = ("python scripts/qualify/run.py --cc C:/mingw64/bi
                                "--support 0.26.13=.work/runtime-026 --out .work/native-full")
 CI_ALLOWED += "|" + re.escape(NATIVE_WINDOWS_FULL_COMMAND)
 ETW_DIAGNOSTIC_COMMAND = ("python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe "
-                          "--out .work/native-characterization --etw-compatibility")
+                          "--runtime .work/runtime-027 --out .work/native-characterization --etw-diagnostic")
 CI_ALLOWED += "|" + re.escape(ETW_DIAGNOSTIC_COMMAND)
 # `run` keys in the spellings recognised here (flow mapping, quoted key, extra spaces, `\x72un`, `\u0072un`);
 # each must be one the parser read. Other escapes are not recognised (validation.md "Identity binding").
@@ -322,13 +322,13 @@ class VerifiedCli(unittest.TestCase):
         for command in (ETW_DIAGNOSTIC_COMMAND,):
             self.assertTrue(allowed(command))
             for mutant in (command + " --gates CANCEL", command + " --characterize",
-                           command.replace("--etw-compatibility", "--preflight"),
-                           command.replace("--etw-compatibility", "--characterize"),
-                           command.replace("--etw-compatibility", "--etw-diagnostic"),
-                           command.replace("--etw-compatibility", "--gates ABS-MEMORY"),
+                           command.replace("--etw-diagnostic", "--preflight"),
+                           command.replace("--etw-diagnostic", "--characterize"),
+                           command.replace("--etw-diagnostic", "--etw-compatibility"),
+                           command.replace("--etw-diagnostic", "--gates ABS-MEMORY"),
                            command + " --latency-diagnostic",
                            command.replace(".work/native-characterization", "../outside"),
-                           command + " --runtime .work/runtime-027",
+                           command.replace(".work/runtime-027", "../runtime"),
                            command.replace("/usr/bin/cc", "cc").replace("C:/mingw64/bin/gcc.exe", "gcc.exe"),
                            command + "; whoami", command + "\n", command + " # comment",
                            command + "\nwhoami", command + " && whoami"):
