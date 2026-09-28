@@ -541,3 +541,90 @@ Independent review confirms HOLD: neither this pilot nor the completed
 non-reproducing Windows diagnostics establishes a latency cause or correction.
 No new full pair is registered. The current result and evidence needed to
 reopen are recorded in the [candidate report](../reports/0.1.4-native-parity-candidate.md#v41-cancel-pilot-bcc5755--pass-within-its-scope).
+
+## One bounded Windows ETW diagnostic
+
+The owner approved one ephemeral GitHub-hosted Windows VM job (30 minutes),
+at most 120 seconds of tracing in total, at most 64 MiB of capture buffers,
+no environment/command-line collection, and no automatic raw-trace publication.
+The existing 100 ms limits and historical FAILs remain unchanged. This is
+diagnosis, not another full qualification attempt.
+
+The original Windows B trace at `9ad11bb` starts its L-ANON maximum-gap point
+after 5,833 native executions. Its first measured plain medians for L-ANON,
+V-LONGEXPR and V-FLAT were about 1.76, 1.47 and 1.51 times Windows A's, based
+on only three retained samples each. Earlier short diagnostics did not replay
+this prefix. This supports testing accumulated host/workload conditions; it
+does not establish scheduler interference or CPU affinity as the cause.
+
+`scripts/qualify/etw-prelude.json` freezes that exact ordered command tuple
+prefix, derived from run 36374461333's Windows `runs.jsonl` (SHA-256
+`60d981591a6ab33d8ad4dab7eb4dad95b8e8457f12352854d118f3db29bcd307`).
+The same generated inputs, scheduled probes and baseline references replay
+with tracing inactive. Then stock plain probes execute eight reference calls:
+L-ANON, V-FLAT and V-LONGEXPR 1 MiB twice each, followed by the two existing
+short witnesses once each. The eight calls repeat under one trace with a
+separate QPC-marker probe; eight final stock calls follow verified absence of
+our owned trace session. They are time-ordered references, not a randomized
+ETW-overhead or affinity A/B experiment. Plain/allocator probe byte identity
+against the pre-instrumentation source remains mandatory.
+
+The native collector enables only CSwitch, Dispatcher ReadyThread and
+NO_SYSCONFIG, uses raw QPC timestamps, and decodes documented numeric prefixes.
+It records no ETL, process/thread-start, image, stack or system-configuration
+payload. Requested ETW buffers total 16 MiB; the fixed numeric array is under
+24 MiB. Actual settings, loss, malformed records and overflow are checked.
+Only target-phase derived durations, bounded metadata, identities and hashes
+are uploaded; the numeric trace remains inside the disposable VM.
+
+Before the prefix, two live negative controls deliberately crash/stall the
+collector. Each must prove termination and GUID-bound cleanup of its own
+session; a collision or cleanup failure stops further work. The collector's
+measurement self-stop is 30 seconds, its separate existing safety-profile
+Job watchdog 40 seconds, outer grace five seconds, cleanup watchdog two
+seconds plus five-second grace. Each control reserves 13 seconds and the
+measurement reserves 60 seconds (86 total). Conservative parent-clock bounds
+include launch through confirmed session absence. Missing absence evidence is
+FAIL with unknown final lifetime, never a claim of compliance with 120 seconds.
+Original qualification supervisor limits and source remain unchanged.
+
+Offline controls cover decoding, interval state consistency, loss/overflow,
+probe/collector failure, stop-file write failure and cleanup failure. Only the
+preassigned first-attempt hosted Windows job can activate tracing; local checks
+never activate ETW. The workflow uses explicit dispatch with an expected-commit
+input, no push trigger. Both workflow and runner bind the exact reviewed commit.
+There is one authorized dispatch; a further explicit dispatch needs new scope.
+
+Implementation review found two P1 and two P2 items: a stop-file write exception
+could skip cleanup; push triggers could unintentionally repeat ETW; target
+switches sharing marker ticks were discarded; future schema versions were
+accepted without a layout check. Remediation retains stop-write failure while
+continuing cleanup, removes automatic triggers, rejects ambiguous boundary
+ticks and permits only documented Thread_V2 24-byte CSwitch/8-byte ReadyThread.
+It also requires target switch-in before parse and switch-out after cleanup;
+individual phases may correctly contain no switch. All have planted-defect
+controls. Independent re-review closed all four items with no additional P1/P2.
+Local native evidence (20 tests), CLI controls (12), C codec controls, stock and
+extended supervisor controls (seven each), V0 and diff checks passed. Plain and
+allocator binaries match the earlier source byte for byte; a native marker
+observation's QPC durations match its original timing fields. Local ETW entry
+was rejected before launching anything. Hosted lifecycle checks remain unrun.
+
+GitHub's [dispatch documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch)
+allows CLI/API dispatch against a branch after a workflow has run at least once;
+this repository already has registered workflow ID `368659596`. The exact
+commit and one dispatch are recorded in issue 11 before execution.
+
+Interpretation: target CSwitch/ReadyThread events distinguish scheduled,
+ready, waiting and unknown intervals, bound to the probe's PID/creation identity,
+TID and QPC phase markers. Scheduled duration is not CPU execution time: ISR,
+DPC and hypervisor pauses are outside this collection's attribution. Boundary
+thread-CPU counters are complementary and have finite granularity. Lack of
+reproduction remains inconclusive and does not close the earlier FAILs.
+
+Official references checked 2026-09-28:
+[StartTrace lifetime and system logger scope](https://learn.microsoft.com/en-us/windows/win32/api/evntrace/nf-evntrace-starttracew),
+[buffer and EnableFlags properties](https://learn.microsoft.com/en-us/windows/win32/api/evntrace/ns-evntrace-event_trace_properties),
+[CSwitch schema](https://learn.microsoft.com/en-us/windows/win32/etw/cswitch),
+[ReadyThread schema](https://learn.microsoft.com/en-us/windows/win32/etw/readythread),
+[QPC and affinity guidance](https://learn.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps).

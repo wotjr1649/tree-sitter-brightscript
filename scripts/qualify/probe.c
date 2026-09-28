@@ -87,9 +87,23 @@ static int record_scheduling(void) {
 
 #ifdef _WIN32
 static LARGE_INTEGER frequency;
+#ifdef TSQ_ETW_MARKERS
+static uint64_t mark_tick, mark_last, mark_gap_start, mark_gap_end;
+static uint32_t mark_byte, mark_gap_from, mark_gap_to;
+static void mark_gap(uint32_t byte) {
+  if (mark_tick - mark_last > mark_gap_end - mark_gap_start) {
+    mark_gap_start = mark_last; mark_gap_end = mark_tick;
+    mark_gap_from = mark_byte; mark_gap_to = byte;
+  }
+  mark_last = mark_tick; mark_byte = byte;
+}
+#endif
 static double clock_ms(void) {
   LARGE_INTEGER c;
   QueryPerformanceCounter(&c);
+#ifdef TSQ_ETW_MARKERS
+  mark_tick = (uint64_t)c.QuadPart;
+#endif
   return c.QuadPart * 1000.0 / frequency.QuadPart;
 }
 #else
@@ -101,7 +115,7 @@ static double clock_ms(void) {
 #endif
 
 /* ------------------------------------------------------------- allocator */
-#ifdef TSQ_DIAGNOSTIC_CLOCKS
+#if defined(TSQ_DIAGNOSTIC_CLOCKS) || defined(TSQ_ETW_MARKERS)
 /* Diagnostic-only CPU observations. Never used for qualification decisions. */
 static double cpu_ms(void) {
 #ifdef _WIN32
@@ -116,6 +130,8 @@ static double cpu_ms(void) {
          (usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1000.0;
 #endif
 }
+#endif
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
 static double diag_start_cpu, diag_last_cpu, diag_last_wall, diag_gap_wall, diag_gap_cpu;
 static uint32_t diag_last_byte, diag_gap_from, diag_gap_to;
 static uint64_t diag_gap_ordinal;
@@ -294,6 +310,9 @@ static bool progress(TSParseState *state) {
   double cpu = cpu_ms();
 #endif
   double t = clock_ms() - parse_start;
+#ifdef TSQ_ETW_MARKERS
+  mark_gap(state->current_byte_offset);
+#endif
   if (first_callback < 0) first_callback = t;
   else if (t - last_callback > max_gap) max_gap = t - last_callback;
   last_callback = t;
@@ -348,12 +367,23 @@ static int run(const char *op, const char *input_path, const char *query_path, d
 #ifdef TSQ_DIAGNOSTIC_CLOCKS
   diag_start_cpu = diag_last_cpu = cpu_ms();
 #endif
+#ifdef TSQ_ETW_MARKERS
+  double mark_start_cpu = cpu_ms();
+#endif
   parse_start = clock_ms();
+#ifdef TSQ_ETW_MARKERS
+  uint64_t mark_parse_start = mark_last = mark_tick;
+#endif
   TSTree *tree = ts_parser_parse_with_options(parser, NULL, (TSInput){&input, read_input, TSInputEncodingUTF8, NULL}, options);
 #ifdef TSQ_DIAGNOSTIC_CLOCKS
   double return_cpu = cpu_ms();
 #endif
   double parse_ms = clock_ms() - parse_start;
+#ifdef TSQ_ETW_MARKERS
+  uint64_t mark_parse_end = mark_tick;
+  mark_gap(tree ? length : mark_byte);
+  double mark_parse_cpu = cpu_ms() - mark_start_cpu;
+#endif
 #ifdef TSQ_DIAGNOSTIC_CLOCKS
   observe_gap(parse_ms, return_cpu, tree ? length : diag_last_byte, callbacks + 1, 2);
 #endif
@@ -481,12 +511,34 @@ static int run(const char *op, const char *input_path, const char *query_path, d
 #ifdef TSQ_DIAGNOSTIC_CLOCKS
   double cleanup_start_cpu = cpu_ms();
 #endif
+#ifdef TSQ_ETW_MARKERS
+  double mark_cleanup_cpu = cpu_ms();
+#endif
   double t = clock_ms();
+#ifdef TSQ_ETW_MARKERS
+  uint64_t mark_cleanup_start = mark_tick;
+#endif
   if (tree) ts_tree_delete(tree);
   double tree_delete_ms = clock_ms() - t;
   t = clock_ms();
   ts_parser_delete(parser);
   double parser_delete_ms = clock_ms() - t;
+#ifdef TSQ_ETW_MARKERS
+  uint64_t mark_cleanup_end = mark_tick;
+  mark_cleanup_cpu = cpu_ms() - mark_cleanup_cpu;
+  FILETIME created, exited, kernel, user;
+  if (!GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user)) return 97;
+  printf("{\"event\":\"etw_markers\",\"pid\":%lu,\"tid\":%lu,\"creation_filetime\":%llu,"
+         "\"frequency\":%llu,\"parse_start\":%llu,\"parse_end\":%llu,\"cleanup_start\":%llu,\"cleanup_end\":%llu,"
+         "\"gap_start\":%llu,\"gap_end\":%llu,\"gap_from_byte\":%u,\"gap_to_byte\":%u,"
+         "\"parse_cpu_ms\":%.6f,\"cleanup_cpu_ms\":%.6f}\n",
+         GetCurrentProcessId(), GetCurrentThreadId(),
+         (unsigned long long)(((uint64_t)created.dwHighDateTime << 32) | created.dwLowDateTime),
+         (unsigned long long)frequency.QuadPart, (unsigned long long)mark_parse_start, (unsigned long long)mark_parse_end,
+         (unsigned long long)mark_cleanup_start, (unsigned long long)mark_cleanup_end,
+         (unsigned long long)mark_gap_start, (unsigned long long)mark_gap_end, mark_gap_from, mark_gap_to,
+         mark_parse_cpu, mark_cleanup_cpu);
+#endif
 #ifdef TSQ_DIAGNOSTIC_CLOCKS
   double cleanup_cpu = cpu_ms() - cleanup_start_cpu;
   printf("{\"event\":\"diagnostic\",\"parse_cpu_ms\":%.6f,\"cleanup_cpu_ms\":%.6f,"

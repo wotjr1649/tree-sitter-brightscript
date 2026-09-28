@@ -15,6 +15,8 @@ private library directory per checkout). A runtime source root is used only if e
 runtime-<version>.sha256 matches.
 Results: <out>/runs.jsonl (every run) and <out>/gates.json; the exit status is 0 only if every selected gate
 passes.
+The separately authorized --etw-diagnostic route adds one bounded concurrent
+collector Job; it never produces a qualification verdict (native-v4-plan.md).
 """
 import argparse
 import datetime as dt
@@ -159,6 +161,7 @@ class Lab:
             p.mkdir(parents=True, exist_ok=True)
             self.env[name] = str(p)
         self.supervisor, self.supervised_builds = None, False
+        self.supervisor_grace = 30
         self.log = (self.out / "commands.jsonl").open("a", encoding="utf-8", newline="\n")
         self.runs = []
 
@@ -205,7 +208,7 @@ class Lab:
         argv = list(map(str, argv))
         command = [str(self.supervisor), str(raw / "supervisor.json"), str(raw / "child.out"), str(cap), str(ms),
                    str(output_cap), argv[0], subprocess.list2cmdline(argv)]
-        cp = subprocess.run(command, env=self.env, capture_output=True, timeout=ms / 1000 + 30,
+        cp = subprocess.run(command, env=self.env, capture_output=True, timeout=ms / 1000 + self.supervisor_grace,
                             creationflags=subprocess.DETACHED_PROCESS)
         report = json.loads((raw / "supervisor.json").read_text(encoding="utf-8"))
         guard = (cp.returncode == 0 and report["win32_error"] == 0 and report["assigned_before_resume"] and
@@ -574,6 +577,153 @@ def reference_grammar(lab, name):
     return d
 
 
+def etw_session(collector, exe, mode, receipts, public_out, work=None):
+    """One owned session, bounded recovery, no retry. Cleanup also runs after a probe failure."""
+    from concurrent.futures import ThreadPoolExecutor
+    directory = collector.out / mode
+    directory.mkdir()
+    began = time.monotonic()
+    receipt = {"mode": mode, "absence_confirmed": False, "session_seconds_upper_bound": None}
+    receipts.append(receipt)
+    error, result = None, None
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(collector.supervise, mode, [exe, mode, directory],
+                             128 * 2**20, 40000 if mode == "capture" else 1000, 64 * 2**10)
+        try:
+            while not (directory / "ready.json").exists():
+                if future.done() or time.monotonic() - began >= 5:
+                    raise RuntimeError("ETW collector did not become ready")
+                time.sleep(0.01)
+            if work:
+                result = work(began + 15)
+        except Exception as exc:
+            error = exc
+        finally:
+            try:
+                (directory / "stop").write_text("stop\n", encoding="ascii")
+            except Exception as exc:
+                error = error or exc  # the collector watchdog and owned cleanup still run
+            try:
+                report, output = future.result(timeout=max(0.001, began + 45 - time.monotonic()))
+                receipt.update(termination_reason=report["termination_reason"], exit_code=report["exit_code_raw"])
+                expected = {"capture": ("COMPLETED", 0), "crash-control": ("COMPLETED", 92),
+                            "stall-control": ("WATCHDOG_TERMINATED", report["exit_code_raw"])}[mode]
+                if (report["termination_reason"], report["exit_code_raw"]) != expected:
+                    error = error or RuntimeError("ETW collector failed")
+            except Exception as exc:
+                error = error or exc
+            # The future's subprocess timeout kills its supervisor; kill-on-close
+            # ends its child, but NOT the kernel session. An exact GUID receipt
+            # allows cleanup of only this session, followed by an absence query.
+            try:
+                cleanup_mode = "stop-owned" if (directory / "ownership.bin").exists() else "assert-absent"
+                report, output = collector.supervise(mode + "-cleanup", [exe, cleanup_mode, directory],
+                                                      cap=64 * 2**20, ms=2000, output_cap=64 * 2**10)
+                receipt["absence_confirmed"] = (report["termination_reason"] == "COMPLETED"
+                    and report["exit_code_raw"] == 0 and output.strip() == "ETW_OWNED_SESSION_ABSENT")
+                if not receipt["absence_confirmed"]:
+                    raise RuntimeError("owned ETW session absence NOT confirmed")
+                receipt["session_seconds_upper_bound"] = time.monotonic() - began
+                limit = 60 if mode == "capture" else 13
+                if receipt["session_seconds_upper_bound"] > limit:
+                    raise RuntimeError("ETW lifecycle exceeded its reservation")
+            except Exception as exc:
+                error = error or exc
+            meta = directory / "capture.json"
+            try:
+                if meta.exists():
+                    value = json.loads(meta.read_text(encoding="utf-8"))
+                    receipt["capture"] = {k: value[k] for k in (
+                        "ok", "error", "start_status", "started", "stopped", "rows", "ignored", "malformed", "overflow",
+                        "consumer_status", "events_lost", "buffers_lost", "qpc_start", "qpc_end", "qpc_frequency",
+                        "flags", "buffer_kib", "maximum_buffers", "number_of_buffers") if type(value.get(k)) in (bool, int)}
+            except Exception as exc:
+                error = error or exc
+            receipt["pass"] = error is None
+            (public_out / "etw-lifecycle.json").write_text(json.dumps(receipts, indent=1), encoding="utf-8")
+    if error:
+        raise error
+    return result, directory
+
+
+def etw_diagnosis(r, identity):
+    """One Windows hosted diagnostic; stock qualification limits remain unchanged."""
+    import etw_diagnostic as etw
+    import latency_diagnostic
+    lab = r.lab
+    rows = etw.prelude()
+    collector = Lab(lab.cc, lab.out / "trace-private")
+    collector.supervisor_grace = lab.supervisor_grace = 5
+    collector.supervisor = collector.out / "build/supervisor.exe"
+    lab.compile("etw-supervisor", ["-O2", "-Wall", "-Wextra", "-Werror", "-municode", "-DTSQ_SAFETY_PROFILE",
+                                    HERE / "supervisor.c", "-lpsapi", "-Wl,--no-insert-timestamp"], collector.supervisor)
+    exe = collector.out / "build/etw-capture.exe"
+    lab.compile("etw-collector", ["-O2", "-Wall", "-Wextra", "-Werror", "-municode", HERE / "etw_capture.c",
+                                 "-lole32", "-ladvapi32", "-Wl,--no-insert-timestamp"], exe)
+    identity.update(protocol="etw-latency-diagnostic-v1", gates=[], qualification=False,
+                    etw_collector_sha256=sha(exe), etw_supervisor_sha256=sha(collector.supervisor),
+                    prelude_sha256=etw.PREFIX_SHA, prelude_runs=len(rows), targets=etw.TARGETS)
+    identity["diagnostic_inputs"] = {case: {"sha256": sha(r.input(case)), "bytes": r.input(case).stat().st_size}
+                                     for case in sorted({row[2] for row in rows} | set(etw.TARGETS))}
+    (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
+    r.runtime_build = "etw-diagnostic-only-not-qualification"
+    report, text = collector.supervise("offline-codec", [exe, "--selftest"], cap=64 * 2**20,
+                                       ms=2000, output_cap=64 * 2**10)
+    if report["exit_code_raw"] != 0 or text.strip() != "ETW_OFFLINE_SELFTEST_PASS":
+        raise RuntimeError("ETW offline codec control failed")
+    receipts = []
+    # Failure controls must prove cleanup before the long untraced prelude.
+    for mode in ("crash-control", "stall-control"):
+        etw_session(collector, exe, mode, receipts, lab.out)
+    r.probes.update({"aa-left": r.probes["cand"], "aa-right": r.probes["cand"]})
+    for index, (build, op, case, budget, tag) in enumerate(rows):
+        record = r.run(build, op, case, budget, "prelude-" + str(index) + "-" + tag)
+        if not record["completed"] or not record["final"] or record["final"].get("op") != op:
+            raise RuntimeError("ETW prelude execution failed; record retained")
+        if (index + 1) % 500 == 0:
+            print("ETW_PRELUDE_RECORDED", index + 1, flush=True)
+    refs, marked = [], []
+
+    def references(phase):
+        for index, case in enumerate(etw.TARGETS):
+            record = r.run("cand", "PARSE", case, 0, f"{phase}-{index}")
+            if not latency_diagnostic.witness_record(record, case, r.input(case).stat().st_size):
+                raise RuntimeError("ETW stock reference incomplete")
+            refs.append({"phase": phase, "case": case, "tag": record["tag"],
+                         "parse_ms": record["events"]["parse"]["parse_ms"],
+                         "gap_ms": record["events"]["parse"]["max_gap_incl_edges_ms"],
+                         "cleanup_ms": record["events"]["cleanup"]["tree_delete_ms"]
+                                       + record["events"]["cleanup"]["parser_delete_ms"]})
+
+    def measured(deadline):
+        for index, case in enumerate(etw.TARGETS):
+            if time.monotonic() >= deadline:
+                raise RuntimeError("ETW measurement reservation exhausted")
+            record = r.run("cand-etw", "PARSE", case, 0, f"traced-{index}")
+            marked.append(record)
+            if not record["completed"]:
+                raise RuntimeError("ETW target execution failed")
+
+    references("before")
+    _, directory = etw_session(collector, exe, "capture", receipts, lab.out, measured)
+    if sum(x["session_seconds_upper_bound"] for x in receipts) > 120:
+        raise RuntimeError("ETW cumulative reservation exceeded")
+    references("after")
+    metadata = json.loads((directory / "capture.json").read_text(encoding="utf-8"))
+    events, trace_sha = etw.trace_rows(directory / "numeric-private.bin", metadata)
+    observations = [etw.observation(rec, events, metadata, r.input(rec["case"]).stat().st_size) for rec in marked]
+    if len(observations) != 8 or len(refs) != 16:
+        raise RuntimeError("ETW registration incomplete")
+    (lab.out / "etw-summary.json").write_text(json.dumps({"qualification": False, "observations_complete": True,
+        "capture": metadata, "private_numeric_sha256": trace_sha, "lifecycle": receipts,
+        "references": refs, "observations": observations,
+        "limitations": ["Instrumented and time-ordered; no causal ETW overhead or affinity A/B claim.",
+                        "Scheduled duration can include interrupts and hypervisor pauses.",
+                        "Only our owned session absence is verified; other VM tracing is unknown."]}, indent=1), encoding="utf-8")
+    print("ETW_DIAGNOSTIC_COMPLETE", flush=True)
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cc", required=True)
@@ -583,18 +733,26 @@ def main():
     ap.add_argument("--characterize", action="store_true")
     ap.add_argument("--latency-diagnostic", action="store_true")
     ap.add_argument("--latency-witness", action="store_true")
+    ap.add_argument("--etw-diagnostic", action="store_true")
     ap.add_argument("--support", action="append", default=[])
     ap.add_argument("--gates", default=",".join(ALL_GATES))
     ap.add_argument("--seed", type=int, default=5707)
     args = ap.parse_args()
     if args.characterize and (args.preflight or args.support or args.gates != ",".join(ALL_GATES)):
         raise SystemExit("characterization has a fixed plan and cannot select gates, support or preflight")
-    latency_mode = args.latency_diagnostic or args.latency_witness
+    latency_mode = args.latency_diagnostic or args.latency_witness or args.etw_diagnostic
     if latency_mode and (args.characterize or args.preflight or args.support or args.gates != ",".join(ALL_GATES)
-                         or args.latency_diagnostic and args.latency_witness):
+                         or sum((args.latency_diagnostic, args.latency_witness, args.etw_diagnostic)) != 1):
         raise SystemExit("latency diagnosis has a fixed plan and cannot select other modes or gates")
     if args.latency_witness and sys.platform != "win32":
         raise SystemExit("the latency witness plan is Windows-only")
+    if args.etw_diagnostic and (sys.platform != "win32" or os.environ.get("GITHUB_ACTIONS") != "true"
+            or os.environ.get("GITHUB_REPOSITORY") != "wotjr1649/tree-sitter-brightscript"
+            or os.environ.get("GITHUB_REF") != "refs/heads/session/10-v014-latency-diagnosis"
+            or os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch"
+            or os.environ.get("GITHUB_RUN_ATTEMPT") != "1" or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"
+            or os.environ.get("GITHUB_JOB") != "characterize"):
+        raise SystemExit("live ETW is restricted to the preassigned first-attempt hosted Windows job")
     selected = [g for g in args.gates.split(",") if g]
     unknown = sorted(set(selected) - set(ALL_GATES))
     if unknown:
@@ -639,7 +797,8 @@ def main():
                 objs.append(o)
         return objs
 
-    def probe(name, grammar, runtime, runtime_root, alloc=False, scheduled=False, slow=False, diagnostic=False, source=None):
+    def probe(name, grammar, runtime, runtime_root, alloc=False, scheduled=False, slow=False, diagnostic=False, source=None,
+              etw=False):
         exe = lab.out / "build" / (f"probe-{name}.exe" if sys.platform == "win32" else f"probe-{name}")
         if source is not None:
             exe = Path(source).parent / exe.name  # PE exports retain the executable basename.
@@ -650,6 +809,8 @@ def main():
             flags.append("-DTSQ_SLOW_NAV")
         if diagnostic:
             flags.append("-DTSQ_DIAGNOSTIC_CLOCKS")
+        if etw:
+            flags.append("-DTSQ_ETW_MARKERS")
         platform_link = ["-lpsapi", "-Wl,--no-insert-timestamp"] if sys.platform == "win32" else []
         lab.compile(f"probe-{name}", ["-O2", "-Wall", "-Wextra", *flags, "-I", Path(runtime_root) / "lib/include",
                                       source or HERE / "probe.c", *grammar, *runtime, *platform_link], exe)
@@ -679,6 +840,8 @@ def main():
             if args.latency_diagnostic:
                 probes[name + "-diagnostic"] = (probe(name + "-diagnostic", cand, rt, args.runtime,
                                                       alloc=alloc, scheduled=True, diagnostic=True), query)
+        if args.etw_diagnostic:
+            probes["cand-etw"] = (probe("cand-etw", cand, rt, args.runtime, scheduled=True, etw=True), query)
     support_versions = []
     for spec in args.support:
         version, root = spec.split("=", 1)
@@ -689,6 +852,8 @@ def main():
     lane_files.extend(("characterize.py", "gates_v4.py", "test_characterize.py", "test_gates.py", "test_gates_v4.py"))
     if latency_mode:
         lane_files.extend(("latency_diagnostic.py", "test_latency_diagnostic.py"))
+    if args.etw_diagnostic:
+        lane_files.extend(("etw_capture.c", "etw_diagnostic.py", "etw-prelude.json", "test_etw_diagnostic.py"))
     status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, timeout=60)
     other_files = ["scripts/tscli.py", "scripts/corpus.py", "docs/provenance/upstream-sources.md", "package.json",
                    "package-lock.json", "tree-sitter.json"]
@@ -711,6 +876,11 @@ def main():
                 "protocol": "v4.1", "runtime": "0.27.0", "support": support_versions, "seed": args.seed, "gates": selected}
     (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
     r = Runner(lab, probes, query, roots={"cand": ROOT, "h": refs["h"]}, runtime_build="separate-scheduled-v4.1")
+    if args.etw_diagnostic:
+        if not identity["git_clean"] or identity["git_head"] != os.environ.get("TSQ_ETW_EXPECTED_COMMIT"):
+            raise RuntimeError("ETW hosted diagnostic requires the clean preassigned commit")
+        identity["unchanged_probe_sha256"] = unchanged_probes
+        return etw_diagnosis(r, identity)
     if latency_mode:
         import latency_diagnostic
         plan = ({"cases": latency_diagnostic.WITNESSES, "budgets": [0], "repetitions": 5000,

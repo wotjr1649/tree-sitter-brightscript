@@ -1,25 +1,21 @@
-name: Three-OS v4.1 CANCEL pilot
+name: Windows bounded ETW latency diagnosis
 
 on:
   workflow_dispatch:
-  push:
-    branches: [session/10-v014-latency-diagnosis]
-    paths:
-      - .github/workflows/native-characterization.yml
-      - scripts/qualify/gates_v4.py
-      - scripts/qualify/run.py
+    inputs:
+      expected_commit:
+        description: Exact reviewed commit preassigned in issue 11
+        type: string
+        required: true
 
 permissions:
   contents: read
 
 jobs:
   characterize:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-2025-vs2026, ubuntu-24.04, macos-15]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    if: github.run_attempt == 1 && github.sha == inputs.expected_commit && github.ref == 'refs/heads/session/10-v014-latency-diagnosis'
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,20 +34,19 @@ jobs:
         with:
           python-version: "3.14"
       - run: npm ci
-      - name: Run the fixed CANCEL pilot on Windows
-        if: runner.os == 'Windows'
-        run: python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe --runtime .work/runtime-027 --out .work/native-characterization --gates CANCEL
-      - name: Run the fixed CANCEL pilot on POSIX
-        if: runner.os != 'Windows'
-        run: python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 --out .work/native-characterization --gates CANCEL
+      - name: Record the one authorized ETW diagnostic
+        env:
+          TSQ_ETW_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+        run: python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe --runtime .work/runtime-027 --out .work/native-characterization --etw-diagnostic
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: cancel-pilot-${{ matrix.os }}
+          name: windows-etw-derived-evidence
           path: |
             .work/native-characterization/identity.json
-            .work/native-characterization/gates.json
             .work/native-characterization/runs.jsonl
             .work/native-characterization/commands.jsonl
+            .work/native-characterization/etw-lifecycle.json
+            .work/native-characterization/etw-summary.json
           if-no-files-found: error
           retention-days: 14
