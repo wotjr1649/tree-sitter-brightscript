@@ -72,6 +72,9 @@ COMPLETION_WINDOWS_COMMAND = ("python scripts/qualify/run.py --cc C:/mingw64/bin
 COMPLETION_POSIX_COMMAND = ("python scripts/qualify/run.py --cc /usr/bin/cc "
                             "--runtime .work/runtime-027 --out .work/completion-pilot --completion-pilot")
 CI_ALLOWED += "|" + "|".join(map(re.escape, (COMPLETION_WINDOWS_COMMAND, COMPLETION_POSIX_COMMAND)))
+COMPLETION_GAP_COMMAND = ("python scripts/qualify/run.py --cc /usr/bin/cc "
+                          "--runtime .work/runtime-027 --out .work/completion-gap --completion-gap-diagnostic")
+CI_ALLOWED += "|" + re.escape(COMPLETION_GAP_COMMAND)
 # `run` keys in the spellings recognised here (flow mapping, quoted key, extra spaces, `\x72un`, `\u0072un`);
 # each must be one the parser read. Other escapes are not recognised (validation.md "Identity binding").
 ANY_RUN_KEY = re.compile(r"""(?:^|[\s{,])["']?(?:run|\\x72un|\\u0072un)["']?\s*:""", re.M)
@@ -320,6 +323,7 @@ class VerifiedCli(unittest.TestCase):
         self.assertEqual(qualification_commands, [("native-characterization.yml", ETW_DIAGNOSTIC_COMMAND),
                                                   ("native-characterization.yml", COMPLETION_WINDOWS_COMMAND),
                                                   ("native-characterization.yml", COMPLETION_POSIX_COMMAND),
+                                                  ("native-characterization.yml", COMPLETION_GAP_COMMAND),
                                                   ("native-preflight.yml", POSIX_PREFLIGHT_COMMAND),
                                                   ("native-preflight.yml", NATIVE_SMOKE_COMMAND),
                                                   ("native-qualification.yml", NATIVE_FULL_COMMAND),
@@ -340,14 +344,17 @@ class VerifiedCli(unittest.TestCase):
                            command + "; whoami", command + "\n", command + " # comment",
                            command + "\nwhoami", command + " && whoami"):
                 self.assertFalse(allowed(mutant), mutant)
-        for command in (COMPLETION_WINDOWS_COMMAND, COMPLETION_POSIX_COMMAND):
+        for command in (COMPLETION_WINDOWS_COMMAND, COMPLETION_POSIX_COMMAND, COMPLETION_GAP_COMMAND):
             self.assertTrue(allowed(command))
             for mutant in (command + " --gates CANCEL", command + " --etw-diagnostic", command + " --seed 1",
                            command.replace("--completion-pilot", "--characterize"),
+                           command.replace("--completion-gap-diagnostic", "--characterize"),
                            command.replace(".work/completion-pilot", "../outside"),
+                           command.replace(".work/completion-gap", "../outside"),
                            command.replace(".work/runtime-027", "../runtime"),
                            command + "; whoami", command + "\nwhoami"):
-                self.assertFalse(allowed(mutant), mutant)
+                if mutant != command:
+                    self.assertFalse(allowed(mutant), mutant)
         for altered in (POSIX_PREFLIGHT_COMMAND + " --gates CANCEL",
                         POSIX_PREFLIGHT_COMMAND.replace("/usr/bin/cc", "cc"),
                         POSIX_PREFLIGHT_COMMAND.replace(".work/posix-preflight", "../outside"),

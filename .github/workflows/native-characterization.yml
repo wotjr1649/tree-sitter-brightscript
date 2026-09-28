@@ -14,6 +14,7 @@ on:
         default: completion
         options:
           - completion
+          - completion-gap
           - etw
 
 permissions:
@@ -59,11 +60,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   completion:
-    if: inputs.experiment == 'completion' && github.run_attempt == 1 && github.sha == inputs.expected_commit && github.ref == 'refs/heads/session/10-v014-latency-diagnosis'
+    if: (inputs.experiment == 'completion' || inputs.experiment == 'completion-gap') && github.run_attempt == 1 && github.sha == inputs.expected_commit && github.ref == 'refs/heads/session/10-v014-latency-diagnosis'
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2025-vs2026, ubuntu-24.04, macos-15]
+        os: ${{ fromJSON(inputs.experiment == 'completion-gap' && '["macos-15"]' || '["windows-2025-vs2026", "ubuntu-24.04", "macos-15"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -85,24 +86,33 @@ jobs:
           python-version: "3.14"
       - run: npm ci
       - name: Compare stock and completion candidate on Windows
-        if: runner.os == 'Windows'
+        if: inputs.experiment == 'completion' && runner.os == 'Windows'
         env:
           TSQ_COMPLETION_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
         run: python scripts/qualify/run.py --cc C:/mingw64/bin/gcc.exe --runtime .work/runtime-027 --out .work/completion-pilot --completion-pilot
       - name: Compare stock and completion candidate on POSIX
-        if: runner.os != 'Windows'
+        if: inputs.experiment == 'completion' && runner.os != 'Windows'
         env:
           TSQ_COMPLETION_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
         run: python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 --out .work/completion-pilot --completion-pilot
+      - name: Diagnose the macOS L-WHILE callback gap
+        if: inputs.experiment == 'completion-gap' && runner.os == 'macOS'
+        env:
+          TSQ_COMPLETION_EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+        run: python scripts/qualify/run.py --cc /usr/bin/cc --runtime .work/runtime-027 --out .work/completion-gap --completion-gap-diagnostic
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: completion-pilot-${{ matrix.os }}
+          name: ${{ inputs.experiment }}-${{ matrix.os }}
           path: |
             .work/completion-pilot/identity.json
             .work/completion-pilot/runs.jsonl
             .work/completion-pilot/commands.jsonl
             .work/completion-pilot/completion-pilot.json
             .work/completion-pilot/controls-result.txt
+            .work/completion-gap/identity.json
+            .work/completion-gap/runs.jsonl
+            .work/completion-gap/commands.jsonl
+            .work/completion-gap/completion-gap.json
           if-no-files-found: error
           retention-days: 14

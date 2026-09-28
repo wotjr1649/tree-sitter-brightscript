@@ -769,3 +769,23 @@ The prior long-expression QUERY_ONLY watchdogs remain unresolved and excluded
 from any claim of complete API coverage. No first-attempt failure is replaced
 by a continuation or rerun. A successful pilot may justify a candidate decision;
 it cannot supply any of the final six qualification jobs.
+
+The [first hosted pilot](../reports/0.1.4-native-parity-candidate.md#first-hosted-completion-pilot-fbe1b30)
+passed Windows/Ubuntu but failed macOS on one L-WHILE candidate gap. Preserve
+that complete failure. Its next discriminating diagnostic uses the existing
+CPU/wall probe instrumentation, with no replacement qualification metric:
+one exact-SHA, first-attempt macOS ARM64 job, 30-minute bound, 16 fixed rounds
+of stock/plain, stock/instrumented, candidate/plain and candidate/instrumented
+L-WHILE parses, rotating order by round modulo four, plus four NAV checks.
+All 68 records require correct registration, unique identity and individually
+valid results; all four NAV signatures must agree. Instrumented records also
+require consistent maximum-gap wall time, finite CPU observations, valid byte
+positions and head/interior/tail callback ordinals. Stop on invalid data; do
+not add replacement samples. Publish exactly identity, RUN, command and
+completion-gap summary files from the dedicated output directory.
+
+If an instrumented execution exceeds 100 ms, interpret only that execution's
+gap. CPU observations do not supply a release timing substitute or identify a
+particular OS scheduling cause. If it does not reproduce, record the cause as
+unresolved and stop the unchanged diagnostic. Neither outcome replaces the
+failed pilot or starts an unchanged full qualification rerun.

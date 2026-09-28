@@ -1,5 +1,6 @@
 """Synthetic judgement controls; these are not native runtime evidence."""
 import unittest
+import copy
 import re
 from pathlib import Path
 
@@ -44,14 +45,41 @@ class CompletionPilot(unittest.TestCase):
     def test_hosted_scope(self):
         text = (Path(__file__).resolve().parents[2] / ".github/workflows/native-characterization.yml").read_text()
         block = text.split("  completion:\n", 1)[1]
-        self.assertIn("inputs.experiment == 'completion' && github.run_attempt == 1", block)
+        self.assertIn("inputs.experiment == 'completion-gap') && github.run_attempt == 1", block)
         self.assertIn("github.sha == inputs.expected_commit", block)
-        self.assertIn("os: [windows-2025-vs2026, ubuntu-24.04, macos-15]", block)
+        self.assertIn("fromJSON(inputs.experiment == 'completion-gap' && '[\"macos-15\"]'", block)
+        self.assertIn("'[\"windows-2025-vs2026\", \"ubuntu-24.04\", \"macos-15\"]'", block)
         self.assertIn("timeout-minutes: 30", block)
         self.assertNotIn("--etw-", block)
         paths = re.search(r"          path: \|\n((?:            [^\n]+\n)+)", block).group(1)
         self.assertEqual([x.strip() for x in paths.splitlines()], [".work/completion-pilot/" + name for name in (
-            "identity.json", "runs.jsonl", "commands.jsonl", "completion-pilot.json", "controls-result.txt")])
+            "identity.json", "runs.jsonl", "commands.jsonl", "completion-pilot.json", "controls-result.txt")]
+            + [".work/completion-gap/" + name for name in ("identity.json", "runs.jsonl", "commands.jsonl", "completion-gap.json")])
+
+    def test_gap_diagnostic_registration_and_negative_controls(self):
+        plan = pilot.gap_registration()
+        self.assertEqual(len(plan), 68)
+        self.assertEqual(len(set(plan)), 68)
+        self.assertEqual([x[0] for x in plan[:4]], list(pilot.GAP_BUILDS))
+        self.assertEqual([x[0] for x in plan[4:8]], list(pilot.GAP_BUILDS[1:] + pilot.GAP_BUILDS[:1]))
+        base = record()
+        self.assertTrue(pilot.gap_record(base))
+        base['build'] = 'completion-diagnostic'
+        self.assertFalse(pilot.gap_record(base))
+        base['events']['diagnostic'] = dict(parse_cpu_ms=1., cleanup_cpu_ms=.5, gap_wall_ms=1., gap_cpu_ms=.5,
+                                            gap_from_byte=0, gap_to_byte=10, gap_edge=0, gap_ordinal=1)
+        self.assertTrue(pilot.gap_record(base))
+        for key, values in {'parse_cpu_ms': (-1., None, float('nan'), True),
+                            'gap_wall_ms': (2., float('inf')), 'gap_cpu_ms': (2., -.1),
+                            'gap_from_byte': (-1, base['final']['bytes']+1, True),
+                            'gap_to_byte': (-1, base['final']['bytes']+1),
+                            'gap_edge': (3, 1, 2, True), 'gap_ordinal': (0, 2, True)}.items():
+            for value in values:
+                bad=copy.deepcopy(base)
+                bad['events']['diagnostic'][key]=value
+                self.assertFalse(pilot.gap_record(bad), (key,value))
+        base['build']='completion'
+        self.assertFalse(pilot.gap_record(base))
 
     def test_registration(self):
         plan = pilot.registered_runs()

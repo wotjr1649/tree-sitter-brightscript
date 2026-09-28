@@ -158,7 +158,7 @@ def verify_semantics(r, result, check):
         r.probes["cand"] = original
 
 
-def run(r, identity, runtime_root, runtime_objects, grammar_objects, make_probe):
+def build_candidate(r, runtime_root, runtime_objects, grammar_objects, make_probe):
     lab, here = r.lab, cases.ROOT / "scripts/qualify"
     out, build = lab.out, lab.out / "build"
     candidate = completion_runtime.candidate_bytes((runtime_root / "lib/src/parser.c").read_bytes())
@@ -174,6 +174,85 @@ def run(r, identity, runtime_root, runtime_objects, grammar_objects, make_probe)
     for name, alloc in (("completion", False), ("completion-alloc", True)):
         r.probes[name] = (make_probe(name, grammar_objects, variant_objects, runtime_root,
                                      alloc=alloc, scheduled=True), r.query)
+    return variant_objects
+
+
+GAP_BUILDS = ("cand", "cand-diagnostic", "completion", "completion-diagnostic")
+
+
+def gap_registration():
+    return [(name, "PARSE", "L-WHILE-1MiB", 0, f"gap{round}") for round in range(16)
+            for name in GAP_BUILDS[round % 4:] + GAP_BUILDS[:round % 4]] + [
+                (name, "NAV_CURSOR", "L-WHILE-1MiB", 0, "gap-api") for name in GAP_BUILDS]
+
+
+def gap_record(rec):
+    if not judge_record(rec)["pass"]:
+        return False
+    d, pe, f = rec["events"].get("diagnostic"), rec["events"]["parse"], rec["final"]
+    if not rec["build"].endswith("-diagnostic"):
+        return d is None
+    if not isinstance(d, dict) or any(gates.number(d.get(k)) is None for k in (
+            "parse_cpu_ms", "cleanup_cpu_ms", "gap_wall_ms", "gap_cpu_ms")):
+        return False
+    if (abs(d["gap_wall_ms"] - pe["max_gap_incl_edges_ms"]) > .000002
+            or d["gap_cpu_ms"] > d["parse_cpu_ms"] + .000002
+            or any(type(d.get(k)) is not int or not 0 <= d[k] <= f["bytes"] for k in ("gap_from_byte", "gap_to_byte"))
+            or type(d.get("gap_edge")) is not int or type(d.get("gap_ordinal")) is not int
+            or type(pe.get("callbacks")) is not int or pe["callbacks"] < 1):
+        return False
+    edge, ordinal = d["gap_edge"], d["gap_ordinal"]
+    return ((edge == 0 and ordinal == 1 and d["gap_from_byte"] == 0
+             and abs(d["gap_wall_ms"] - pe["head_gap_ms"]) <= .000002)
+            or (edge == 1 and 2 <= ordinal <= pe["callbacks"]
+                and abs(d["gap_wall_ms"] - pe["max_gap_ms"]) <= .000002)
+            or (edge == 2 and ordinal == pe["callbacks"] + 1 and d["gap_to_byte"] == f["bytes"]
+                and abs(d["gap_wall_ms"] - pe["tail_gap_ms"]) <= .000002))
+
+
+def gap_diagnostic(r, identity, runtime_root, runtime_objects, grammar_objects, make_probe):
+    """One finite follow-up to macOS pilot failure; CPU is never a release metric."""
+    variant = build_candidate(r, runtime_root, runtime_objects, grammar_objects, make_probe)
+    for name, objects in (("cand-diagnostic", runtime_objects), ("completion-diagnostic", variant)):
+        r.probes[name] = (make_probe(name, grammar_objects, objects, runtime_root, scheduled=True, diagnostic=True), r.query)
+    identity.update(protocol="completion-gap-diagnostic-v1", qualification=False, gates=[],
+        runtime_candidate={"variant": completion_runtime.VARIANT, "base_parser_sha256": completion_runtime.BASE_SHA256,
+                           "candidate_parser_sha256": completion_runtime.CANDIDATE_SHA256},
+        diagnostic_plan={"rounds": 16, "case": "L-WHILE-1MiB", "builds": GAP_BUILDS, "parse_rows": 64,
+                         "nav_rows": 4, "order": "rotate builds by round modulo four", "limit_ms": 100})
+    identity["probes"].update({name: digest(r.probes[name][0].read_bytes()) for name in GAP_BUILDS})
+    write_json(r.lab.out / "identity.json", identity)
+    r.runtime_build = "completion-gap-diagnostic-v1-stock-and-explicit-candidate"
+    result = {"qualification": False, "release_verdict": "HOLD", "complete": False, "observations": [], "api": []}
+    ids, plan = set(), gap_registration()
+    for expected in plan:
+        name, op, case, budget, tag = expected
+        rec = r.run(name, op, case, budget, tag)
+        registration = tuple(rec.get(k) for k in ("build", "op", "case", "budget", "tag"))
+        run_id = gates.run_id(rec)
+        valid = gap_record(rec) and registration == expected and run_id not in ids
+        ids.add(run_id)
+        result["observations"].append({"registration": registration, "run_id": run_id, "valid": valid,
+            "gap_ms": rec["events"].get("parse", {}).get("max_gap_incl_edges_ms"),
+            "diagnostic": rec["events"].get("diagnostic")})
+        if valid and op == "NAV_CURSOR":
+            result["api"].append(api_signature(rec))
+        write_json(r.lab.out / "completion-gap.json", result)
+        if not valid:
+            raise RuntimeError("completion gap diagnostic invalid record: " + str(registration))
+    result["complete"] = (len(ids) == len(result["observations"]) == len(plan) == 68
+                          and len(result["api"]) == 4 and all(x == result["api"][0] for x in result["api"]))
+    result["diagnostic_over_100ms"] = [x for x in result["observations"] if x["registration"][1] == "PARSE"
+                                      and x["diagnostic"] is not None and x["gap_ms"] > 100]
+    write_json(r.lab.out / "completion-gap.json", result)
+    print("COMPLETION_GAP_DIAGNOSTIC_COMPLETE" if result["complete"] else "COMPLETION_GAP_DIAGNOSTIC_INCOMPLETE", flush=True)
+    return 0 if result["complete"] else 1
+
+
+def run(r, identity, runtime_root, runtime_objects, grammar_objects, make_probe):
+    lab, here = r.lab, cases.ROOT / "scripts/qualify"
+    out, build = lab.out, lab.out / "build"
+    build_candidate(r, runtime_root, runtime_objects, grammar_objects, make_probe)
     identity.update(protocol="completion-pilot-v1", qualification=False, gates=[],
         runtime_candidate={"variant": completion_runtime.VARIANT, "base_parser_sha256": completion_runtime.BASE_SHA256,
             "candidate_parser_sha256": completion_runtime.CANDIDATE_SHA256,
