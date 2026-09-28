@@ -577,12 +577,15 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--preflight", action="store_true")
     ap.add_argument("--characterize", action="store_true")
+    ap.add_argument("--latency-diagnostic", action="store_true")
     ap.add_argument("--support", action="append", default=[])
     ap.add_argument("--gates", default=",".join(ALL_GATES))
     ap.add_argument("--seed", type=int, default=5707)
     args = ap.parse_args()
     if args.characterize and (args.preflight or args.support or args.gates != ",".join(ALL_GATES)):
         raise SystemExit("characterization has a fixed plan and cannot select gates, support or preflight")
+    if args.latency_diagnostic and (args.characterize or args.preflight or args.support or args.gates != ",".join(ALL_GATES)):
+        raise SystemExit("latency diagnosis has a fixed plan and cannot select other modes or gates")
     selected = [g for g in args.gates.split(",") if g]
     unknown = sorted(set(selected) - set(ALL_GATES))
     if unknown:
@@ -627,16 +630,20 @@ def main():
                 objs.append(o)
         return objs
 
-    def probe(name, grammar, runtime, runtime_root, alloc=False, scheduled=False, slow=False):
+    def probe(name, grammar, runtime, runtime_root, alloc=False, scheduled=False, slow=False, diagnostic=False, source=None):
         exe = lab.out / "build" / (f"probe-{name}.exe" if sys.platform == "win32" else f"probe-{name}")
+        if source is not None:
+            exe = Path(source).parent / exe.name  # PE exports retain the executable basename.
         flags = ["-DMEASURE_ALLOC"] if alloc else []
         if scheduled:
             flags.append("-DTSQ_SCHEDULED")
         if slow:
             flags.append("-DTSQ_SLOW_NAV")
+        if diagnostic:
+            flags.append("-DTSQ_DIAGNOSTIC_CLOCKS")
         platform_link = ["-lpsapi", "-Wl,--no-insert-timestamp"] if sys.platform == "win32" else []
         lab.compile(f"probe-{name}", ["-O2", "-Wall", "-Wextra", *flags, "-I", Path(runtime_root) / "lib/include",
-                                      HERE / "probe.c", *grammar, *runtime, *platform_link], exe)
+                                      source or HERE / "probe.c", *grammar, *runtime, *platform_link], exe)
         return exe
 
     rt = runtime_objects("0.27.0", args.runtime)
@@ -649,6 +656,19 @@ def main():
               "h": (probe("h", ref_objs["h"], rt, args.runtime, scheduled=True), refs["h"] / "queries/highlights.scm"),
               "bp": (probe("bp", ref_objs["bp"], rt, args.runtime, scheduled=True), refs["bp"] / "queries/highlights.scm"),
               "slow": (probe("slow", cand, rt, args.runtime, scheduled=True, slow=True), query)}
+    unchanged_probes = {}
+    if args.latency_diagnostic:
+        old_probe = lab.out / "build/unchanged-control/probe.c"
+        old_probe.parent.mkdir()
+        old_probe.write_bytes(subprocess.run(["git", "show", "f3f67fa604baf845a4b569310080a0904a55a9d3:scripts/qualify/probe.c"], cwd=ROOT,
+                                             capture_output=True, check=True, timeout=60).stdout)
+        for name, alloc in (("cand", False), ("cand-alloc", True)):
+            old = probe(name, cand, rt, args.runtime, alloc=alloc, scheduled=True, source=old_probe)
+            if old.read_bytes() != probes[name][0].read_bytes():
+                raise RuntimeError("uninstrumented probe bytes changed: " + name)
+            unchanged_probes[name] = sha(old)
+            probes[name + "-diagnostic"] = (probe(name + "-diagnostic", cand, rt, args.runtime,
+                                                  alloc=alloc, scheduled=True, diagnostic=True), query)
     support_versions = []
     for spec in args.support:
         version, root = spec.split("=", 1)
@@ -657,6 +677,8 @@ def main():
     lane_files = ["run.py", "gates.py", "cases.py", "probe.c", "supervisor.c", "test_supervisor_accounting.c", "benign.c", "benign_posix.c", "recorded-inputs.json",
                   "runtime-0.27.0.sha256", "runtime-0.25.1.sha256", "runtime-0.26.13.sha256"]
     lane_files.extend(("characterize.py", "gates_v4.py", "test_characterize.py", "test_gates.py", "test_gates_v4.py"))
+    if args.latency_diagnostic:
+        lane_files.append("latency_diagnostic.py")
     status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, timeout=60)
     other_files = ["scripts/tscli.py", "scripts/corpus.py", "docs/provenance/upstream-sources.md", "package.json",
                    "package-lock.json", "tree-sitter.json"]
@@ -679,6 +701,14 @@ def main():
                 "protocol": "v4", "runtime": "0.27.0", "support": support_versions, "seed": args.seed, "gates": selected}
     (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
     r = Runner(lab, probes, query, roots={"cand": ROOT, "h": refs["h"]}, runtime_build="separate-scheduled-v4")
+    if args.latency_diagnostic:
+        import latency_diagnostic
+        identity.update(protocol="latency-diagnostic-v1", gates=[], unchanged_probe_sha256=unchanged_probes,
+                        diagnostic_plan={"cases": latency_diagnostic.CASES, "budgets": [0, 100, 200],
+                                         "repetitions": 4, "builds": latency_diagnostic.BUILDS, "runs": 240})
+        (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
+        r.runtime_build = "diagnostic-only-not-qualification"
+        return latency_diagnostic.run(r, lab.out)
     if args.characterize:
         import characterize
         baseline = characterize.BASELINE

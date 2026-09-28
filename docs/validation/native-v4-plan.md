@@ -397,3 +397,37 @@ source/tool identities, and make no release judgement from diagnostic
 timings. Existing wall-clock maxima, timed cancellation growth requirements
 and all 17 purposes remain unchanged. A material correction, independent
 review and a newly preregistered full pair are still required.
+
+The bounded diagnostic uses five unchanged 1 MiB inputs (L-WHILE,
+L-FOREACH, L-ANON, V-FLAT, V-LONGEXPR), budgets 0/100/200 ms, four repetitions
+and four builds: original plain/allocator and diagnostic plain/allocator.
+All 240 executions per OS are retained in fixed alternating order. One
+20-minute job per supported OS runs on a separate diagnostic branch. This
+does not constitute either cohort of a final qualification pair.
+
+The diagnostic build observes head, interior and tail gaps with fixed
+CPU-then-wall snapshots at parse start, every callback and parse return. It
+also records cleanup CPU time, callback ordinal and byte positions. CPU
+accounting uses [GetThreadTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getthreadtimes)
+on Windows and [getrusage](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/getrusage.2.html)
+for the single-threaded POSIX probe (official API contracts checked
+2026-09-28). API errors stop the process. The diagnostic maximum must match
+the existing measured gap including edges. CPU resolution and observation
+overhead limit interpretation; wall minus CPU does not identify a particular
+scheduler or system cause. Compare plain/diagnostic elapsed times, callback
+counts and cancellation positions before drawing conclusions.
+
+Without the diagnostic macro, both plain and allocator executables must be
+byte-identical to builds of the pre-diagnostic probe at `f3f67fa` using the
+same compiler, grammar, runtime and executable basename. Different PE image
+basenames produced a failed initial identity check; the comparison now keeps
+the basename fixed in separate task-owned directories. The byte equality
+requirement itself is unchanged. The diagnostic protocol and output are
+explicitly ineligible for release qualification.
+
+Independent design and implementation review found no P1/P2. The local
+Windows plan completed all 240 observations and verified both unchanged
+binary identities. A cancelled parse's tail endpoint is the last observed
+callback offset, not a new parser-position observation; diagnostic CPU
+values include instrumentation overhead. These observations do not replace
+hosted diagnosis or final qualification.

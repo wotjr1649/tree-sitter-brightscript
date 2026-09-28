@@ -101,6 +101,36 @@ static double clock_ms(void) {
 #endif
 
 /* ------------------------------------------------------------- allocator */
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+/* Diagnostic-only CPU observations. Never used for qualification decisions. */
+static double cpu_ms(void) {
+#ifdef _WIN32
+  FILETIME created, exited, kernel, user;
+  if (!GetThreadTimes(GetCurrentThread(), &created, &exited, &kernel, &user)) exit(97);
+  return ((((uint64_t)kernel.dwHighDateTime << 32) | kernel.dwLowDateTime) +
+          (((uint64_t)user.dwHighDateTime << 32) | user.dwLowDateTime)) / 10000.0;
+#else
+  struct rusage usage;
+  if (getrusage(RUSAGE_SELF, &usage)) exit(97);
+  return (usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) * 1000.0 +
+         (usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1000.0;
+#endif
+}
+static double diag_start_cpu, diag_last_cpu, diag_last_wall, diag_gap_wall, diag_gap_cpu;
+static uint32_t diag_last_byte, diag_gap_from, diag_gap_to;
+static uint64_t diag_gap_ordinal;
+static unsigned diag_gap_edge;
+static void observe_gap(double wall, double cpu, uint32_t byte, uint64_t ordinal, unsigned edge) {
+  if (wall - diag_last_wall > diag_gap_wall) {
+    diag_gap_wall = wall - diag_last_wall;
+    diag_gap_cpu = cpu - diag_last_cpu;
+    diag_gap_from = diag_last_byte; diag_gap_to = byte;
+    diag_gap_ordinal = ordinal; diag_gap_edge = edge;
+  }
+  diag_last_wall = wall; diag_last_cpu = cpu; diag_last_byte = byte;
+}
+#endif
+
 static uint64_t live_bytes, peak_bytes, total_bytes, allocations;
 static int parse_active;
 static double parse_start, budget_ms;
@@ -260,11 +290,17 @@ static int same(const Buf *a, const Buf *b) { return a->n == b->n && !memcmp(a->
 static double first_callback = -1, last_callback = -1, request_ms = -1, max_gap = 0;
 static uint64_t callbacks;
 static bool progress(TSParseState *state) {
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+  double cpu = cpu_ms();
+#endif
   double t = clock_ms() - parse_start;
   if (first_callback < 0) first_callback = t;
   else if (t - last_callback > max_gap) max_gap = t - last_callback;
   last_callback = t;
   callbacks++;
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+  observe_gap(t, cpu, state->current_byte_offset, callbacks, callbacks == 1 ? 0 : 1);
+#endif
   if ((callback_target && callbacks >= callback_target) ||
       (byte_target && state->current_byte_offset >= byte_target) || (budget_ms > 0 && t >= budget_ms)) {
     if (request_ms < 0) { request_ms = t; request_byte = state->current_byte_offset; }
@@ -309,9 +345,18 @@ static int run(const char *op, const char *input_path, const char *query_path, d
 
   TSParseOptions options = {NULL, progress};
   parse_active = 1;
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+  diag_start_cpu = diag_last_cpu = cpu_ms();
+#endif
   parse_start = clock_ms();
   TSTree *tree = ts_parser_parse_with_options(parser, NULL, (TSInput){&input, read_input, TSInputEncodingUTF8, NULL}, options);
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+  double return_cpu = cpu_ms();
+#endif
   double parse_ms = clock_ms() - parse_start;
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+  observe_gap(parse_ms, return_cpu, tree ? length : diag_last_byte, callbacks + 1, 2);
+#endif
   /* The deterministic control also observes allocation growth during parser cleanup. */
   parse_active = (callback_target || byte_target) && !tree;
   uint64_t live_at_return = live_bytes;
@@ -433,12 +478,23 @@ static int run(const char *op, const char *input_path, const char *query_path, d
              "\"child_calls\":%llu,\"digest\":\"%016llx\"}\n", op, nav_ms, (unsigned long long)nav_visits,
              (unsigned long long)nav_fields, (unsigned long long)nav_children, (unsigned long long)tree_digest.h);
   }
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+  double cleanup_start_cpu = cpu_ms();
+#endif
   double t = clock_ms();
   if (tree) ts_tree_delete(tree);
   double tree_delete_ms = clock_ms() - t;
   t = clock_ms();
   ts_parser_delete(parser);
   double parser_delete_ms = clock_ms() - t;
+#ifdef TSQ_DIAGNOSTIC_CLOCKS
+  double cleanup_cpu = cpu_ms() - cleanup_start_cpu;
+  printf("{\"event\":\"diagnostic\",\"parse_cpu_ms\":%.6f,\"cleanup_cpu_ms\":%.6f,"
+         "\"gap_wall_ms\":%.6f,\"gap_cpu_ms\":%.6f,\"gap_from_byte\":%u,\"gap_to_byte\":%u,"
+         "\"gap_ordinal\":%llu,\"gap_edge\":%u}\n",
+         return_cpu - diag_start_cpu, cleanup_cpu, diag_gap_wall, diag_gap_cpu,
+         diag_gap_from, diag_gap_to, (unsigned long long)diag_gap_ordinal, diag_gap_edge);
+#endif
   parse_active = 0;
   printf("{\"event\":\"cleanup\",\"tree_delete_ms\":%.6f,\"parser_delete_ms\":%.6f,\"allocator_live_after\":%llu,"
          "\"peak_after_budget\":%llu}\n",
