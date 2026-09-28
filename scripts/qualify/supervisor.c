@@ -6,7 +6,8 @@
  * Runs one child suspended inside a private job with process and job memory
  * limits, kill-on-close and die-on-unhandled-exception, resumes it, enforces
  * the watchdog and the output cap, and reports one JSON object. Promoted from
- * artifacts/session-05-2 tools/supervisor.c (sha256 15573ee1...), unchanged below.
+ * artifacts/session-05-2 tools/supervisor.c (sha256 15573ee1...). v0.1.4
+ * distinguishes delayed accounting of the exited root from live descendants.
  */
 #define _WIN32_WINNT 0x0601
 #include <windows.h>
@@ -34,6 +35,18 @@ static double milliseconds(void) {
   QueryPerformanceCounter(&count);
   QueryPerformanceFrequency(&frequency);
   return 1000.0 * count.QuadPart / frequency.QuadPart;
+}
+
+enum AccountingState { ACCOUNTING_INVALID, ACCOUNTING_EMPTY, ACCOUNTING_ROOT_PENDING, ACCOUNTING_DESCENDANTS };
+
+/* Called only after the root process handle has signalled. TotalProcesses is
+ * cumulative: once root-only settling starts, any later child is a failure,
+ * even if it has already exited. Never infer an empty job from the root handle. */
+static enum AccountingState accounting_state(DWORD active, DWORD total, BOOL root_pending) {
+  if (!total || active > total) return ACCOUNTING_INVALID;
+  if (root_pending && total != 1) return ACCOUNTING_DESCENDANTS;
+  if (!active) return ACCOUNTING_EMPTY;
+  return total == 1 ? ACCOUNTING_ROOT_PENDING : ACCOUNTING_DESCENDANTS;
 }
 
 static void json_wide(FILE *out, const wchar_t *value) {
@@ -67,6 +80,9 @@ int wmain(int argc, wchar_t **argv) {
   FILE *raw = NULL, *report = NULL;
   BOOL assigned = FALSE, resumed = FALSE, ended = FALSE, truncated = FALSE, memory_event = FALSE;
   BOOL attributes_initialized = FALSE;
+  BOOL root_accounting_pending = FALSE;
+  DWORD exit_active_processes = 0, exit_total_processes = 0;
+  double accounting_settle_ms = 0;
   DWORD failure = 0, exit_code = STILL_ACTIVE, total_processes = 0;
   const char *reason = "COMPLETED";
   uint64_t stored = 0, observed = 0;
@@ -153,7 +169,12 @@ int wmain(int argc, wchar_t **argv) {
       ended = TRUE;
       REQUIRE(QueryInformationJobObject(job, JobObjectBasicAccountingInformation, &accounting, sizeof accounting, NULL));
       total_processes = accounting.TotalProcesses;
-      if (accounting.ActiveProcesses) { reason = "DESCENDANTS_TERMINATED"; goto cleanup; }
+      exit_active_processes = accounting.ActiveProcesses;
+      exit_total_processes = accounting.TotalProcesses;
+      enum AccountingState state = accounting_state(accounting.ActiveProcesses, total_processes, FALSE);
+      if (state == ACCOUNTING_INVALID) { failure = ERROR_INVALID_DATA; reason = "HARNESS_FAILURE"; goto cleanup; }
+      if (state == ACCOUNTING_DESCENDANTS) { reason = "DESCENDANTS_TERMINATED"; goto cleanup; }
+      if (state == ACCOUNTING_ROOT_PENDING) { root_accounting_pending = TRUE; break; }
       if (PeekNamedPipe(read_pipe, NULL, 0, NULL, &available, NULL) && available) continue;
       break;
     }
@@ -181,16 +202,29 @@ cleanup:
     }
   }
   if (assigned) {
-    double cleanup_deadline = milliseconds() + 3000;
+    double cleanup_start = milliseconds(), cleanup_deadline = cleanup_start + 3000;
     do {
       if (!QueryInformationJobObject(job, JobObjectBasicAccountingInformation, &accounting, sizeof accounting, NULL)) {
-        failure = GetLastError(); reason = "HARNESS_FAILURE"; break;
+        failure = GetLastError(); reason = "HARNESS_FAILURE";
+        TerminateJobObject(job, 0xE0502001); break;
       }
       total_processes = accounting.TotalProcesses;
+      if (root_accounting_pending && !strcmp(reason, "COMPLETED")) {
+        enum AccountingState state = accounting_state(accounting.ActiveProcesses, total_processes, TRUE);
+        if (state == ACCOUNTING_INVALID || state == ACCOUNTING_DESCENDANTS) {
+          reason = state == ACCOUNTING_INVALID ? "HARNESS_FAILURE" : "DESCENDANTS_TERMINATED";
+          if (state == ACCOUNTING_INVALID) failure = ERROR_INVALID_DATA;
+          if (!TerminateJobObject(job, 0xE0502001)) { failure = GetLastError(); reason = "HARNESS_FAILURE"; }
+        }
+      }
       if (!accounting.ActiveProcesses) break;
       Sleep(1);
     } while (milliseconds() < cleanup_deadline);
-    if (accounting.ActiveProcesses) { failure = ERROR_TIMEOUT; reason = "UNKNOWN_PROCESS_STATE"; }
+    if (root_accounting_pending) accounting_settle_ms = milliseconds() - cleanup_start;
+    if (accounting.ActiveProcesses) {
+      failure = ERROR_TIMEOUT; reason = "UNKNOWN_PROCESS_STATE";
+      TerminateJobObject(job, 0xE0502001);
+    }
     if (!QueryInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof limits, NULL)) {
       failure = GetLastError(); reason = "HARNESS_FAILURE";
     }
@@ -221,6 +255,8 @@ cleanup:
       "\"memory_limit_event\":%s,\"output_truncated\":%s,\"output_stored_bytes\":%llu,"
       "\"output_observed_bytes\":%llu,\"wall_ms\":%.3f,\"peak_working_set_bytes\":%llu,"
       "\"peak_commit_bytes\":%llu,\"job_peak_commit_bytes\":%llu,\"active_processes\":%lu,"
+      "\"exit_active_processes\":%lu,\"exit_total_processes\":%lu,"
+      "\"root_accounting_pending\":%s,\"accounting_settle_ms\":%.3f,"
       "\"total_processes\":%lu,\"configured_process_memory_limit_bytes\":%llu,"
       "\"configured_job_memory_limit_bytes\":%llu,\"limit_flags\":%lu,\"image_path\":",
       process.dwProcessId, GetCurrentProcessId(), (unsigned long long)creation,
@@ -228,7 +264,9 @@ cleanup:
       ended ? "true" : "false", exit_code, reason, failure, memory_event ? "true" : "false",
       truncated ? "true" : "false", (unsigned long long)stored, (unsigned long long)observed, end - begin,
       (unsigned long long)memory.PeakWorkingSetSize, (unsigned long long)limits.PeakProcessMemoryUsed,
-      (unsigned long long)limits.PeakJobMemoryUsed, accounting.ActiveProcesses, total_processes,
+      (unsigned long long)limits.PeakJobMemoryUsed, accounting.ActiveProcesses,
+      exit_active_processes, exit_total_processes, root_accounting_pending ? "true" : "false", accounting_settle_ms,
+      total_processes,
       (unsigned long long)limits.ProcessMemoryLimit, (unsigned long long)limits.JobMemoryLimit,
       limits.BasicLimitInformation.LimitFlags);
     json_wide(report, image);

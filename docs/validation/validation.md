@@ -520,7 +520,21 @@ direct launcher exemption: `test_tscli.py` still admits only `qualify/run.py`.
 Executable hashes, exact fixed check arguments, new task-contained output and the
 private child environment are checked; `qualify/test_safety.py` exercises rejection.
 
-The default supervisor remains byte-identical to S572 (SHA-256 `000ce1db84540d2195a352bf6c49f19bcd859d4e9f726b3d0f17d23477ef56f5`).
+The 0.1.1–0.1.3 default supervisor was byte-identical to S572 (SHA-256
+`000ce1db84540d2195a352bf6c49f19bcd859d4e9f726b3d0f17d23477ef56f5`).
+The 0.1.4 root-accounting correction uses the same pinned GCC and stock build
+recipe, with one exact replacement image SHA-256
+`e2ce27725de5471cdefc157a8e5885a6da0e12a7ea36e665b21c551533c5a8e0`.
+After the root signals, only `(ActiveProcesses=1, TotalProcesses=1)` may
+settle inside the existing fixed 3-second cleanup deadline. During settling,
+any observed child is rejected before an empty-job check, including an
+already-exited child. Query errors, inconsistent counts and timeout fail
+closed. The initial counts, pending flag and settling time are retained.
+Microsoft's [Job accounting contract](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information)
+and [process termination contract](https://learn.microsoft.com/en-us/windows/win32/procthread/terminating-a-process)
+were checked on 2026-09-28. Old failure records and published identities are
+unchanged. Windows self-test also executes the ten pure accounting-state
+checks; these do not replace actual process/Job controls.
 Only a separate `TSQ_SAFETY_PROFILE` build admits the test-only upper bounds:
 2 GiB process/job commit, 360 s watchdog and 64 MiB output. Both profiles
 must pass normal, timeout, memory, output, descendant and private-environment

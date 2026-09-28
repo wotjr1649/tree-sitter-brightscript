@@ -1,7 +1,7 @@
 """Explicit test-only Windows safety route of qualify/run.py; no direct process launcher.
 
 python scripts/qualify/run.py --safety-profile capability --cc <pinned gcc> --safety-cc <approved clang> --out <new .work dir>
-The stock profile stays unchanged. This route fixes executable hashes, arguments, private environment,
+The stock limits stay unchanged. This route fixes executable hashes, arguments, private environment,
 single-job limits and task-contained output. It does not download tools or run a full timing campaign.
 """
 import argparse
@@ -199,9 +199,9 @@ def prepare(args):
             "-lpsapi", "-Wl,--no-insert-timestamp"]
     lab.compile("supervisor-stock", base, lab.supervisor)
     stock_sha = run.sha(lab.supervisor)
-    # Original S572 image: source changed only through a compile-time safety profile.
-    if stock_sha != "000ce1db84540d2195a352bf6c49f19bcd859d4e9f726b3d0f17d23477ef56f5":
-        raise RuntimeError("stock supervisor is not byte-identical to S572")
+    # v0.1.4 root-accounting correction; the historical S572 identity is retained in validation.md.
+    if stock_sha != "e2ce27725de5471cdefc157a8e5885a6da0e12a7ea36e665b21c551533c5a8e0":
+        raise RuntimeError("stock supervisor differs from the verified v0.1.4 image")
     stock_tests = run.self_test(lab)
     stock_tests.append(lab.supervisor_refusal("stock-refuses-safety-cap", CAP, 1000, 1024))
     lab.supervisor = out / "build/supervisor-safety.exe"

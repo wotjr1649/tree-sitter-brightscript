@@ -380,3 +380,20 @@ Reducing redundant Python record retention preserves every raw byte and
 judge input. Its local controls and six-job offline replays pass, but native
 Linux confirmation is pending. Remaining single-run cleanup, callback and
 late-natural-cancellation failures require separate root-cause work.
+
+## List candidate follow-up and Windows accounting correction
+
+The second frozen pair, `9ad11bb`, passed all 17 purposes on both Ubuntu
+jobs but failed on Windows and macOS; the [retained report](../reports/0.1.4-native-parity-candidate.md#frozen-list-candidate-9ad11bb--fail-retained)
+records each failure. Independent design and implementation review accepted
+the bounded root-only Job-accounting correction. Native safety controls and
+the pinned safety-profile checks passed; a rare settling transition remains
+unobserved locally. Historical FAILs are preserved.
+
+Next, measure CPU time and callback byte positions in a separate diagnostic
+build to distinguish expensive parser work from time spent off CPU. Keep the
+unchanged plain and allocator builds as controls, retain all samples and
+source/tool identities, and make no release judgement from diagnostic
+timings. Existing wall-clock maxima, timed cancellation growth requirements
+and all 17 purposes remain unchanged. A material correction, independent
+review and a newly preregistered full pair are still required.

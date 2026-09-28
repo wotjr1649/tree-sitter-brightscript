@@ -507,6 +507,15 @@ def self_test(lab):
     env_before = os.environ.get("S05_PRIVATE_CANARY")
     os.environ["S05_PRIVATE_CANARY"] = "must-not-reach-child"  # the child must not see the parent's variables
     results = []
+    if not posix:
+        accounting = lab.out / "build/accounting-test.exe"
+        lab.compile("accounting-test", ["-O2", "-Wall", "-Wextra", "-Werror",
+                    HERE / "test_supervisor_accounting.c", "-lpsapi", "-Wl,--no-insert-timestamp"], accounting)
+        report, text = lab.supervise("selftest-accounting-state", [accounting],
+                                     cap=64 * 2**20, ms=3000, output_cap=64 * 2**10)
+        results.append({"mode": "accounting-state", "pass": report["termination_reason"] == "COMPLETED"
+                        and report["exit_code_raw"] == 0 and text.strip() == "ACCOUNTING_STATE_PASS 10",
+                        "report": report})
     modes = ["normal", "sleep", "memory", "output", "descendant", "private-env"]
     if posix:
         modes.append("descendant-closed")
@@ -645,7 +654,7 @@ def main():
         version, root = spec.split("=", 1)
         probes[f"cand-rt{version}"] = (probe(f"cand-rt{version}", cand, runtime_objects(version, root), root), query)
         support_versions.append(version)
-    lane_files = ["run.py", "gates.py", "cases.py", "probe.c", "supervisor.c", "benign.c", "benign_posix.c", "recorded-inputs.json",
+    lane_files = ["run.py", "gates.py", "cases.py", "probe.c", "supervisor.c", "test_supervisor_accounting.c", "benign.c", "benign_posix.c", "recorded-inputs.json",
                   "runtime-0.27.0.sha256", "runtime-0.25.1.sha256", "runtime-0.26.13.sha256"]
     lane_files.extend(("characterize.py", "gates_v4.py", "test_characterize.py", "test_gates.py", "test_gates_v4.py"))
     status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, timeout=60)
