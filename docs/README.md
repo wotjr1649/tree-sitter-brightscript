@@ -22,6 +22,7 @@ link to it rather than restate it.
 | [provenance/upstream-sources.md](provenance/upstream-sources.md) | Dated identities of sources and toolchain | Citing a source; refreshing; selecting the generator |
 | [validation/validation.md](validation/validation.md) | Validation levels (V0–V10), gates, V0 checklist, failure handling, Level 2 policy | Claiming anything; closing a session; preparing a release |
 | [validation/public-replay.md](validation/public-replay.md) | v0.1.2의 offline raw 재판정과 candidate identity 검사 | 공개 verifier를 실행하거나 결과를 해석할 때 |
+| [validation/native-v4-plan.md](validation/native-v4-plan.md) | v0.1.4 HOLD 원인 진단과 재검증 순서, 적대적 설계 검토 결과 | 세 OS native FAIL을 해결할 때 |
 | [validation/workload-matrix.md](validation/workload-matrix.md) | Validation sets W01–W14 and the catalogue of every corpus fixture | Writing fixtures; running V2–V10 |
 | [validation/known-regressions.md](validation/known-regressions.md) | Defects of earlier grammars and the checks that prevent them | Reviewing grammar or generation changes |
 | [reports/0.1.0-release-candidate.md](reports/0.1.0-release-candidate.md) | Release-candidate evidence, gate results and verdict for 0.1.0 | Checking what the candidate proves |

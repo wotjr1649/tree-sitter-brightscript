@@ -384,8 +384,9 @@ class Lab:
 class Runner:
     """What the gates call: measurements of built probes on generated inputs."""
 
-    def __init__(self, lab, probes, query, roots=None):
+    def __init__(self, lab, probes, query, roots=None, runtime_build="separate"):
         self.lab, self.probes, self.query, self.roots = lab, probes, query, roots or {}
+        self.runtime_build = runtime_build
 
     def input(self, case):
         path = self.lab.out / "inputs" / f"{case}.brs"
@@ -425,6 +426,7 @@ class Runner:
         events = {e["event"]: e for e in self.json_lines(text) if "event" in e}
         final = next((e for e in self.json_lines(text) if e.get("final")), None)
         rec = {"build": build, "op": op, "case": case, "budget": budget, "tag": tag, "report": report,
+               "runtime_build": self.runtime_build,
                "completed": report["termination_reason"] == "COMPLETED" and report["exit_code_raw"] == 0,
                "events": events, "final": final}
         self.lab.runs.append(rec)
@@ -533,10 +535,13 @@ def main():
     ap.add_argument("--runtime")
     ap.add_argument("--out", required=True)
     ap.add_argument("--preflight", action="store_true")
+    ap.add_argument("--characterize", action="store_true")
     ap.add_argument("--support", action="append", default=[])
     ap.add_argument("--gates", default=",".join(ALL_GATES))
     ap.add_argument("--seed", type=int, default=5707)
     args = ap.parse_args()
+    if args.characterize and (args.preflight or args.support or args.gates != ",".join(ALL_GATES)):
+        raise SystemExit("characterization has a fixed plan and cannot select gates, support or preflight")
     selected = [g for g in args.gates.split(",") if g]
     unknown = sorted(set(selected) - set(ALL_GATES))
     if unknown:
@@ -561,11 +566,14 @@ def main():
         raise SystemExit("--runtime is required for qualification")
     lab.supervised_builds = True
 
-    def runtime_objects(version, root):
+    def runtime_objects(version, root, amalgamated=False):
         units = verify_runtime(root, version)
+        if amalgamated:
+            units = [Path(root) / "lib/src/lib.c"]
         objs = []
         for u in units:
-            o = lab.out / "build" / f"rt-{version}" / (u.stem + ".o")
+            tag = f"rt-{version}" + ("-amalgamated" if amalgamated else "")
+            o = lab.out / "build" / tag / (u.stem + ".o")
             o.parent.mkdir(parents=True, exist_ok=True)
             lab.compile(f"rt-{version}-{u.stem}", ["-O2", "-I", Path(root) / "lib/include", "-I", Path(root) / "lib/src",
                                                    "-c", u], o)
@@ -605,6 +613,8 @@ def main():
         support_versions.append(version)
     lane_files = ["run.py", "gates.py", "cases.py", "probe.c", "supervisor.c", "benign.c", "benign_posix.c", "recorded-inputs.json",
                   "runtime-0.27.0.sha256", "runtime-0.25.1.sha256", "runtime-0.26.13.sha256"]
+    if args.characterize:
+        lane_files.append("characterize.py")
     status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, timeout=60)
     other_files = ["scripts/tscli.py", "scripts/corpus.py", "docs/provenance/upstream-sources.md", "package.json",
                    "package-lock.json", "tree-sitter.json"]
@@ -625,6 +635,26 @@ def main():
                 "runtime": "0.27.0", "support": support_versions, "seed": args.seed, "gates": selected}
     (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
     r = Runner(lab, probes, query, roots={"cand": ROOT, "h": refs["h"]})
+    if args.characterize:
+        import characterize
+        baseline = characterize.BASELINE
+        for rel, digest in identity["candidate"].items():
+            data = subprocess.run(["git", "show", f"{baseline}:{rel}"], cwd=ROOT, capture_output=True,
+                                  check=True, timeout=60).stdout
+            if hashlib.sha256(data).hexdigest() != digest:
+                raise RuntimeError(f"characterization requires frozen v0.1.3 product: {rel}")
+        art = runtime_objects("0.27.0", args.runtime, amalgamated=True)
+        aprobes = {"cand": (probe("cand-amalgamated", cand, art, args.runtime), query),
+                   "cand-alloc": (probe("cand-alloc-amalgamated", cand, art, args.runtime, alloc=True), query),
+                   **{n: (probe(f"{n}-amalgamated", ref_objs[n], art, args.runtime), q)
+                      for n, q in (("h", refs["h"] / "queries/highlights.scm"),
+                                   ("bp", refs["bp"] / "queries/highlights.scm"))}}
+        identity.update(characterization_baseline=baseline,
+                        amalgamated_probes={n: sha(p) for n, (p, _) in aprobes.items()})
+        (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
+        ar = Runner(lab, aprobes, query, roots=r.roots, runtime_build="amalgamated")
+        characterize.run({"separate": r, "amalgamated": ar}, identity, lab.out, args.seed)
+        return 0
     results = []
     plan = {"B5-01-MEMORY": lambda: gates.b5_01_memory(r), "B5-02-LIFECYCLE": lambda: gates.b5_02_lifecycle(r),
             "A5-01-COST": lambda: gates.a5_01_cost(r, args.seed), "CANCEL": lambda: gates.cancel(r),
