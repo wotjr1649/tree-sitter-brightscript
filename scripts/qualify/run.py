@@ -647,12 +647,8 @@ def etw_session(collector, exe, mode, receipts, public_out, work=None):
     return result, directory
 
 
-def etw_diagnosis(r, identity):
-    """One Windows hosted diagnostic; stock qualification limits remain unchanged."""
-    import etw_diagnostic as etw
-    import latency_diagnostic
-    lab = r.lab
-    rows = etw.prelude()
+def etw_collector(lab):
+    """Build and offline-check the same bounded collector for either diagnostic."""
     collector = Lab(lab.cc, lab.out / "trace-private")
     collector.supervisor_grace = lab.supervisor_grace = 5
     collector.supervisor = collector.out / "build/supervisor.exe"
@@ -661,6 +657,46 @@ def etw_diagnosis(r, identity):
     exe = collector.out / "build/etw-capture.exe"
     lab.compile("etw-collector", ["-O2", "-Wall", "-Wextra", "-Werror", "-municode", HERE / "etw_capture.c",
                                  "-lole32", "-ladvapi32", "-Wl,--no-insert-timestamp"], exe)
+    report, text = collector.supervise("offline-codec", [exe, "--selftest"], cap=64 * 2**20,
+                                       ms=2000, output_cap=64 * 2**10)
+    if report["exit_code_raw"] != 0 or text.strip() != "ETW_OFFLINE_SELFTEST_PASS":
+        raise RuntimeError("ETW offline codec control failed")
+    return collector, exe
+
+
+def etw_compatibility(lab, selftest):
+    """One capture for the first rejection descriptor; no parser or performance work."""
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True,
+                           check=True, timeout=60).stdout.strip()
+    status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True,
+                             check=True, timeout=60).stdout.strip()
+    if status or head != os.environ.get("TSQ_ETW_EXPECTED_COMMIT"):
+        raise RuntimeError("ETW compatibility requires the clean preassigned commit")
+    collector, exe = etw_collector(lab)
+    identity = {"protocol": "etw-compatibility-v1", "qualification": False, "git_head": head, "git_clean": True,
+        "hosted_run": {"id": os.environ.get("GITHUB_RUN_ID"), "attempt": os.environ.get("GITHUB_RUN_ATTEMPT")},
+        "runner_image": {"os": os.environ.get("ImageOS"), "version": os.environ.get("ImageVersion"),
+                         "runner_arch": os.environ.get("RUNNER_ARCH")}, "selftest": selftest,
+        "cc_sha256": sha(lab.cc), "etw_collector_sha256": sha(exe), "etw_supervisor_sha256": sha(collector.supervisor),
+        "lane_sources": {name: sha(HERE / name) for name in ("run.py", "etw_capture.c", "supervisor.c",
+                          "test_supervisor_accounting.c", "benign.c", "test_etw_diagnostic.py", "cases.py",
+                          "gates.py", "gates_v4.py", "characterize.py")},
+        "scope": {"sessions": 1, "lifetime_seconds": 60, "buffer_bytes": 64 * 2**20, "parser_runs": 0}}
+    (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
+    # One second is sufficient to request a short observation, not a guarantee
+    # of schema coverage. Self-stop/watchdog/cleanup retain their 60s reservation.
+    etw_session(collector, exe, "capture", [], lab.out, lambda deadline, active: time.sleep(1))
+    print("ETW_COMPATIBILITY_CAPTURE_COMPLETE; no performance conclusion", flush=True)
+    return 0
+
+
+def etw_diagnosis(r, identity):
+    """One Windows hosted diagnostic; stock qualification limits remain unchanged."""
+    import etw_diagnostic as etw
+    import latency_diagnostic
+    lab = r.lab
+    rows = etw.prelude()
+    collector, exe = etw_collector(lab)
     identity.update(protocol="etw-latency-diagnostic-v1", gates=[], qualification=False,
                     etw_collector_sha256=sha(exe), etw_supervisor_sha256=sha(collector.supervisor),
                     prelude_sha256=etw.PREFIX_SHA, prelude_runs=len(rows), targets=etw.TARGETS)
@@ -668,10 +704,6 @@ def etw_diagnosis(r, identity):
                                      for case in sorted({row[2] for row in rows} | set(etw.TARGETS))}
     (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
     r.runtime_build = "etw-diagnostic-only-not-qualification"
-    report, text = collector.supervise("offline-codec", [exe, "--selftest"], cap=64 * 2**20,
-                                       ms=2000, output_cap=64 * 2**10)
-    if report["exit_code_raw"] != 0 or text.strip() != "ETW_OFFLINE_SELFTEST_PASS":
-        raise RuntimeError("ETW offline codec control failed")
     receipts = []
     # Failure controls must prove cleanup before the long untraced prelude.
     for mode in ("crash-control", "stall-control"):
@@ -735,19 +767,22 @@ def main():
     ap.add_argument("--latency-diagnostic", action="store_true")
     ap.add_argument("--latency-witness", action="store_true")
     ap.add_argument("--etw-diagnostic", action="store_true")
+    ap.add_argument("--etw-compatibility", action="store_true")
     ap.add_argument("--support", action="append", default=[])
     ap.add_argument("--gates", default=",".join(ALL_GATES))
     ap.add_argument("--seed", type=int, default=5707)
     args = ap.parse_args()
     if args.characterize and (args.preflight or args.support or args.gates != ",".join(ALL_GATES)):
         raise SystemExit("characterization has a fixed plan and cannot select gates, support or preflight")
-    latency_mode = args.latency_diagnostic or args.latency_witness or args.etw_diagnostic
+    etw_mode = args.etw_diagnostic or args.etw_compatibility
+    latency_mode = args.latency_diagnostic or args.latency_witness or etw_mode
     if latency_mode and (args.characterize or args.preflight or args.support or args.gates != ",".join(ALL_GATES)
-                         or sum((args.latency_diagnostic, args.latency_witness, args.etw_diagnostic)) != 1):
+                         or sum((args.latency_diagnostic, args.latency_witness, args.etw_diagnostic,
+                                 args.etw_compatibility)) != 1):
         raise SystemExit("latency diagnosis has a fixed plan and cannot select other modes or gates")
     if args.latency_witness and sys.platform != "win32":
         raise SystemExit("the latency witness plan is Windows-only")
-    if args.etw_diagnostic and (sys.platform != "win32" or os.environ.get("GITHUB_ACTIONS") != "true"
+    if etw_mode and (sys.platform != "win32" or os.environ.get("GITHUB_ACTIONS") != "true"
             or os.environ.get("GITHUB_REPOSITORY") != "wotjr1649/tree-sitter-brightscript"
             or os.environ.get("GITHUB_REF") != "refs/heads/session/10-v014-latency-diagnosis"
             or os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch"
@@ -774,9 +809,13 @@ def main():
                                                  encoding="utf-8")
         print("POSIX_PREFLIGHT_PASS" if sys.platform != "win32" else "WINDOWS_PREFLIGHT_PASS")
         return 0
+    lab.supervised_builds = True
+    if args.etw_compatibility:
+        if args.runtime:
+            raise SystemExit("ETW compatibility does not run a parser runtime")
+        return etw_compatibility(lab, selftest)
     if not args.runtime:
         raise SystemExit("--runtime is required for qualification")
-    lab.supervised_builds = True
 
     def runtime_objects(version, root):
         units = verify_runtime(root, version)

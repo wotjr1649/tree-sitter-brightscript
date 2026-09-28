@@ -58,13 +58,37 @@ class EtwDiagnostic(unittest.TestCase):
         text = (Path(__file__).resolve().parents[2] / ".github/workflows/native-characterization.yml").read_text()
         block = re.search(r"          path: \|\n((?:            [^\n]+\n)+)", text).group(1)
         self.assertEqual([x.strip() for x in block.splitlines()], [".work/native-characterization/" + name for name in (
-            "identity.json", "runs.jsonl", "commands.jsonl", "etw-lifecycle.json", "etw-summary.json")])
+            "identity.json", "commands.jsonl", "etw-lifecycle.json")])
         self.assertIn("  workflow_dispatch:", text)
         self.assertNotIn("  push:", text)
         self.assertIn("github.sha == inputs.expected_commit", text)
         self.assertIn("    if: github.run_attempt == 1", text)
-        self.assertIn("    timeout-minutes: 30", text)
+        self.assertIn("    timeout-minutes: 10", text)
         self.assertEqual(text.count("uses: actions/upload-artifact@"), 1)
+
+    def test_compatibility_has_one_session_and_no_parser(self):
+        from types import SimpleNamespace
+        import run
+        root = Path(__file__).resolve().parents[2] / ".work"
+        with tempfile.TemporaryDirectory(dir=root) as temp:
+            lab = SimpleNamespace(out=Path(temp), cc=Path("unused-gcc"))
+            collector = SimpleNamespace(supervisor=Path("unused-supervisor"))
+            head = "a" * 40
+            with patch.object(run.subprocess, "run", side_effect=[SimpleNamespace(stdout=head), SimpleNamespace(stdout="")]), \
+                    patch.object(run.os, "environ", {"TSQ_ETW_EXPECTED_COMMIT": head}), \
+                    patch.object(run, "sha", return_value="0" * 64), \
+                    patch.object(run, "etw_collector", return_value=(collector, "unused.exe")), \
+                    patch.object(run, "etw_session") as session:
+                self.assertEqual(run.etw_compatibility(lab, []), 0)
+                session.assert_called_once()
+                args = session.call_args.args
+                self.assertEqual(args[2:5], ("capture", [], Path(temp)))
+                with patch.object(run.time, "sleep") as sleep:
+                    args[5](0, lambda: True)
+                    sleep.assert_called_once_with(1)
+            identity = json.loads((Path(temp) / "identity.json").read_text())
+            self.assertEqual(identity["scope"], dict(sessions=1, lifetime_seconds=60, buffer_bytes=64*2**20, parser_runs=0))
+            self.assertFalse(identity["qualification"])
 
     def test_marker_identity_and_clock_rejections(self):
         case = next(iter(d.latency_diagnostic.WITNESSES))

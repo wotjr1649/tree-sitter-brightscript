@@ -638,3 +638,20 @@ unknown schemas, stops additional probes after collector termination, and
 rejects target transitions within +/-1 QPC tick of phase boundaries. A short
 compatibility-only capture is a proposed new scope; it requires a separate
 owner choice before activation. Historical FAILs and the 100 ms bounds stand.
+
+The owner subsequently approved exactly one compatibility-only job: Windows
+ephemeral VM, 10 minutes overall, one capture session with launch-through-
+confirmed-cleanup bounded by 60 seconds, 64 MiB capture buffer limit. It builds
+and offline-checks the existing collector under the checked Job supervisor,
+requests one second of collection, and retains the existing self-stop/watchdog/
+cleanup reservation. It runs zero parser probes and no 5,833-run prefix.
+Capture rejection remains FAIL; its four unsigned first-rejection fields are
+the intended evidence. The exact commit must be preassigned before the one
+explicit dispatch. No raw trace is uploaded; no full latency or qualification
+rerun is included in this additional authorization.
+
+Independent static implementation review found no P1/P2 in this mode. Local
+native evidence controls (21 tests), CLI controls (12), V0 and diff checks
+passed. The one-second request does not guarantee every event shape appears;
+no rejection would leave the earlier decoder failure unexplained. Rejection
+collects its descriptor while preserving the failed capture verdict.
