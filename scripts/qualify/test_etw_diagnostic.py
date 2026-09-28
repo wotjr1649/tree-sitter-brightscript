@@ -32,7 +32,9 @@ class EtwDiagnostic(unittest.TestCase):
         self.assertEqual(d.interval([], 7, 10, 70, 1000)["scheduled_ms"], 60)
         for bad in (rows[:-1], rows[1:], rows[:1] + rows, [rows[3]],
                     [(10, 9, 7, 0, 36, 1, 0), (70, 7, 9, 0, 36, 1, 0)],
-                    [(10, 9, 7, 0, 36, 1, 0)], [(70, 7, 9, 0, 36, 1, 0)]):
+                    [(10, 9, 7, 0, 36, 1, 0)], [(70, 7, 9, 0, 36, 1, 0)],
+                    [(9, 9, 7, 0, 36, 1, 0), (71, 7, 9, 0, 36, 1, 0)],
+                    [(11, 9, 7, 0, 36, 1, 0)], [(69, 7, 9, 0, 36, 1, 0)]):
             with self.assertRaises(ValueError):
                 d.interval(bad, 7, 10, 70, 1000)
 
@@ -118,7 +120,8 @@ class EtwDiagnostic(unittest.TestCase):
 
                 collector, receipts = Collector(), []
 
-                def work(deadline):
+                def work(deadline, collector_active):
+                    self.assertTrue(collector_active())
                     if defect == "probe":
                         raise RuntimeError("planted probe failure")
 

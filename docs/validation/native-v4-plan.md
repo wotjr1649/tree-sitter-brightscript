@@ -628,3 +628,13 @@ Official references checked 2026-09-28:
 [CSwitch schema](https://learn.microsoft.com/en-us/windows/win32/etw/cswitch),
 [ReadyThread schema](https://learn.microsoft.com/en-us/windows/win32/etw/readythread),
 [QPC and affinity guidance](https://learn.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps).
+
+The single dispatch at `108401d` completed with diagnostic FAIL; the
+[candidate report](../reports/0.1.4-native-parity-candidate.md#etw-run-108401d--diagnostic-fail-cleanup-verified)
+records verified cleanup/buffer limits, the incomplete capture and exact raw
+native audit. No retry is authorized by the one-job choice. Follow-up local
+hardening records the first rejection's numeric descriptor without accepting
+unknown schemas, stops additional probes after collector termination, and
+rejects target transitions within +/-1 QPC tick of phase boundaries. A short
+compatibility-only capture is a proposed new scope; it requires a separate
+owner choice before activation. Historical FAILs and the 100 ms bounds stand.

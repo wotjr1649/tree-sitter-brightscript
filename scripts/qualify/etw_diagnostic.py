@@ -72,7 +72,8 @@ def interval(rows, tid, begin, end, frequency):
     totals = dict(scheduled=0, ready=0, waiting=0, unknown=0)
     counts = dict(switch_out=0, switch_in=0, ready=0)
     for tick, new, old, cpu, kind, oldstate, _ in rows:
-        if tick in (begin, end) and tid in (new, old):
+        # Microsoft documents +/-1 QPC tick ordering uncertainty across threads.
+        if min(abs(tick - begin), abs(tick - end)) <= 1 and tid in (new, old):
             raise ValueError("ambiguous ETW event at QPC boundary")
         if tick <= begin or tick >= end or tid not in (new, old):
             continue

@@ -24,6 +24,7 @@ typedef struct { EVENT_TRACE_PROPERTIES p; wchar_t name[128]; } Properties;
 static Row *rows;
 static ULONG row_count, ignored;
 static volatile LONG malformed, overflow;
+static unsigned rejected_opcode, rejected_version, rejected_length, rejected_reason;
 static TRACEHANDLE consumer = INVALID_PROCESSTRACE_HANDLE;
 static ULONG consume_status;
 
@@ -47,8 +48,10 @@ static int decode(const EVENT_RECORD *e, Row *r) {
   if (memcmp(&e->EventHeader.ProviderId, &thread_guid, sizeof(GUID))) return 0;
   unsigned op = e->EventHeader.EventDescriptor.Opcode;
   if (op != 36 && op != 50) return 0;
-  if (e->EventHeader.EventDescriptor.Version != 2 || !e->UserData ||
-      e->UserDataLength != (op == 36 ? 24 : 8) || e->EventHeader.TimeStamp.QuadPart <= 0) return -1;
+  if (e->EventHeader.EventDescriptor.Version != 2) return -1;
+  if (e->UserDataLength != (op == 36 ? 24 : 8)) return -2;
+  if (!e->UserData) return -3;
+  if (e->EventHeader.TimeStamp.QuadPart <= 0) return -4;
   const unsigned char *p = e->UserData;
   memset(r, 0, sizeof *r);
   r->tick = (uint64_t)e->EventHeader.TimeStamp.QuadPart;
@@ -58,7 +61,7 @@ static int decode(const EVENT_RECORD *e, Row *r) {
   if (op == 36) {
     memcpy(&r->previous, p + 4, 4);
     r->state = p[14];
-    if (r->state > 9) return -1;
+    if (r->state > 9) return -5;
   }
   return 1;
 }
@@ -66,7 +69,16 @@ static int decode(const EVENT_RECORD *e, Row *r) {
 static void WINAPI event_record(EVENT_RECORD *e) {
   Row r;
   int ok = decode(e, &r);
-  if (ok < 0) { InterlockedExchange(&malformed, 1); return; }
+  if (ok < 0) {
+    if (!malformed) {
+      rejected_opcode = e->EventHeader.EventDescriptor.Opcode;
+      rejected_version = e->EventHeader.EventDescriptor.Version;
+      rejected_length = e->UserDataLength;
+      rejected_reason = (unsigned)-ok;
+    }
+    InterlockedExchange(&malformed, 1);
+    return;
+  }
   if (!ok) { ignored++; return; }
   if (row_count == EVENT_LIMIT) { InterlockedExchange(&overflow, 1); return; }
   rows[row_count++] = r;
@@ -115,15 +127,21 @@ static int selftest(void) {
   e.UserData = bytes; e.UserDataLength = 24;
   bytes[0] = 3; bytes[4] = 5; bytes[14] = 2;
   if (decode(&e, &r) != 1 || r.next != 3 || r.previous != 5 || r.state != 2 || r.kind != 36) return 1;
-  e.UserDataLength = 23; if (decode(&e, &r) != -1) return 2;
-  e.UserDataLength = 24; bytes[14] = 255; if (decode(&e, &r) != -1) return 3;
+  e.UserDataLength = 23; if (decode(&e, &r) != -2) return 2;
+  e.UserDataLength = 24; bytes[14] = 255; if (decode(&e, &r) != -5) return 3;
   e.EventHeader.EventDescriptor.Opcode = 50; e.UserDataLength = 8;
   if (decode(&e, &r) != 1 || r.next != 3 || r.previous || r.state || r.kind != 50) return 4;
-  e.UserDataLength = 7; if (decode(&e, &r) != -1) return 5;
+  e.UserDataLength = 7; if (decode(&e, &r) != -2) return 5;
   e.UserDataLength = 8; e.EventHeader.EventDescriptor.Version = 1; if (decode(&e, &r) != -1) return 6;
   e.EventHeader.EventDescriptor.Version = 255; if (decode(&e, &r) != -1) return 10;
-  e.EventHeader.EventDescriptor.Version = 2; e.UserDataLength = 9; if (decode(&e, &r) != -1) return 11;
-  e.EventHeader.EventDescriptor.Opcode = 36; e.UserDataLength = 25; if (decode(&e, &r) != -1) return 12;
+  e.EventHeader.EventDescriptor.Version = 2; e.UserDataLength = 9; if (decode(&e, &r) != -2) return 11;
+  e.EventHeader.EventDescriptor.Opcode = 36; e.UserDataLength = 25; if (decode(&e, &r) != -2) return 12;
+  e.UserDataLength = 24; e.UserData = NULL; if (decode(&e, &r) != -3) return 13;
+  e.UserData = bytes; e.EventHeader.TimeStamp.QuadPart = 0; if (decode(&e, &r) != -4) return 14;
+  e.EventHeader.TimeStamp.QuadPart = 123; e.EventHeader.EventDescriptor.Version = 255;
+  event_record(&e);
+  if (malformed != 1 || rejected_reason != 1 || rejected_opcode != 36 || rejected_version != 255 ||
+      rejected_length != 24 || row_count != 0) return 15;
   e.EventHeader.EventDescriptor.Opcode = 1; if (decode(&e, &r)) return 7;
   e.EventHeader.ProviderId.Data1++; if (decode(&e, &r)) return 8;
   Properties p; properties(&p, NULL);
@@ -207,11 +225,13 @@ done:
   fprintf(f, "{\"ok\":%s,\"error\":%d,\"start_status\":%lu,\"started\":%s,\"stopped\":%s,"
       "\"rows\":%lu,\"ignored\":%lu,\"malformed\":%ld,\"overflow\":%ld,\"consumer_status\":%lu,"
       "\"events_lost\":%lu,\"buffers_lost\":%lu,\"qpc_start\":%llu,\"qpc_end\":%llu,\"qpc_frequency\":%llu,"
+      "\"rejected_opcode\":%u,\"rejected_version\":%u,\"rejected_length\":%u,\"rejected_reason\":%u,"
       "\"flags\":%lu,\"buffer_kib\":%lu,\"maximum_buffers\":%lu,\"number_of_buffers\":%lu}\n",
       !error && row_count ? "true" : "false", error, status, started ? "true" : "false", stop_ok ? "true" : "false",
       row_count, ignored, malformed, overflow, consume_status, stopped.p.EventsLost,
       stopped.p.LogBuffersLost + stopped.p.RealTimeBuffersLost, (unsigned long long)start.QuadPart,
-      (unsigned long long)end.QuadPart, (unsigned long long)frequency.QuadPart, p.p.EnableFlags,
+      (unsigned long long)end.QuadPart, (unsigned long long)frequency.QuadPart,
+      rejected_opcode, rejected_version, rejected_length, rejected_reason, p.p.EnableFlags,
       stopped.p.BufferSize, stopped.p.MaximumBuffers, stopped.p.NumberOfBuffers);
   if (fclose(f)) return 91;
   printf("ETW_CAPTURE_%s rows=%lu error=%d\n", !error && row_count ? "COMPLETE" : "INCOMPLETE", row_count, error);

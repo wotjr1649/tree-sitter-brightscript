@@ -595,7 +595,7 @@ def etw_session(collector, exe, mode, receipts, public_out, work=None):
                     raise RuntimeError("ETW collector did not become ready")
                 time.sleep(0.01)
             if work:
-                result = work(began + 15)
+                result = work(began + 15, lambda: not future.done())
         except Exception as exc:
             error = exc
         finally:
@@ -636,7 +636,8 @@ def etw_session(collector, exe, mode, receipts, public_out, work=None):
                     receipt["capture"] = {k: value[k] for k in (
                         "ok", "error", "start_status", "started", "stopped", "rows", "ignored", "malformed", "overflow",
                         "consumer_status", "events_lost", "buffers_lost", "qpc_start", "qpc_end", "qpc_frequency",
-                        "flags", "buffer_kib", "maximum_buffers", "number_of_buffers") if type(value.get(k)) in (bool, int)}
+                        "flags", "buffer_kib", "maximum_buffers", "number_of_buffers", "rejected_opcode",
+                        "rejected_version", "rejected_length", "rejected_reason") if type(value.get(k)) in (bool, int)}
             except Exception as exc:
                 error = error or exc
             receipt["pass"] = error is None
@@ -695,14 +696,14 @@ def etw_diagnosis(r, identity):
                          "cleanup_ms": record["events"]["cleanup"]["tree_delete_ms"]
                                        + record["events"]["cleanup"]["parser_delete_ms"]})
 
-    def measured(deadline):
+    def measured(deadline, collector_active):
         for index, case in enumerate(etw.TARGETS):
-            if time.monotonic() >= deadline:
+            if time.monotonic() >= deadline or not collector_active():
                 raise RuntimeError("ETW measurement reservation exhausted")
             record = r.run("cand-etw", "PARSE", case, 0, f"traced-{index}")
             marked.append(record)
-            if not record["completed"]:
-                raise RuntimeError("ETW target execution failed")
+            if not record["completed"] or not collector_active():
+                raise RuntimeError("ETW target execution or concurrent capture failed")
 
     references("before")
     _, directory = etw_session(collector, exe, "capture", receipts, lab.out, measured)
