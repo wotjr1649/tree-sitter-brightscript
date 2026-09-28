@@ -658,12 +658,12 @@ def main():
                                   check=True, timeout=60).stdout
             if hashlib.sha256(data).hexdigest() != digest:
                 raise RuntimeError(f"characterization requires frozen v0.1.3 product: {rel}")
-        identity.update(characterization_baseline=baseline, characterization_phase=5,
-                        control={"warmup_rounds": 1, "measured_rounds": 15, "native_runs": 6816,
-                                 "cost_estimator": "median of paired candidate/reference ratios",
-                                 "scheduling": "phase3 scheduled", "slow_nav_delay_ms": 2})
+        identity.update(characterization_baseline=baseline, characterization_phase=6,
+                        control={"ops": ["CANCEL_FIRST", "CANCEL_HALF"], "warmup": 1,
+                                 "plain_samples": 5, "allocator_samples": 1, "native_runs": 98,
+                                 "byte_target": "ceil(input bytes / 2)", "scheduling": "phase3 scheduled"})
         (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
-        r.runtime_build = "separate-scheduled-paired-rounds"
+        r.runtime_build = "separate-scheduled-progressed-cancellation"
         return characterize.run(r, identity, lab.out)
     results = []
     plan = {"B5-01-MEMORY": lambda: gates.b5_01_memory(r), "B5-02-LIFECYCLE": lambda: gates.b5_02_lifecycle(r),

@@ -12,7 +12,7 @@ import gates
 BASELINE = "b9eab178472c9a43914bd86eb9a14b8a16a9464e"  # peeled immutable v0.1.3
 
 
-def first_callback_record(rec, length, allocator):
+def first_callback_record(rec, length, allocator, progressed=False):
     """Judge one diagnostic run by its own trigger, return, cleanup and supervisor evidence."""
     pe, cl = rec.get("events", {}).get("parse", {}), rec.get("events", {}).get("cleanup", {})
     final, report = rec.get("final") or {}, rec.get("report", {})
@@ -30,10 +30,10 @@ def first_callback_record(rec, length, allocator):
              and all(gates.number(t) is not None for t in times + [cleanup])
              and all(type(c) is int and c >= 0 for c in counts)
              and pe.get("cancelled") is True and pe.get("cross_at_callback") is True
-             and type(pe.get("callbacks")) is int and pe["callbacks"] == 1
-             and type(pe.get("callback_target")) is int and pe["callback_target"] == 1
+             and type(pe.get("callbacks")) is int and (pe["callbacks"] >= 2 if progressed else pe["callbacks"] == 1)
+             and type(pe.get("callback_target")) is int and pe["callback_target"] == (0 if progressed else 1)
              and type(pe.get("budget_ms")) in (int, float) and pe["budget_ms"] == 0
-             and final.get("final") is True and final.get("op") == "CANCEL_FIRST"
+             and final.get("final") is True and final.get("op") == ("CANCEL_HALF" if progressed else "CANCEL_FIRST")
              and type(final.get("bytes")) is int and final["bytes"] == length
              and final.get("cancelled") is True and type(final.get("has_error")) is int
              and final["has_error"] == -1 and final.get("parse_ms") == times[0]
@@ -41,6 +41,11 @@ def first_callback_record(rec, length, allocator):
              and final.get("parser_delete_ms") == cleanup
              and type(cl.get("allocator_live_after")) is int and cl["allocator_live_after"] == 0
              and final.get("allocator_live_after") == 0)
+    if progressed:
+        valid &= (all(type(pe.get(k)) is int and pe[k] >= 0 for k in
+                      ("byte_target", "request_byte", "max_byte_before_request"))
+                  and length > 1 and pe["byte_target"] == (length + 1) // 2
+                  and pe["max_byte_before_request"] < pe["byte_target"] <= pe["request_byte"] < length)
     if valid:
         parse_ms, request, cross = times
         live, peak, returned, overall, allocations, _, cleanup_peak = counts
@@ -56,12 +61,13 @@ def first_callback_record(rec, length, allocator):
             "cleanup_ms": cleanup, "growth_after_request_bytes": growth}
 
 
-def first_callback_control(r):
+def first_callback_control(r, progressed=False):
     points, all_ids = [], []
+    op, tag = ("CANCEL_HALF", "half") if progressed else ("CANCEL_FIRST", "first")
     for case in gates.CANCEL_ACTUAL:
-        plain = [r.run("cand", "CANCEL_FIRST", case, 0, tag=f"first{i}") for i in range(6)]
-        alloc = r.run("cand-alloc", "CANCEL_FIRST", case, 0, tag="first-alloc")
-        judged = [first_callback_record(x, len(gates.cases.generate(case)), i == 6)
+        plain = [r.run("cand", op, case, 0, tag=f"{tag}{i}") for i in range(6)]
+        alloc = r.run("cand-alloc", op, case, 0, tag=f"{tag}-alloc")
+        judged = [first_callback_record(x, len(gates.cases.generate(case)), i == 6, progressed)
                   for i, x in enumerate(plain + [alloc])]
         ids = [gates.run_id(x) for x in plain + [alloc]]
         all_ids.extend(ids)
@@ -295,14 +301,19 @@ def run(r, identity, out):
     if trial not in (1, 2, 3):
         raise ValueError("TSQ_TRIAL must be 1, 2 or 3")
     result = {"release_verdict": "HOLD", "complete": False, "purpose": "characterization-only", "identity": identity,
-              "trial": trial, "paired_diagnosis": paired_diagnosis(r, identity["seed"] + trial)}
+              "trial": trial, "first_callback_control": first_callback_control(r),
+              "progressed_control": first_callback_control(r, progressed=True)}
     result["input_sha256"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                               for p in sorted((out / "inputs").glob("*.brs"))}
     (out / "characterization.json").write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
     if (out / "runs.jsonl").stat().st_size > 64 * 2**20:
         raise RuntimeError("characterization raw evidence exceeds 64 MiB; cohort incomplete")
-    result["complete"] = result["paired_diagnosis"]["complete"]
+    ids = [gates.run_id(x) for x in r.lab.runs]
+    expected = {case + ".brs": gates.cases.RECORDED["cases"][case] for case in gates.CANCEL_ACTUAL}
+    result["complete"] = (len(ids) == 98 and len(set(ids)) == 98 and all("None" not in i for i in ids)
+                          and result["input_sha256"] == expected)
     result["runs_sha256"] = hashlib.sha256((out / "runs.jsonl").read_bytes()).hexdigest()
     (out / "characterization.json").write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
     print("CHARACTERIZATION_RECORDED release=HOLD", flush=True)
-    return 0 if result["paired_diagnosis"]["controls_pass"] else 1
+    return 0 if (result["complete"] and result["first_callback_control"]["pass"]
+                 and result["progressed_control"]["pass"]) else 1

@@ -2,6 +2,7 @@
 import copy
 import contextlib
 import io
+import json
 import random
 import tempfile
 import unittest
@@ -160,6 +161,78 @@ def cancellation_record(allocator=False):
 
 
 class FirstCallbackControl(unittest.TestCase):
+    def test_two_controls_require_98_globally_unique_runs_and_registered_inputs(self):
+        class Runner:
+            def __init__(self, out, duplicate):
+                self.out, self.duplicate, self.lab, self.runs = out, duplicate, self, []
+
+            def run(self, build, op, case, budget, tag=""):
+                assert budget == 0 and op in ("CANCEL_FIRST", "CANCEL_HALF")
+                data = characterize.gates.cases.generate(case)
+                (self.out / "inputs" / (case + ".brs")).write_bytes(data)
+                rec = cancellation_record(build == "cand-alloc")
+                rec["final"].update(bytes=len(data), op=op)
+                if op == "CANCEL_HALF":
+                    target = (len(data) + 1) // 2
+                    rec["events"]["parse"].update(callbacks=10, callback_target=0, byte_target=target,
+                                                  request_byte=target, max_byte_before_request=target - 1)
+                n = len(self.runs) + 1
+                rec["report"]["pid"] = 1 if self.duplicate and n == 50 else n
+                self.runs.append(rec)
+                with (self.out / "runs.jsonl").open("a") as raw:
+                    raw.write(json.dumps(rec) + "\n")
+                return rec
+
+        for duplicate in (False, True):
+            with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+                out = Path(directory)
+                (out / "inputs").mkdir()
+                r = Runner(out, duplicate)
+                code = characterize.run(r, {}, out)
+                self.assertEqual(code, int(duplicate))
+                result = json.loads((out / "characterization.json").read_text())
+                self.assertEqual(result["complete"], not duplicate)
+                self.assertTrue(result["first_callback_control"]["pass"] and result["progressed_control"]["pass"])
+                self.assertEqual(len(r.runs), 98)
+
+    def test_progressed_trigger_and_odd_length(self):
+        for allocator in (False, True):
+            base = cancellation_record(allocator)
+            base["final"]["op"] = "CANCEL_HALF"
+            base["events"]["parse"].update(callbacks=10, callback_target=0, byte_target=50,
+                                           request_byte=55, max_byte_before_request=40)
+            self.assertTrue(characterize.first_callback_record(base, 100, allocator, progressed=True)["pass"])
+            for key, values in {"callbacks": (0, 1), "callback_target": (1,), "byte_target": (49, 51, 0),
+                                "request_byte": (49, 100), "max_byte_before_request": (50, 55)}.items():
+                for value in (*values, None, True, -1, float("inf")):
+                    bad = copy.deepcopy(base)
+                    if value is None:
+                        del bad["events"]["parse"][key]
+                    else:
+                        bad["events"]["parse"][key] = value
+                    self.assertFalse(characterize.first_callback_record(bad, 100, allocator, progressed=True)["pass"],
+                                     (key, value))
+            base["final"]["bytes"] = 101
+            self.assertFalse(characterize.first_callback_record(base, 101, allocator, progressed=True)["pass"])
+            base["events"]["parse"]["byte_target"] = 51
+            self.assertTrue(characterize.first_callback_record(base, 101, allocator, progressed=True)["pass"])
+            base["events"]["parse"].update(request_byte=51, max_byte_before_request=50)
+            self.assertTrue(characterize.first_callback_record(base, 101, allocator, progressed=True)["pass"])
+            if not allocator:
+                for ms in (100., 100.1):
+                    changed = copy.deepcopy(base)
+                    changed["events"]["cleanup"]["parser_delete_ms"] = changed["final"]["parser_delete_ms"] = ms
+                    self.assertEqual(characterize.first_callback_record(changed, 101, False, progressed=True)["pass"], ms <= 100)
+                    changed = copy.deepcopy(base)
+                    changed["events"]["parse"]["parse_ms"] = changed["final"]["parse_ms"] = 1 + ms
+                    self.assertEqual(characterize.first_callback_record(changed, 101, False, progressed=True)["pass"], ms <= 100)
+            else:
+                for growth in (64 * 2**20 - 1, 64 * 2**20):
+                    changed = copy.deepcopy(base)
+                    changed["events"]["cleanup"]["peak_after_budget"] = changed["final"]["allocator_peak_live"] = 1000 + growth
+                    self.assertEqual(characterize.first_callback_record(changed, 101, True, progressed=True)["pass"],
+                                     growth < 64 * 2**20)
+
     def test_all_families_run_once_with_unique_processes(self):
         class Runner:
             def __init__(self, duplicate):

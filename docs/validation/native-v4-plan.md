@@ -267,3 +267,66 @@ counts and floor locations. A separate Windows native 64-execution screen
 measured identical-binary paired ratio 0.99786 and detected the same-work
 2 ms control at ratio 21.8559; raw rejudgement with the strengthened validator
 passed. These local controls do not replace the new hosted cohort.
+
+Phase 5 [run 36366610860](https://github.com/wotjr1649/tree-sitter-brightscript/actions/runs/36366610860)
+at `d1eaa61` completed all nine jobs, 61,344 native executions. Every A/A,
+same-work slow control, registered cost and growth comparison passed. The
+maximum A/A symmetric ratio was 1.148704 and the maximum cost ratio 1.184564.
+The closest growth comparison to its bound was VALID nested-if at 1.126818
+against 1.2. Slow-control ratios ranged from 8.2079 to 18.8839. Per-OS runner,
+compiler, product, probe and harness hashes agree; input hashes agree across
+all nine jobs. This supports adopting the paired estimator, subject to new
+full qualification of the eventual product and all 297 sweep families.
+
+An offline audit replayed the registered order and every record from each
+raw file after checking its SHA-256. All verdicts and fields matched exactly
+except one macOS legacy log exponent: 1.0386319426574064 versus the Windows
+recalculation 1.0386319426574062. The strict audit failure was retained. The
+audit permits at most two ULP only in recalculated log-exponent fields for
+platform math-library rounding, while requiring exact verdicts and all other
+fields. No native threshold or native decision receives a tolerance.
+
+## Phase 6: progressed cancellation before v4 integration
+
+Adoption review accepted the paired estimator evidence but rejected replacing
+all legacy ACTUAL coverage with first-callback cancellation: that alone would
+not prove cleanup after parser state has accumulated. The corrected v4 plan
+keeps every original timed point and SAFETY requirement. Each warmup, plain
+or allocator run that reaches its own budget or records a crossing must
+actually cancel. Only normal completion strictly before its own budget is
+an allowed legacy ACTUAL exception; preserve the original verdict separately.
+Unobserved post-budget growth, late natural completion, wrong results,
+censoring, inconsistent records or exceeded limits still fail v4 primary.
+
+Before integration, phase 6 requires FIRST and HALF controls for all seven
+families on the frozen product, three scheduled jobs per OS, at most 20
+minutes per job. `CANCEL_HALF` asks to cancel at the first progress callback
+whose public `TSParseState.current_byte_offset` reaches `ceil(input bytes/2)`.
+Require at least two callbacks, the maximum earlier callback offset strictly
+below the target, and `target <= request offset < input length`. EOF-only
+arrival, no arrival, natural completion or an earlier request fails. This
+observes a byte-position milestone; it does not assert that half the syntax
+tree has been built. The pinned 0.27.0 public header and implementation define
+that state field; no private runtime mutation is used.
+
+Each control has one warmup, five plain and one allocator execution per
+family: 98 unique executions per job. All phase 4 exit, null-tree, own-trigger,
+100 ms return/cleanup and less-than-64 MiB growth-through-cleanup checks remain.
+HALF uses budget zero and no callback-count trigger. Negative controls cover
+odd input lengths, missing/invalid offsets, early/EOF request and an already
+reached target at an earlier callback. Independent design review closed the
+coverage finding; implementation and hosted confirmation remain required.
+
+Independent implementation review found no P1/P2. Its requested additional
+negative controls cover 98-run integration with a cross-control duplicate ID,
+exact target/prior-offset boundaries and the common time/growth bounds in
+HALF mode. The diagnostic also requires the exact seven registered input
+hashes. Local judge checks passed 10/10. A Windows native FIRST/HALF screen
+passed 98/98 executions: HALF requested cancellation after 2,622–13,108
+callbacks, at offsets 524,320–524,442, and its maximum plain cleanup was
+31.6216 ms. Hosted confirmation is still required.
+
+The future normalized registration is 1,768 keys: retain the exact existing
+1,533 keys, plus 206 A/A aliases, one slow control, 14 FIRST and 14 HALF keys.
+The existing 2,811 trees, 30 incremental results and 231 repeated W12 inputs
+remain required. Registration is not a release result.
