@@ -54,6 +54,7 @@ def same_binary_control(r, seed):
             ratio = max(left, right) / min(left, right) if valid else None
             same = len(set(signatures)) == 1
             points.append({"case": case, "op": op, "left_ms": left, "right_ms": right,
+                           "observed_count": {side: len(series) for side, series in recs.items()},
                            "symmetric_ratio": ratio, "same_work": same,
                            "pass": valid and same and ratio <= 1.5})
     return {"image_sha256": hashlib.sha256(Path(image).read_bytes()).hexdigest(),
@@ -67,7 +68,7 @@ def run(runners, identity, out, seed):
         raise ValueError("TSQ_TRIAL must be 1, 2 or 3")
     order = list(runners)
     random.Random(seed + trial).shuffle(order)
-    result = {"release_verdict": "HOLD", "purpose": "characterization-only", "identity": identity,
+    result = {"release_verdict": "HOLD", "complete": False, "purpose": "characterization-only", "identity": identity,
               "trial": trial, "order": order, "profiles": {}}
     for name in order:
         r = runners[name]
@@ -80,12 +81,17 @@ def run(runners, identity, out, seed):
             print(f"CHARACTERIZATION {name}: {results[-1]['gate']} {results[-1]['status']}", flush=True)
         sweep = []
         for family in SWEEP:
-            series = {k: gates.timed(r, "cand", "PARSE", f"{family}-k{k:05d}", 5, gates.m_parse)
+            series = {k: gates.timed(r, "cand", "PARSE", f"{family}-k{k:05d}", r.cost_samples, gates.m_parse)
                       for k in (100, 400, 4000, 20000)}
             times = {k: gates.med(values) if values else None for k, (values, _) in series.items()}
             sweep.append({"family": family, "median_ms": times})
-        result["profiles"][name] = {"same_binary_control": control, "v3_results": results, "sweep_diagnosis": sweep}
+        result["profiles"][name] = {"measured_samples": r.cost_samples, "warmup": 1,
+                                    "same_binary_control": control, "v3_results": results, "sweep_diagnosis": sweep}
         result["input_sha256"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                                   for p in sorted((out / "inputs").glob("*.brs"))}
         (out / "characterization.json").write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
+    if (out / "runs.jsonl").stat().st_size > 64 * 2**20:
+        raise RuntimeError("characterization raw evidence exceeds 64 MiB; cohort incomplete")
+    result["complete"] = True
+    (out / "characterization.json").write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
     print("CHARACTERIZATION_RECORDED release=HOLD", flush=True)

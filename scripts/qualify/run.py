@@ -613,10 +613,10 @@ def main():
     refs = {n: reference_grammar(lab, n) for n in ("h", "bp")}
     ref_objs = {n: grammar_objects(n, d / "src") for n, d in refs.items()}
     query = ROOT / "queries/highlights.scm"
-    probes = {"cand": (probe("cand", cand, rt, args.runtime), query),
-              "cand-alloc": (probe("cand-alloc", cand, rt, args.runtime, alloc=True), query),
-              "h": (probe("h", ref_objs["h"], rt, args.runtime), refs["h"] / "queries/highlights.scm"),
-              "bp": (probe("bp", ref_objs["bp"], rt, args.runtime), refs["bp"] / "queries/highlights.scm")}
+    probes = {"cand": (probe("cand", cand, rt, args.runtime, scheduled=args.characterize), query),
+              "cand-alloc": (probe("cand-alloc", cand, rt, args.runtime, alloc=True, scheduled=args.characterize), query),
+              "h": (probe("h", ref_objs["h"], rt, args.runtime, scheduled=args.characterize), refs["h"] / "queries/highlights.scm"),
+              "bp": (probe("bp", ref_objs["bp"], rt, args.runtime, scheduled=args.characterize), refs["bp"] / "queries/highlights.scm")}
     support_versions = []
     for spec in args.support:
         version, root = spec.split("=", 1)
@@ -654,16 +654,14 @@ def main():
                                   check=True, timeout=60).stdout
             if hashlib.sha256(data).hexdigest() != digest:
                 raise RuntimeError(f"characterization requires frozen v0.1.3 product: {rel}")
-        aprobes = {"cand": (probe("cand-scheduled", cand, rt, args.runtime, scheduled=True), query),
-                   "cand-alloc": (probe("cand-alloc-scheduled", cand, rt, args.runtime, alloc=True, scheduled=True), query),
-                   **{n: (probe(f"{n}-scheduled", ref_objs[n], rt, args.runtime, scheduled=True), q)
-                      for n, q in (("h", refs["h"] / "queries/highlights.scm"),
-                                   ("bp", refs["bp"] / "queries/highlights.scm"))}}
-        identity.update(characterization_baseline=baseline, characterization_phase=2,
-                        scheduled_probes={n: sha(p) for n, (p, _) in aprobes.items()})
+        identity.update(characterization_baseline=baseline, characterization_phase=3,
+                        profiles={"single5": {"measured_samples": 5, "warmup": 1},
+                                  "single15": {"measured_samples": 15, "warmup": 1}})
         (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
-        ar = Runner(lab, aprobes, query, roots=r.roots, runtime_build="separate-scheduled")
-        characterize.run({"default": r, "scheduled": ar}, identity, lab.out, args.seed)
+        r.runtime_build, r.cost_samples = "separate-scheduled-single5", 5
+        ar = Runner(lab, dict(probes), query, roots=r.roots, runtime_build="separate-scheduled-single15")
+        ar.cost_samples = 15
+        characterize.run({"single5": r, "single15": ar}, identity, lab.out, args.seed)
         return 0
     results = []
     plan = {"B5-01-MEMORY": lambda: gates.b5_01_memory(r), "B5-02-LIFECYCLE": lambda: gates.b5_02_lifecycle(r),

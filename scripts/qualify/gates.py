@@ -69,8 +69,14 @@ def timed(r, build, op, case, n, metric, budget=0, warmup=1):
         records.append(rec)
         if not completed(rec):
             return None, records
+        value = metric(rec)
+        if metric in (m_parse, m_query, m_nav) and (number(value) is None or value <= 0):
+            return None, records
         if i >= warmup:
-            values.append(metric(rec))
+            values.append(value)
+    identities = [run_id(rec) for rec in records]
+    if len(set(identities)) != warmup + n or any("None" in identity for identity in identities):
+        return None, records
     return values, records
 
 
@@ -141,6 +147,7 @@ def b5_02_lifecycle(r):
 # ------------------------------------------------------------------ A5-01
 def paired(r, cand, ref, op, case, n, metric, rng):
     """Candidate and reference alternately in random order; 1 warmup + n each."""
+    n = getattr(r, "cost_samples", n)
     vals = {cand: [], ref: []}
     recs = {cand: [], ref: []}
     for i in range(n + 1):
@@ -151,8 +158,14 @@ def paired(r, cand, ref, op, case, n, metric, rng):
             recs[b].append(rec)
             if not completed(rec):
                 return None, recs
+            value = metric(rec)
+            if number(value) is None or value <= 0:
+                return None, recs
             if i > 0:
-                vals[b].append(metric(rec))
+                vals[b].append(value)
+    identities = [run_id(rec) for series in recs.values() for rec in series]
+    if len(set(identities)) != 2 * (n + 1) or any("None" in identity for identity in identities):
+        return None, recs
     return {b: med(v) for b, v in vals.items()}, recs
 
 

@@ -123,3 +123,27 @@ API contracts checked for the experiment:
 [SetThreadAffinityMask](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setthreadaffinitymask),
 [GetThreadGroupAffinity](https://learn.microsoft.com/en-us/windows/win32/api/processtopologyapi/nf-processtopologyapi-getthreadgroupaffinity),
 [Apple pthread QoS](https://github.com/apple-oss-distributions/libpthread/blob/main/include/pthread/qos.h).
+
+## Phase 3: additional independent cold samples
+
+Phase 2's macOS scheduled A/A control still failed in an observed trial:
+the same binary's NAV_FIELD medians were 0.242 and 0.444 ms (ratio 1.835).
+Scheduling alone is therefore insufficient. A proposed in-process batch was
+rejected before implementation because it would change cache/allocator state
+and the measured quantity. No batch execution path was added.
+
+Phase 3 retains independently launched single-operation processes and the same
+median statistic. It compares scheduled `single5` (one warmup plus five
+measurements) with scheduled `single15` (one warmup plus fifteen) for A/A,
+paired A5/VALID costs and the three registered diagnostic sweep families.
+The same binary/query, input and scheduling condition are used in both.
+Only the sample count changes. Exact completed counts and unique process
+identities are required; every value and trial is retained. Cancellation,
+callback gap, cleanup, memory and their maximum-value rules are unchanged.
+
+The experiment is three jobs per OS, at most 60 minutes per job. Exceeding
+execution or evidence-size limits makes it incomplete; no sample or raw field
+is dropped to fit. If `single15` fails, it does not automatically trigger more
+samples or replacement runs. v4 adoption still requires an independent review
+of all three cohorts and their performance verdicts. Existing `single5` FAILs
+remain failures.
