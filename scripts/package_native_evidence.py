@@ -38,6 +38,7 @@ def verified_files(root, platform, common):
             or gates["identity"] != identity or not identity["git_clean"]
             or identity["git_head"] != common["commit"] or identity["candidate"] != common["candidate"]
             or identity["lane_sources"] != common["lane_sources"]
+            or identity.get("protocol") != common["protocol"]
             or identity["runtime"] != common["runtime"] or identity["support"] != common["support"]
             or identity["seed"] != common["seed"]
             or identity["runner_image"] != host["runner_image"]

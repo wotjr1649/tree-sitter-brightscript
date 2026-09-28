@@ -6,7 +6,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from build_native_evidence import REQUIRED_GATES, build, signatures
+from build_native_evidence import REQUIRED_GATES, build, signatures, registered_run_keys
 from check_oracle_pair import compare as compare_oracles
 from compare_native_evidence import compare as compare_hosts
 from package_native_evidence import package
@@ -17,17 +17,33 @@ def sha(data):
 
 
 class NativeEvidence(unittest.TestCase):
+    def test_exact_registration_preserves_v3_and_rejects_equal_count_replacement(self):
+        old, current = registered_run_keys(False), registered_run_keys()
+        self.assertEqual((len(old), len(current), len(current - old)), (1533, 1768, 235))
+        self.assertTrue(old < current)
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = [Path(tmp) / f"{name}.json" for name in ("windows", "ubuntu", "macos")]
+            common = self.common()
+            removed = sorted(old)[0]
+            common["native_runs"]["cand|PARSE|unregistered"] = common["native_runs"].pop(removed)
+            for path, platform, arch in zip(paths, ("win32", "linux", "darwin"), ("amd64", "x86_64", "arm64")):
+                path.write_text(json.dumps({"common": common, "host": {"platform": platform, "architecture": arch,
+                                "runner_image": {"os": platform, "version": "test",
+                                                 "runner_arch": "ARM64" if platform == "darwin" else "X64"}}}))
+            with self.assertRaisesRegex(ValueError, "native run"):
+                compare_hosts(*paths)
+
     @staticmethod
     def common():
         zero = "0" * 64
         return {"commit": "a" * 40, "candidate": {"src/parser.c": zero, "grammar.js": zero},
                 "lane_sources": {"run.py": zero},
-                "runtime": "0.27.0", "support": ["0.25.1", "0.26.13"], "seed": 5707,
+                "protocol": "v4", "runtime": "0.27.0", "support": ["0.25.1", "0.26.13"], "seed": 5707,
                 "gate_statuses": list(REQUIRED_GATES), "oracle_cases": 231,
                 "oracle_workload": {"cases": 231, "sha256": zero}, "oracle_content_sha256": zero,
                 "native_trees": [{"name": f"case-{i}", "input_sha256": zero, "tree_sha256": zero}
                                  for i in range(2811)],
-                "native_runs": {f"cand|PARSE|case-{i}": {"bytes": 1} for i in range(1533)},
+                "native_runs": {key: {"bytes": 1} for key in sorted(registered_run_keys())},
                 "incremental": [{"case": f"edit-{i}", "pass": True, "result": {"same": True}}
                                 for i in range(28)] + [
                                     {"case": f"comparator self-test {i}", "pass": True, "detected": True}
@@ -87,7 +103,7 @@ class NativeEvidence(unittest.TestCase):
             q.mkdir()
             common = self.common()
             identity = {"git_clean": True, "git_head": common["commit"], "candidate": common["candidate"],
-                        "lane_sources": common["lane_sources"], "runtime": common["runtime"],
+                        "lane_sources": common["lane_sources"], "runtime": common["runtime"], "protocol": "v4",
                         "support": common["support"], "seed": common["seed"], "cc_sha256": "0" * 64,
                         "runner_image": {"os": "win25", "version": "test", "runner_arch": "X64"},
                         "supervisor_kind": "windows_job", "probes": {"cand": "0" * 64}}
@@ -133,10 +149,10 @@ class NativeEvidence(unittest.TestCase):
             final = {"final": True, "bytes": 1, "cancelled": False, "has_error": 0, "nodes": 1,
                      "errors": 0, "missing": 0, "max_depth": 0, "captures": 0,
                      "match_limit_exceeded": False}
-            runs = "".join(json.dumps({"budget": 0, "completed": True, "build": "cand", "op": "PARSE",
-                                      "case": f"case-{i}", "final": final, "events": {},
+            runs = "".join(json.dumps({"budget": 0, "completed": True, "build": b, "op": o,
+                                      "case": c, "final": final, "events": {},
                                       "report": {"memory_metric": "host-memory"}}) + "\n"
-                           for i in range(1533))
+                           for b, o, c in (key.split("|") for key in sorted(registered_run_keys())))
             runs += json.dumps({"budget": 100, "completed": True, "report": {"memory_metric": "host-memory"}}) + "\n"
             with (root / "runs.jsonl").open("w", encoding="utf-8") as output:
                 output.write(runs)
@@ -159,7 +175,7 @@ class NativeEvidence(unittest.TestCase):
                 runner_image = {"os": platform, "version": "test", "runner_arch": runner_arch}
                 identity = {"git_clean": True, "git_head": common["commit"], "candidate": common["candidate"],
                             "runner_image": runner_image, "lane_sources": common["lane_sources"],
-                            "runtime": common["runtime"], "support": common["support"], "seed": common["seed"],
+                            "protocol": "v4", "runtime": common["runtime"], "support": common["support"], "seed": common["seed"],
                             "cc_sha256": "0" * 64, "probes": {"cand": "0" * 64},
                             "supervisor_kind": "test-supervisor"}
                 gates = [{"gate": gate, "status": "PASS", "points": []} for gate in REQUIRED_GATES]

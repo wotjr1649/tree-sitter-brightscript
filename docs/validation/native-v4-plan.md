@@ -326,7 +326,27 @@ passed 98/98 executions: HALF requested cancellation after 2,622–13,108
 callbacks, at offsets 524,320–524,442, and its maximum plain cleanup was
 31.6216 ms. Hosted confirmation is still required.
 
-The future normalized registration is 1,768 keys: retain the exact existing
+The v4 normalized registration is 1,768 keys: retain the exact existing
 1,533 keys, plus 206 A/A aliases, one slow control, 14 FIRST and 14 HALF keys.
 The existing 2,811 trees, 30 incremental results and 231 repeated W12 inputs
 remain required. Registration is not a release result.
+
+[Phase 6, 36368317053](https://github.com/wotjr1649/tree-sitter-brightscript/actions/runs/36368317053)
+at `92e637e` passed all nine jobs. Offline replay checked every field, source
+hash, process ID, registered order and raw-file SHA-256: 882/882 executions
+passed. Per-OS image/compiler/product/harness/probe hashes agree. Maximum
+plain cleanup was Windows 73.0684 ms, Ubuntu 25.106737 ms and macOS 33.717 ms;
+maximum growth after the trigger through cleanup was 64 bytes on each OS.
+This closes the progressed-cancellation prerequisite for v4 adoption.
+
+## v4 integration
+
+Independent design review accepted phase 5's estimator and phase 6's coverage.
+The executable contract is now in [validation.md](validation.md#v014-three-os-native-candidate).
+The implementation retains v3 judgements, requires the controls in every
+affected performance gate, and preserves the exact previous API key set.
+Implementation review found that SWEEP's smallest size could escape work
+validation because neither exponent uses it. All four sizes are now required
+valid, with dedicated warmup-censoring and missing-final negative controls.
+This correction preserves the original no-crash/full-observation requirement.
+Native candidate screening and final six-job qualification remain pending.

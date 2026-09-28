@@ -3,9 +3,13 @@ import argparse
 import hashlib
 import json
 import platform
+import sys
 from pathlib import Path
 
 from check_oracle_pair import compare, stable_files
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "qualify"))
+import gates as registered
 
 REQUIRED_GATES = (
     "B5-01-MEMORY", "B5-02-LIFECYCLE", "A5-01-COST", "CANCEL", "CANCEL-OVERSHOOT",
@@ -13,6 +17,35 @@ REQUIRED_GATES = (
     "SEM-PUBLIC", "INCREMENTAL-REPAIR", "RESUME-RESET", "SUPPORT", "REGRESSION-SWEEP",
     "ABS-MEMORY", "RECOVERY-LOCALITY",
 )
+
+
+def registered_run_keys(v4=True):
+    """Exact operation/input registration, preserving every one of the 1,533 v3 keys."""
+    keys = set()
+
+    def add(builds, ops, cases):
+        keys.update(f"{b}|{o}|{c}" for b in builds for o in ops for c in cases)
+
+    a5 = registered.A5_01 + registered.A501J
+    ops = ("QUERY_ONLY", "NAV_CURSOR", "NAV_FIELD", "NAV_INDEX")
+    valid = registered.A5_01 + [f"VALID-{f}-{k:03d}k" for f in registered.VALID_FAMILIES for k in (4, 16, 64, 256)]
+    valid += ["W03-compact", "W03-program", "W03-program-crlf"]
+    add(("cand", "bp"), ops, a5)
+    add(("cand",), ("LIFECYCLE",), registered.B5_02 + registered.B5_02_NONPRINT)
+    add(("cand",), ("PARSE",), registered.B5_01 + registered.CANCEL_SET + registered.LARGE_SET + registered.VALID_1MIB)
+    add(("cand", "h"), ("PARSE",), valid)
+    add(("cand",), ("PARSE",), [f"{f}-k{k:05d}" for f, _, _, _ in registered.cases.sweep_families()
+                                  for k in (100, 400, 4000, 20000)])
+    add(("cand",), ("QUERY_ONLY",), [f"{f}-k{k:05d}" for f in registered.QUERY_MALFORMED for k in (2000, 20000)])
+    add(("cand-alloc",), ("PARSE",), registered.B5_01 + registered.LARGE_SET + registered.VALID_1MIB)
+    add(("cand-rt0.25.1", "cand-rt0.26.13"), ("LIFECYCLE",),
+        registered.B5_01 + registered.B5_02 + ["A5-01-k32000", "A5-01-number-k32000"])
+    if v4:
+        add(("aa-left", "aa-right"), ops, a5)
+        add(("aa-left", "aa-right"), ("PARSE",), valid)
+        add(("slow",), ("NAV_CURSOR",), ("A501J-k01000",))
+        add(("cand", "cand-alloc"), ("CANCEL_FIRST", "CANCEL_HALF"), registered.CANCEL_ACTUAL)
+    return keys
 
 
 def read_json(path, limit=32 * 2**20):
@@ -72,7 +105,7 @@ def build(qualification, oracle_a, oracle_b):
     q = Path(qualification)
     identity = read_json(q / "identity.json", 2**20)
     gate_record = read_json(q / "gates.json")
-    if gate_record["identity"] != identity or not identity["git_clean"]:
+    if gate_record["identity"] != identity or not identity["git_clean"] or identity.get("protocol") != "v4":
         raise ValueError("qualification identity is incomplete or dirty")
     gates = gate_record["results"]
     if tuple(g["gate"] for g in gates) != REQUIRED_GATES or any(g["status"] != "PASS" for g in gates):
@@ -97,7 +130,7 @@ def build(qualification, oracle_a, oracle_b):
         "common": {
             "commit": identity["git_head"], "candidate": identity["candidate"],
             "lane_sources": identity["lane_sources"],
-            "runtime": identity["runtime"], "support": identity["support"], "seed": identity["seed"],
+            "protocol": identity["protocol"], "runtime": identity["runtime"], "support": identity["support"], "seed": identity["seed"],
             "gate_statuses": [g["gate"] for g in gates],
             "oracle_cases": count, "oracle_workload": oracle_id["workload"],
             "oracle_content_sha256": content_sha, "native_trees": trees,

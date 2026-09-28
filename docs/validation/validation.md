@@ -342,7 +342,7 @@ of the four KL-002 rows, and with the method-call pattern in parent form
 (`(call_expression property: (identifier) @function)`) every method, mixed
 and optional chain row.
 
-## Release qualification lane
+## Release qualification lane (historical v3)
 
 The CLI guards above run in hosted CI but cannot measure cancellation,
 callback gaps, tree deletion, allocator memory or the stock runtime without
@@ -407,13 +407,53 @@ compiler and a private parser-library directory per checkout.
 
 ### v0.1.4 three-OS native candidate
 
-The historical Windows lane above is retained. The v0.1.4 candidate runs
-the same registered inputs, 17 result names and existing protocol-v3 bounds
+The historical Windows lane above and its failures are retained. The v0.1.4
+candidate now uses protocol v4, with the same registered inputs, 17 result
+names and existing numeric bounds
 on `windows-2025-vs2026` x64, `ubuntu-24.04` x64 and `macos-15` ARM64 in
 `.github/workflows/native-qualification.yml`. These are candidate checks,
 not a v0.1.4 release claim. A failed OS job prevents the required aggregation
 job from running. The full record and known FAILs are in
 [the candidate report](../reports/0.1.4-native-parity-candidate.md).
+
+The measurement change is supported by the predeclared nine-job phase 5
+and phase 6 experiments in [native-v4-plan.md](native-v4-plan.md). It does not
+reclassify earlier v3 failures. `gates.py` preserves v3; `gates_v4.py` applies
+these reviewed changes:
+
+- Candidate, allocator, H and BEFORE_PRINT probes use the phase 3 scheduled
+  condition: Windows thread affinity to the lowest allowed mask bit, macOS
+  requested/read-back `USER_INITIATED` QoS, Linux unchanged. Support-version
+  crash/cap checks keep their original condition. The slow probe is used
+  only as a measurement control.
+- A5, VALID and all 297 SWEEP families use 16 independent cold rounds,
+  first round warmup, 15 measured; seeded order visits all sizes in a round.
+  Costs use the median of paired ratios; growth uses same-round size ratios.
+  Bounds and floor locations are exactly those registered in phase 5. Keep
+  both estimators and their verdicts. Every round must contain valid work,
+  including the smallest sweep size, even where no time exponent uses it.
+- Each qualification job runs all 103 A/A comparisons and the same-work
+  2 ms slow control once (3,328 executions). All three performance gates
+  require their complete successful result. No invalid sample is replaced.
+  SWEEP memory uses maxima over all 16 records at each size; single-run
+  callback, return, cleanup and memory bounds elsewhere are unchanged.
+- CANCEL retains all 15 timed points and every legacy SAFETY requirement.
+  Each warmup/plain/allocator execution reaching its own budget must cancel;
+  only normal completion strictly before that budget is allowed without
+  cancellation. Any plain execution reaching budget also requires measured
+  post-budget growth in the allocator run. Preserve legacy ACTUAL verdicts.
+  In addition, require FIRST49 and HALF49 for all seven families, with the
+  exact trigger, result, exit, 100 ms plain return/cleanup and less-than-64 MiB
+  allocator growth-through-cleanup rules registered in phases 4 and 6.
+- Every native process identity is unique. The full raw file must fit the
+  existing 64 MiB evidence bound; incomplete or oversized evidence is HOLD.
+
+Release requires two preassigned independently allocated full jobs per OS
+at one frozen candidate, with equal per-OS image/tool identities. Each of all
+six jobs must pass all 17 purposes and repeated W12. Product/harness failures
+are retained, never replaced by a favourable rerun. Changing a candidate or
+method requires a new qualification cohort. The two three-OS cohorts and
+their equal-identity receipt must both be retained in the release evidence.
 
 The POSIX supervisor uses a private environment, a process group, a watchdog
 and bounded output, with a preflight that exercises a descendant which keeps
@@ -441,7 +481,7 @@ These control observations do not bound unseen transient peaks.
 
 Each hosted OS records the W12/V6 native oracle twice and requires stable
 bytes for its 231 inputs. The aggregate job requires the exact 17 gate names,
-2,811 native tree digests, 1,533 deterministic native API signatures and
+2,811 native tree digests, exactly the 1,768 registered native API keys and
 30 incremental results including two planted comparator controls to match
 across the three hosts. It binds the candidate commit, generated files,
 runtime versions, runner image, architecture, compiler and CLI identities.
@@ -449,8 +489,11 @@ Only OS-specific path, timing and memory values are excluded from exact
 functional comparison. The evidence ZIP contains normalized results, raw
 gate/run records and identity manifests, with a host SHA-256 binding for the
 full raw run file and no compiled parser library.
-The current v3 performance bounds are retained; predeclared OS-specific
-performance calibration remains required before a v0.1.4 release.
+The key set includes every previous 1,533 key plus 206 A/A, one slow-control,
+14 FIRST and 14 HALF keys; an equal-size replacement set fails. Protocol v4
+is recorded in the identity. Adoption of this contract is not release PASS;
+the Windows PRINT cleanup defect and full candidate qualification still
+require evidence.
 
 ## Maintenance native safety profile (0.1.1)
 

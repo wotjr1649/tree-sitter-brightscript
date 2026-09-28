@@ -118,6 +118,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 import cases  # noqa: E402
 import gates  # noqa: E402
+import gates_v4  # noqa: E402
 import tscli  # noqa: E402
 
 CAP, WATCHDOG_MS, OUTPUT_CAP = 512 * 2**20, 15000, 8 * 2**20
@@ -396,6 +397,7 @@ class Runner:
     def __init__(self, lab, probes, query, roots=None, runtime_build="separate"):
         self.lab, self.probes, self.query, self.roots = lab, probes, query, roots or {}
         self.runtime_build = runtime_build
+        self.run_ids = set()
 
     def input(self, case):
         path = self.lab.out / "inputs" / f"{case}.brs"
@@ -441,6 +443,10 @@ class Runner:
         self.lab.runs.append(rec)
         with (self.lab.out / "runs.jsonl").open("a", encoding="utf-8", newline="\n") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        identity = gates.run_id(rec)
+        if identity in self.run_ids or "None" in identity:
+            raise RuntimeError("missing or repeated native process identity; record retained")
+        self.run_ids.add(identity)
         return rec
 
     def probe(self, build, args, tag):
@@ -615,12 +621,11 @@ def main():
     refs = {n: reference_grammar(lab, n) for n in ("h", "bp")}
     ref_objs = {n: grammar_objects(n, d / "src") for n, d in refs.items()}
     query = ROOT / "queries/highlights.scm"
-    probes = {"cand": (probe("cand", cand, rt, args.runtime, scheduled=args.characterize), query),
-              "cand-alloc": (probe("cand-alloc", cand, rt, args.runtime, alloc=True, scheduled=args.characterize), query),
-              "h": (probe("h", ref_objs["h"], rt, args.runtime, scheduled=args.characterize), refs["h"] / "queries/highlights.scm"),
-              "bp": (probe("bp", ref_objs["bp"], rt, args.runtime, scheduled=args.characterize), refs["bp"] / "queries/highlights.scm")}
-    if args.characterize:
-        probes["slow"] = (probe("slow", cand, rt, args.runtime, scheduled=True, slow=True), query)
+    probes = {"cand": (probe("cand", cand, rt, args.runtime, scheduled=True), query),
+              "cand-alloc": (probe("cand-alloc", cand, rt, args.runtime, alloc=True, scheduled=True), query),
+              "h": (probe("h", ref_objs["h"], rt, args.runtime, scheduled=True), refs["h"] / "queries/highlights.scm"),
+              "bp": (probe("bp", ref_objs["bp"], rt, args.runtime, scheduled=True), refs["bp"] / "queries/highlights.scm"),
+              "slow": (probe("slow", cand, rt, args.runtime, scheduled=True, slow=True), query)}
     support_versions = []
     for spec in args.support:
         version, root = spec.split("=", 1)
@@ -628,8 +633,7 @@ def main():
         support_versions.append(version)
     lane_files = ["run.py", "gates.py", "cases.py", "probe.c", "supervisor.c", "benign.c", "benign_posix.c", "recorded-inputs.json",
                   "runtime-0.27.0.sha256", "runtime-0.25.1.sha256", "runtime-0.26.13.sha256"]
-    if args.characterize:
-        lane_files.extend(("characterize.py", "test_characterize.py", "test_gates.py"))
+    lane_files.extend(("characterize.py", "gates_v4.py", "test_characterize.py", "test_gates.py", "test_gates_v4.py"))
     status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, timeout=60)
     other_files = ["scripts/tscli.py", "scripts/corpus.py", "docs/provenance/upstream-sources.md", "package.json",
                    "package-lock.json", "tree-sitter.json"]
@@ -647,9 +651,9 @@ def main():
                 "probes": {n: sha(p) for n, (p, _) in probes.items()},
                 "git_head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True,
                                            timeout=60).stdout.strip(),
-                "runtime": "0.27.0", "support": support_versions, "seed": args.seed, "gates": selected}
+                "protocol": "v4", "runtime": "0.27.0", "support": support_versions, "seed": args.seed, "gates": selected}
     (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
-    r = Runner(lab, probes, query, roots={"cand": ROOT, "h": refs["h"]})
+    r = Runner(lab, probes, query, roots={"cand": ROOT, "h": refs["h"]}, runtime_build="separate-scheduled-v4")
     if args.characterize:
         import characterize
         baseline = characterize.BASELINE
@@ -667,12 +671,12 @@ def main():
         return characterize.run(r, identity, lab.out)
     results = []
     plan = {"B5-01-MEMORY": lambda: gates.b5_01_memory(r), "B5-02-LIFECYCLE": lambda: gates.b5_02_lifecycle(r),
-            "A5-01-COST": lambda: gates.a5_01_cost(r, args.seed), "CANCEL": lambda: gates.cancel(r),
+            "A5-01-COST": lambda: gates_v4.performance(r, args.seed), "CANCEL": lambda: gates_v4.cancel(r),
             "CANCEL-OVERSHOOT": lambda: gates.overshoot(r), "MAX-CALLBACK-GAP": lambda: gates.gaps_and_cleanup(r),
             "LARGE-INPUT": lambda: gates.large_input(r), "QUERY-MALFORMED": lambda: gates.query_malformed(r),
-            "VALID-PARSE": lambda: gates.valid_parse(r, args.seed), "SEM-PUBLIC": lambda: gates.sem_public(r, args.seed),
+            "VALID-PARSE": lambda: gates_v4.performance(r, args.seed, valid=True), "SEM-PUBLIC": lambda: gates.sem_public(r, args.seed),
             "INCREMENTAL-REPAIR": lambda: gates.incremental_repair(r), "RESUME-RESET": lambda: gates.resume_and_two(r),
-            "SUPPORT": lambda: gates.support(r, support_versions), "REGRESSION-SWEEP": lambda: gates.sweep(r),
+            "SUPPORT": lambda: gates.support(r, support_versions), "REGRESSION-SWEEP": lambda: gates_v4.sweep(r, args.seed),
             "ABS-MEMORY": lambda: gates.abs_memory(lab.runs), "RECOVERY-LOCALITY": lambda: gates.recovery_locality(r)}
     for g in selected:
         out = plan[g]()
