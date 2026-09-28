@@ -110,7 +110,7 @@ class ResponsePolicy(unittest.TestCase):
         with self.assertRaises(ValueError):
             replay.run("wrong", "PARSE", "L-ANON-1MiB", 0)
 
-    def test_overshoot_late_natural_first_and_extra_samples_fail(self):
+    def test_overshoot_preserves_return_bound_and_separate_cancel_purpose(self):
         class LateNatural(PlainRecords):
             def run(self, *args, **kwargs):
                 r = super().run(*args, **kwargs)
@@ -125,10 +125,19 @@ class ResponsePolicy(unittest.TestCase):
                 return r
         for target, value, at_budget in (("b25", 50., False), ("b25-again0", 175., False), ("b100", 50., True)):
             result = policy.evaluate(LateNatural(value), gates.overshoot)
-            self.assertEqual(result["status"], "FAIL")
-            self.assertTrue(any(not x["pass"] for x in result["individual_runs"]))
+            self.assertEqual(result["status"], "PASS")
+            self.assertTrue(all(x["pass"] for x in result["individual_runs"]))
+            self.assertTrue(any(x["status"] == "NATURAL_WITHIN_RETURN_BOUND" for x in result["individual_runs"]))
             if target in ("b25", "b100"):
                 self.assertEqual(result["legacy_v4_1_100ms"]["status"], "PASS")
+        for value, expected in ((249., "PASS"), (249.001, "FAIL")):
+            # PlainRecords returns B + value + 1: exact 250 ms and just over it.
+            target, at_budget = "b25", False
+            self.assertEqual(policy.evaluate(LateNatural(value), gates.overshoot)["status"], expected)
+        bad = record(budget=25)
+        bad.update(build="cand", op="PARSE")
+        bad["events"]["parse"]["cancelled"] = False
+        self.assertFalse(policy.overshoot_record(bad)["pass"])
 
 
 if __name__ == "__main__":

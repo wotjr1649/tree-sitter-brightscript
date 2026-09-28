@@ -16,7 +16,9 @@ CONTRACT = {
     "tree_and_parser_delete_ms": LIMIT_MS,
 }
 SPEC = {"protocol": PROTOCOL, "limits_ms": CONTRACT,
-        "overshoot_collection": "v3: three extra runs at 80..120 ms or above 100 ms"}
+        "overshoot_collection": "v3: three extra runs at 80..120 ms or above 100 ms",
+        "actual_cancellation": "CANCEL registered timed points and FIRST/HALF controls",
+        "overshoot_semantics": "return within budget + allowance; natural completion is not actual-cancellation evidence"}
 SHA256 = hashlib.sha256(json.dumps(SPEC, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 IDENTITY = {"spec": SPEC, "sha256": SHA256}
 GATES = {"CANCEL", "CANCEL-OVERSHOOT", "MAX-CALLBACK-GAP", "CLEANUP-ALL"}
@@ -88,6 +90,17 @@ def valid_record(record):
         return False
 
 
+def overshoot_record(record):
+    """The inherited OVERSHOOT purpose bounds return time; CANCEL proves actual cancellation."""
+    reached, status, _, parse_ms, _ = gates.budget_run(record, record["budget"])
+    pe = record["events"]["parse"]
+    valid = (status != "MEASUREMENT_INCONSISTENT" and gates.uninstrumented(record)
+             and (not pe["cross_at_callback"] or pe["cancelled"]))
+    passed = valid and parse_ms <= record["budget"] + LIMIT_MS
+    return {"pass": passed, "status": ("INVALID" if not valid else "CANCELLED" if pe["cancelled"] else
+             "NATURAL_WITHIN_RETURN_BOUND" if reached else "NATURAL_BEFORE_BUDGET"), "parse_ms": parse_ms}
+
+
 class Recording:
     def __init__(self, runner):
         self.runner, self.lab, self.records = runner, runner.lab, []
@@ -128,9 +141,7 @@ def evaluate(runner, judge):
         raise ValueError("response gate registration changed")
     for result, previous in zip(active, old):
         if result["gate"] == "CANCEL-OVERSHOOT":
-            # The legacy aggregate only bounds elapsed overshoot; v5 also requires actual cancellation.
-            judged = [gates_v4.timed_record(x, x["case"], x["budget"], False, response_ms=LIMIT_MS)
-                      for x in recording.records]
+            judged = [overshoot_record(x) for x in recording.records]
             result["individual_runs"] = judged
             if not all(x["pass"] for x in judged):
                 result["status"] = "FAIL"

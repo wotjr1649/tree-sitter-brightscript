@@ -34,8 +34,9 @@ native process, omit a record or request another sample.
 - OVERSHOOT still requests three extra observations when its first cancelled
   observation is in the old 80–120 ms range or above 100 ms. The response limit
   changes the judgement only, never this collection rule or which records count.
-  Every first/additional timed observation also uses the existing per-run
-  cancellation safety judge: budget reached with natural completion is FAIL.
+  Every first/additional observation must be valid and return within B + 250 ms.
+  Natural completion supplies no actual-cancellation evidence; that separate
+  requirement belongs to CANCEL's registered timed points and FIRST/HALF.
 - Gap/cleanup use the same full parse observations and individual maxima.
 - All other native purposes, input hashes, v4 performance sampling/limits,
   supervisor caps and the macOS sampled-memory controls remain unchanged.

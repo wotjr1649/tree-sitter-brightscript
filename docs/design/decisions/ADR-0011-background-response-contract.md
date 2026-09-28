@@ -28,8 +28,10 @@ must meet the new bound. Separate timers do not establish a summed end-to-end
 deadline from an external request through process/descendant termination.
 
 The same inputs, cancellation budgets and actual-cancellation semantics apply.
-A reached timed budget still requires cancellation; a late natural completion
-does not become acceptable because it fits inside the new response allowance.
+The registered CANCEL timed points still require cancellation when their
+budget is reached; late natural completion cannot satisfy that purpose.
+CANCEL-OVERSHOOT retains its separate return-time purpose: a normal return
+within B + 250 ms is allowed and supplies no actual-cancellation evidence.
 Keep fixed six-allocator sampling and require observed growth when prescribed.
 Keep all 17 purposes, functional equality, memory limits, post-trigger growth,
 cost/growth ratios, watchdogs and process cleanup controls. In particular, the
@@ -59,3 +61,13 @@ replacement run qualifies a failed candidate. Follow [the v5 plan](../../validat
 Known long-expression query stress watchdogs remain disclosed. This decision
 does not claim all inputs/environments are equivalent or that downstream
 go-treesitter has been validated by native Tree-sitter results.
+
+## Scope correction after the first implementation preflight
+
+The initial ADR's unqualified "reached timed budget" wording and its review
+incorrectly extended CANCEL's actual-cancellation condition to OVERSHOOT.
+This was outside the owner's numerical-only response change. Restore the
+historical separation above, keep individual validity and return bounds,
+and include that scope in the policy identity. The original preflight FAIL
+at `2dfaecc` is retained; corrected offline replay is not new qualification.
+A new frozen source and preflight precede the six full jobs.
