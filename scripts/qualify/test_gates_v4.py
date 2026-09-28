@@ -82,15 +82,51 @@ class Cancellation:
             if self.defect == "late-allocator" and n == 7:
                 pe.update(parse_ms=budget + 1., budget_cross_ms=budget, live_at_budget=1000, peak_after_budget=1000)
                 final["parse_ms"] = budget + 1.
+            supplemented = self.defect and self.defect.startswith("extra-") and self.defect not in (
+                "extra-tag", "extra-order", "extra-case", "extra-budget", "extra-duplicate")
+            if supplemented and (n == 2 and self.defect != "extra-no-plain" or n == 106 and self.defect != "extra-miss"
+                                 or n == 107 and self.defect in ("extra-growth", "extra-unobserved")):
+                live = 1000 if build == "cand-alloc" else 0
+                pe.update(parse_ms=budget + 1., cancelled=True, budget_cross_ms=budget, cross_at_callback=True,
+                          live_at_budget=live, peak_after_budget=live)
+                cl.update(tree_delete_ms=-1., peak_after_budget=live)
+                final.update(parse_ms=budget + 1., cancelled=True, has_error=-1, tree_delete_ms=-1.)
+                if self.defect == "extra-unobserved" and n == 107:
+                    pe.update(budget_cross_ms=-1., cross_at_callback=False)
+            if self.defect in ("extra-growth", "extra-no-plain") and n == (107 if self.defect == "extra-growth" else 106):
+                pe["peak_after_budget"] = cl["peak_after_budget"] = final["allocator_peak_live"] = 1000 + 64 * gates.MIB
+            if supplemented and n == 3:
+                if self.defect == "extra-late":
+                    pe["parse_ms"] = final["parse_ms"] = budget
+                elif self.defect == "extra-cleanup":
+                    cl["parser_delete_ms"] = final["parser_delete_ms"] = 101.
+                elif self.defect == "extra-censored":
+                    r["completed"] = False
+                elif self.defect == "extra-wrong":
+                    final["has_error"] = 0
         elif op == "CANCEL_HALF":
             target = (length + 1) // 2
             pe.update(callbacks=10, callback_target=0, byte_target=target,
                       request_byte=target, max_byte_before_request=target - 1)
             if self.defect == "half":
                 pe["request_byte"] = length
-        if self.defect == "duplicate" and n == 203:
+        if self.defect == "duplicate" and n == 278:
             r["report"]["pid"] = 1
-        self.runs.append(r)
+        if self.defect == "extra-tag" and n == 106:
+            r["tag"] = "alloc-extra-2"
+        if self.defect == "extra-case" and n == 106:
+            r["case"] = "V-FLAT-1MiB"
+        if self.defect == "extra-budget" and n == 106:
+            r["budget"] = 100
+        if self.defect == "extra-duplicate" and n == 106:
+            r["report"]["pid"] = 1
+        if self.defect == "extra-order" and n == 107:
+            self.runs[-1], r = r, self.runs[-1]
+        if self.defect == "control-case" and n == 181:
+            r["case"] = "V-ARRAY-1MiB"
+        if self.defect == "control-budget" and n == 181:
+            r["budget"] = 1
+        self.runs.append(retained_run(r))
         return r
 
 
@@ -120,6 +156,9 @@ class V4Judgement(unittest.TestCase):
                 self.assertEqual(gates.run_id(lab.runs[0]), gates.run_id(record))
                 timed = dict(record, budget=200)
                 self.assertIs(retained_run(timed), timed)
+                for op in ("CANCEL_FIRST", "CANCEL_HALF"):
+                    control = dict(record, op=op)
+                    self.assertIs(retained_run(control), control)
 
     def test_complete_performance_plan_and_cache_isolation(self):
         r = Records()
@@ -159,9 +198,28 @@ class V4Judgement(unittest.TestCase):
         self.assertEqual(result["status"], "PASS")
         self.assertEqual(result["legacy"]["status"], "FAIL")
         self.assertTrue(all(p["safety"] == "PASS" for p in result["legacy"]["points"]))
-        self.assertEqual(len(r.runs), 203)
-        for defect in ("late", "late-allocator", "warmup-cleanup", "warmup-memory", "half", "duplicate"):
+        self.assertEqual(len(r.runs), 278)
+        self.assertTrue(all(p["original_sampling_pass"] for p in result["points"]))
+        for defect in ("late", "late-allocator", "warmup-cleanup", "warmup-memory", "half", "duplicate",
+                       "extra-tag", "extra-order", "control-case", "control-budget"):
             self.assertEqual(gates_v4.cancel(Cancellation(defect))["status"], "FAIL", defect)
+        for defect in ("extra-tag", "extra-order", "extra-case", "extra-budget", "extra-duplicate"):
+            changed = gates_v4.cancel(Cancellation(defect))
+            self.assertEqual(changed["status"], "FAIL", defect)
+            self.assertTrue(all(p["original_sampling_pass"] for p in changed["points"]), defect)
+            self.assertEqual(changed["legacy"], result["legacy"], defect)
+
+    def test_supplement_requires_actual_growth_and_retains_every_failure(self):
+        result = gates_v4.cancel(Cancellation("extra-good"))
+        self.assertEqual(result["status"], "PASS")
+        self.assertFalse(result["points"][0]["original_sampling_pass"])
+        self.assertEqual(result["legacy"]["points"][0]["safety"], "FAIL")
+        self.assertEqual(result["legacy"]["points"][0]["memory"], "NOT_RUN_BUDGET_REACHED_UNOBSERVED")
+        for defect in ("extra-miss", "extra-growth", "extra-unobserved", "extra-late", "extra-cleanup",
+                       "extra-censored", "extra-wrong", "extra-no-plain"):
+            result = gates_v4.cancel(Cancellation(defect))
+            self.assertEqual(result["status"], "FAIL", defect)
+            self.assertFalse(result["points"][0]["pass"], defect)
 
     def test_timed_fields_fail_closed(self):
         r = Cancellation()

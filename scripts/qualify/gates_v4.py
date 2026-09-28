@@ -120,23 +120,53 @@ def timed_record(rec, case, budget, allocator):
 def cancel(r):
     start = len(r.lab.runs)
     legacy = gates.cancel(r)
+    original_tags = [("cand", f"rep{i}") for i in range(6)] + [("cand-alloc", "alloc")]
+    originals = {}
+    for (case, budget, _), old in zip(gates.CANCEL_POINTS, legacy["points"]):
+        series = [x for x in r.lab.runs[start:] if x["case"] == case and x["budget"] == budget]
+        judged = [timed_record(x, case, budget, x["build"] == "cand-alloc") for x in series]
+        registered = [(x["build"], x["op"], x["tag"]) for x in series] == [(b, "PARSE", t) for b, t in original_tags]
+        originals[case, budget] = (registered and old["safety"] == "PASS" and all(p["pass"] for p in judged)
+                                   and (not any(p.get("reached") for p in judged[:6]) or judged[6].get("growth") is not None))
+    for case, budget, _ in gates.CANCEL_POINTS:
+        for i in range(1, 6):
+            r.run("cand-alloc", "PARSE", case, budget, tag=f"alloc-extra-{i}")
     records = r.lab.runs[start:]
     points = []
-    for case, budget, _ in gates.CANCEL_POINTS:
+    extra_tags = [("cand-alloc", f"alloc-extra-{i}") for i in range(1, 6)]
+    for (case, budget, _), old in zip(gates.CANCEL_POINTS, legacy["points"]):
         series = [x for x in records if x["case"] == case and x["budget"] == budget]
-        expected = [("cand", f"rep{i}") for i in range(6)] + [("cand-alloc", "alloc")]
         judged = [timed_record(x, case, budget, x["build"] == "cand-alloc") for x in series]
-        registered = [(x["build"], x["tag"]) for x in series] == expected
-        growth_observed = (registered and (not any(p.get("reached") for p in judged[:6])
-                                          or judged[-1].get("growth") is not None))
+        registered = [(x["build"], x["tag"]) for x in series] == original_tags + extra_tags
+        required = any(p.get("reached") for p in judged[:6])
+        growth_observed = registered and (not required or any(p.get("reached") and p.get("growth") is not None
+                                                              for p in judged[6:]))
+        # An additional actual observation may fill only missing counterpart growth.
+        # Prove the other legacy SAFETY facts; the reason string alone is insufficient.
+        missing_only = (registered and all(p["pass"] for p in judged[:7])
+                        and old.get("memory") == "NOT_RUN_BUDGET_REACHED_UNOBSERVED"
+                        and old.get("alloc_memory_status") == "NOT_APPLICABLE_BEFORE_BUDGET"
+                        and all(old.get(k) == 0 for k in ("inconsistent_count", "wrong_result_count", "censored_count"))
+                        and old.get("observed_count") == old.get("required_count") == 5
+                        and gates.number(old.get("return_max_ms")) is not None
+                        and old["return_max_ms"] <= budget + 100
+                        and gates.number(old.get("cleanup_max_ms")) is not None and old["cleanup_max_ms"] <= 100)
+        safety = old["safety"] == "PASS" or missing_only and growth_observed
         points.append({"case": case, "budget": budget, "judged": judged,
-                       "pass": registered and growth_observed and all(p["pass"] for p in judged)})
+                       "original_sampling_pass": originals[case, budget],
+                       "growth_observed": growth_observed, "legacy_safety_satisfied": safety,
+                       "pass": registered and safety and growth_observed and all(p["pass"] for p in judged)})
     first = paired.first_callback_control(r)
     half = paired.first_callback_control(r, progressed=True)
-    complete = unique(r.lab.runs[start:], 203)
-    ok = (complete and all(p["safety"] == "PASS" for p in legacy["points"])
-          and all(p["pass"] for p in points) and first["pass"] and half["pass"])
-    result = gates.result("CANCEL", ok, points, ["v4: retain all 15 timed points and legacy SAFETY; "
+    expected = [(b, "PARSE", c, budget, tag) for tags in (original_tags, extra_tags)
+                for c, budget, _ in gates.CANCEL_POINTS for b, tag in tags]
+    for op, prefix in (("CANCEL_FIRST", "first"), ("CANCEL_HALF", "half")):
+        expected.extend((b, op, c, 0, tag) for c in gates.CANCEL_ACTUAL
+                        for b, tag in [("cand", f"{prefix}{i}") for i in range(6)] + [("cand-alloc", f"{prefix}-alloc")])
+    complete = (unique(r.lab.runs[start:], 278) and len(points) == 15 and
+                [(x["build"], x["op"], x["case"], x["budget"], x["tag"]) for x in r.lab.runs[start:]] == expected)
+    ok = complete and all(p["pass"] for p in points) and first["pass"] and half["pass"]
+    result = gates.result("CANCEL", ok, points, ["v4.1: fixed six allocator runs at each timed point; retain original verdicts; "
                           "require FIRST and HALF for all seven families, independent of timed coverage"])
     result.update(complete=complete, legacy=legacy, first_callback_control=first, progressed_control=half)
     return result

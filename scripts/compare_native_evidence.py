@@ -38,7 +38,7 @@ def load(path):
         raise ValueError("missing runner image identity")
     if (not isinstance(common["commit"], str) or not SHA1.fullmatch(common["commit"])
             or common["gate_statuses"] != list(REQUIRED_GATES)
-            or common["protocol"] != "v4" or common["runtime"] != "0.27.0" or common["support"] != ["0.25.1", "0.26.13"]
+            or common["protocol"] != "v4.1" or common["runtime"] != "0.27.0" or common["support"] != ["0.25.1", "0.26.13"]
             or common["seed"] != 5707 or common["oracle_cases"] != 231
             or common["oracle_workload"].get("cases") != 231
             or not digest(common["oracle_workload"].get("sha256"))

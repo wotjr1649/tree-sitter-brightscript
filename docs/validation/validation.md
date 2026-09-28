@@ -408,7 +408,7 @@ compiler and a private parser-library directory per checkout.
 ### v0.1.4 three-OS native candidate
 
 The historical Windows lane above and its failures are retained. The v0.1.4
-candidate now uses protocol v4, with the same registered inputs, 17 result
+candidate now uses protocol v4.1, with the same registered inputs, 17 result
 names and existing numeric bounds
 on `windows-2025-vs2026` x64, `ubuntu-24.04` x64 and `macos-15` ARM64 in
 `.github/workflows/native-qualification.yml`. These are candidate checks,
@@ -418,8 +418,9 @@ job from running. The full record and known FAILs are in
 
 The measurement change is supported by the predeclared nine-job phase 5
 and phase 6 experiments in [native-v4-plan.md](native-v4-plan.md). It does not
-reclassify earlier v3 failures. `gates.py` preserves v3; `gates_v4.py` applies
-these reviewed changes:
+reclassify earlier v3 failures. `gates.py` preserves v3. The v4 baseline below
+is retained; `gates_v4.py` adds only the explicit v4.1 sampling revision that
+follows it:
 
 - Candidate, allocator, H and BEFORE_PRINT probes use the phase 3 scheduled
   condition: Windows thread affinity to the lowest allowed mask bit, macOS
@@ -447,6 +448,26 @@ these reviewed changes:
   allocator growth-through-cleanup rules registered in phases 4 and 6.
 - Every native process identity is unique. The full raw file must fit the
   existing 64 MiB evidence bound; incomplete or oversized evidence is HOLD.
+
+Protocol v4.1 prospectively supplements CANCEL's allocator observations. Run
+the original 105 timed executions in their original order, then five extra
+allocator executions at each of the 15 points, in registered point order and
+tag order `alloc-extra-1` through `alloc-extra-5`. FIRST49 and HALF49 follow
+unchanged: exactly 278 unique, correctly ordered executions are required.
+The count is fixed before results; every extra execution is judged, with no
+early success, replacement or retry. All six allocator runs use their own
+budget/crossing/cleanup observations; every observed growth must be below
+64 MiB. If any of the six plain runs reaches budget, at least one allocator
+run must actually reach its own budget and measure growth. Otherwise the
+point remains HOLD, even if all six allocator runs finish safely early.
+
+Retain the original v3 judgement and each original seven-sample v4 point
+verdict alongside v4.1. Only missing counterpart growth may be supplied by
+an additional actual observation. All original individual safety/result
+checks, finite timing bounds, complete sample counts and consistency checks
+must pass; a legacy SAFETY failure for another or combined reason still
+fails v4.1. Historical cohort failures are never reclassified. New evidence
+identities and packages require `v4.1`; mixed protocols are rejected.
 
 Release requires two preassigned independently allocated full jobs per OS
 at one frozen candidate, with equal per-OS image/tool identities. Each of all

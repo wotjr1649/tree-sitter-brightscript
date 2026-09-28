@@ -397,9 +397,9 @@ def retained_run(rec):
 
     Linux fork/exec peak RSS also includes the inherited Python image. Retaining
     every full record here needlessly inflates that image throughout a long lane.
-    Timed cancellation still needs its complete per-run events for judgement.
+    Cancellation needs its complete records for per-run judgement and registration.
     """
-    if rec["budget"]:
+    if rec["budget"] or rec["op"] in ("CANCEL_FIRST", "CANCEL_HALF"):
         return rec
     return {"build": rec["build"], "case": rec["case"],
             "report": {k: rec["report"][k] for k in (
@@ -708,9 +708,9 @@ def main():
                 "probes": {n: sha(p) for n, (p, _) in probes.items()},
                 "git_head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True,
                                            timeout=60).stdout.strip(),
-                "protocol": "v4", "runtime": "0.27.0", "support": support_versions, "seed": args.seed, "gates": selected}
+                "protocol": "v4.1", "runtime": "0.27.0", "support": support_versions, "seed": args.seed, "gates": selected}
     (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
-    r = Runner(lab, probes, query, roots={"cand": ROOT, "h": refs["h"]}, runtime_build="separate-scheduled-v4")
+    r = Runner(lab, probes, query, roots={"cand": ROOT, "h": refs["h"]}, runtime_build="separate-scheduled-v4.1")
     if latency_mode:
         import latency_diagnostic
         plan = ({"cases": latency_diagnostic.WITNESSES, "budgets": [0], "repetitions": 5000,

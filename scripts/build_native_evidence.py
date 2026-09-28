@@ -105,7 +105,7 @@ def build(qualification, oracle_a, oracle_b):
     q = Path(qualification)
     identity = read_json(q / "identity.json", 2**20)
     gate_record = read_json(q / "gates.json")
-    if gate_record["identity"] != identity or not identity["git_clean"] or identity.get("protocol") != "v4":
+    if gate_record["identity"] != identity or not identity["git_clean"] or identity.get("protocol") != "v4.1":
         raise ValueError("qualification identity is incomplete or dirty")
     gates = gate_record["results"]
     if tuple(g["gate"] for g in gates) != REQUIRED_GATES or any(g["status"] != "PASS" for g in gates):

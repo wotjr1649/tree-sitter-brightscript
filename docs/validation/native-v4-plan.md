@@ -484,3 +484,50 @@ progress at that finding retains its original source and completion record;
 its stronger post-run audit is separate from execution by the corrected
 validator. The final-CPU supervisor passed stock/extended safety controls,
 including normal/sleep CPU observations, before prospective hosted use.
+
+The corrected hosted [Windows witness run 36379409698](https://github.com/wotjr1649/tree-sitter-brightscript/actions/runs/36379409698)
+at `88172dc` completed all 10,000 observations in 270.1267 seconds. The two
+inputs' median parse times were 1.2105/0.9067 ms; maximum gaps were
+18.7662/15.4048 ms. No gap exceeded 100 ms, so this campaign did not reproduce
+the retained outliers or establish their cause. Exact offline validation of
+registration, 10,000 process identities, input/source/image hashes and every
+summary field passed. Common three-OS CI and POSIX preflight also passed.
+This finite campaign is complete; it is not repeated until a new material
+hypothesis or correction exists. Historical latency failures remain open.
+
+## Prospective v4.1 CANCEL allocator sampling
+
+The owner chose review of the fixed six-allocator-sample proposal. Independent
+adversarial review accepted the design with a factual, fail-closed check for
+the single missing-counterpart exception. The operative contract is in
+[validation.md](validation.md#v014-three-os-native-candidate): original 105,
+fixed 75 additions, unchanged FIRST49/HALF49, 278 unique registered runs.
+No numeric limit or input changes. Record original v4 point dispositions and
+legacy v3 results; all original and extra execution failures remain blocking.
+
+Order: implement the new protocol and exact registration checks; test missing
+coverage, late natural return, censoring, wrong result, cleanup and growth
+violations (including combined violations); independently review the diff;
+then run one preassigned CANCEL-only pilot on each supported hosted OS at one
+commit. The pilot is diagnostic, not a full qualification cohort. Preserve
+all results. If all six allocator samples still miss required growth, retain
+HOLD without another sample-count increase. Windows historical latency
+failures remain a separate unresolved prerequisite for a new full cohort.
+
+Implementation review found and closed P2: an invalid added tag had changed
+the retained original sampling verdict. Original verdicts are now computed
+before the 75 additions; tag/order/case/budget/identity mutants prove their
+preservation and the new gate's failure. A local native trial completed all
+278 executions but failed judgement because compressed FIRST/HALF records
+omitted registration fields. That failure and raw data are retained; the
+runner now retains those 98 control records in full. Its offline replay is
+separate from the failed execution. The corrected fresh local trial passed
+all 278 executions and exact raw replay. The increased retained records must
+also satisfy full-qualification memory limits; a size estimate is no waiver.
+
+Independent static re-review found no open P1/P2 for the pilot. Local checks
+passed: 14 evidence/judgement tests (also registered in common CI), 12 CLI
+guard tests, six original gate tests, ten characterization tests, V0 and
+diff checks. A compiler-path error before the first local trial launched no
+probe and is retained separately from the judgement failure. No hosted pilot
+or full-qualification result is claimed by these local observations.

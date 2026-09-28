@@ -13,6 +13,7 @@ from compare_native_evidence import compare as compare_hosts
 from package_native_evidence import package
 from package_repeated_native_evidence import HOSTS, repeated
 from qualify.test_latency_diagnostic import WitnessRecords
+from qualify.test_gates_v4 import V4Judgement
 
 
 def sha(data):
@@ -41,7 +42,7 @@ class NativeEvidence(unittest.TestCase):
         zero = "0" * 64
         return {"commit": "a" * 40, "candidate": {"src/parser.c": zero, "grammar.js": zero},
                 "lane_sources": {"run.py": zero},
-                "protocol": "v4", "runtime": "0.27.0", "support": ["0.25.1", "0.26.13"], "seed": 5707,
+                "protocol": "v4.1", "runtime": "0.27.0", "support": ["0.25.1", "0.26.13"], "seed": 5707,
                 "gate_statuses": list(REQUIRED_GATES), "oracle_cases": 231,
                 "oracle_workload": {"cases": 231, "sha256": zero}, "oracle_content_sha256": zero,
                 "native_trees": [{"name": f"case-{i}", "input_sha256": zero, "tree_sha256": zero}
@@ -84,6 +85,13 @@ class NativeEvidence(unittest.TestCase):
                                                                                            "version": "test",
                                                                                            "runner_arch": "ARM64" if platform == "darwin" else "X64"}}}), encoding="utf-8")
             self.assertEqual(compare_hosts(*paths), common)
+            original = paths[0].read_text(encoding="utf-8")
+            obsolete = json.loads(original)
+            obsolete["common"]["protocol"] = "v4"
+            paths[0].write_text(json.dumps(obsolete), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                compare_hosts(*paths)
+            paths[0].write_text(original, encoding="utf-8")
             bad = dict(common, native_trees=[dict(common["native_trees"][0], tree_sha256="f" * 64),
                                              *common["native_trees"][1:]])
             paths[2].write_text(json.dumps({"common": bad, "host": {"platform": "darwin",
@@ -106,7 +114,7 @@ class NativeEvidence(unittest.TestCase):
             q.mkdir()
             common = self.common()
             identity = {"git_clean": True, "git_head": common["commit"], "candidate": common["candidate"],
-                        "lane_sources": common["lane_sources"], "runtime": common["runtime"], "protocol": "v4",
+                        "lane_sources": common["lane_sources"], "runtime": common["runtime"], "protocol": "v4.1",
                         "support": common["support"], "seed": common["seed"], "cc_sha256": "0" * 64,
                         "runner_image": {"os": "win25", "version": "test", "runner_arch": "X64"},
                         "supervisor_kind": "windows_job", "probes": {"cand": "0" * 64}}
@@ -178,7 +186,7 @@ class NativeEvidence(unittest.TestCase):
                 runner_image = {"os": platform, "version": "test", "runner_arch": runner_arch}
                 identity = {"git_clean": True, "git_head": common["commit"], "candidate": common["candidate"],
                             "runner_image": runner_image, "lane_sources": common["lane_sources"],
-                            "protocol": "v4", "runtime": common["runtime"], "support": common["support"], "seed": common["seed"],
+                            "protocol": "v4.1", "runtime": common["runtime"], "support": common["support"], "seed": common["seed"],
                             "cc_sha256": "0" * 64, "probes": {"cand": "0" * 64},
                             "supervisor_sha256": "0" * 64 if platform == "win32" else None,
                             "supervisor_kind": "test-supervisor"}
