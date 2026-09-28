@@ -720,3 +720,13 @@ must state the required end-to-end cancellation deadline and ownership of
 the worker/supervisor, alongside throughput, scaling and memory objectives.
 The 17 agreed validation purposes remain in scope. Cross-OS functional
 agreement does not imply an identical maximum wall time on hosted VMs.
+
+The subsequent [local operation diagnosis and rejected corrections](../reports/0.1.4-native-parity-candidate.md#local-eof-operation-attribution-and-rejected-corrections)
+locate most of the local L-ANON gap in runtime acceptance and final stack
+condensation. Compiler optimization, assignment-prefix grouping and the
+retained affinity comparison did not establish an acceptable correction.
+Do not dispatch another full qualification cohort merely to seek a passing
+sample. Before that cohort, establish a behavior-preserving correction on
+the supported runtime, or resolve a separately reviewed product/runtime
+scope decision. The latter is not itself a PASS and does not replace failed
+evidence. The final six-job requirement remains unchanged.
