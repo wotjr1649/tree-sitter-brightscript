@@ -298,11 +298,19 @@ module.exports = grammar({
     // expression grammar allows (LIST precedence is below every operator).
     print_statement: $ => seq(choice(kw('print'), '?'), optional($._print_items)),
 
-    // A balanced repetition (A5-01): a hidden rule whose body is a repetition
-    // is its own binary tree. The error-recovery scanner keeps malformed item
-    // runs from growing the recovery stack (B4-01, ADR-0008). Items name the
-    // expression kinds directly, without an `expression` wrapper node per item.
-    _print_items: $ => repeat1($._print_item),
+    // Four-item groups reduce hidden repetition nodes and deletion allocations.
+    // Every positive item count is 4k + r, r in 1..4; public items stay unchanged.
+    // The error-recovery scanner bounds malformed runs (B4-01, ADR-0008).
+    // Items name expression kinds directly, without an `expression` wrapper.
+    _print_items: $ => seq(
+      repeat(seq($._print_item, $._print_item, $._print_item, $._print_item)),
+      choice(
+        $._print_item,
+        seq($._print_item, $._print_item),
+        seq($._print_item, $._print_item, $._print_item),
+        seq($._print_item, $._print_item, $._print_item, $._print_item),
+      ),
+    ),
 
     _print_item: $ => prec(PREC.LIST, choice($._print_expression, ',', ';')),
 

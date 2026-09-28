@@ -350,3 +350,9 @@ validation because neither exponent uses it. All four sizes are now required
 valid, with dedicated warmup-censoring and missing-final negative controls.
 This correction preserves the original no-crash/full-observation requirement.
 Native candidate screening and final six-job qualification remain pending.
+
+The PRINT grouping candidate subsequently passed its six-purpose local v4
+screen, including exact replay of 6,931 records. Details and remaining limits
+are in the [candidate report](../reports/0.1.4-native-parity-candidate.md#print-candidate-under-v4).
+This supports submitting it to full hosted qualification; it is not a
+replacement for the six required final jobs.

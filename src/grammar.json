@@ -1462,11 +1462,93 @@
       ]
     },
     "_print_items": {
-      "type": "REPEAT1",
-      "content": {
-        "type": "SYMBOL",
-        "name": "_print_item"
-      }
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "_print_item"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_print_item"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_print_item"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "_print_item"
+              }
+            ]
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_print_item"
+            },
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_print_item"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_print_item"
+                }
+              ]
+            },
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_print_item"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_print_item"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_print_item"
+                }
+              ]
+            },
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_print_item"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_print_item"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_print_item"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_print_item"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     },
     "_print_item": {
       "type": "PREC",
