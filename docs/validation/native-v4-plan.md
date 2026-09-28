@@ -431,3 +431,19 @@ binary identities. A cancelled parse's tail endpoint is the last observed
 callback offset, not a new parser-position observation; diagnostic CPU
 values include instrumentation overhead. These observations do not replace
 hosted diagnosis or final qualification.
+
+[Hosted diagnosis 36377524645](https://github.com/wotjr1649/tree-sitter-brightscript/actions/runs/36377524645)
+at `417a7c5` completed all 720 observations and both original-binary identity
+checks per OS. The unrelated common CI stopped because the newly fixed
+diagnostic workflow commands had not been registered in the CLI-path guard;
+the two exact commands now replace the old characterization commands, with
+negative controls for mixed modes, altered compiler/runtime/output, gate
+selection and shell suffixes. No new launcher exemption or wildcard is added.
+
+The short diagnostic did not reproduce the earlier Windows 109/195 ms gaps
+or macOS missing timed-growth evidence. Ubuntu's diagnostic L-WHILE maximum
+gap was 103.892254 ms wall and 103.822 ms CPU near EOF; its original maximum
+was 88.871563 ms. This establishes substantial CPU work in the instrumented
+EOF interval, not the cause of the earlier Windows outliers. The previous
+failures remain open; successful diagnostic completion does not justify
+another unchanged final qualification attempt.
