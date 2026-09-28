@@ -11,12 +11,13 @@ This project aims to provide a current, well-tested BrightScript syntax grammar 
 
 ## Status
 
-[v0.1.3](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.3)을
-2026-09-28 KST 공개하고 검증했다. [출하 기록](docs/reports/0.1.3-release-candidate.md)은
-세 OS CI, Windows 17-gate qualification, 독립 정적 리뷰와 네 공개 자산의 hash를 설명한다.
+[v0.1.4](https://github.com/wotjr1649/tree-sitter-brightscript/releases/tag/v0.1.4)을
+2026-09-28 KST 공개하고 검증했다. [출하 기록](docs/reports/0.1.4-release.md)은
+세 OS에서 각각 두 번 통과한 17개 native gate, 등록 범위의 기능 동등성,
+독립 리뷰와 다섯 공개 자산의 검증을 설명한다.
 배포는 소스 전용이다. Windows x64를 우선 지원하며 Linux x64는 Ubuntu 24.04,
 macOS Apple Silicon ARM64는 macOS 15에서 검증했다. macOS Intel은 지원하지 않는다.
-[v0.1.2 출하 기록](docs/reports/0.1.2-maintenance-candidate.md)은 별도로 보존한다.
+[v0.1.3 출하 기록](docs/reports/0.1.3-release-candidate.md)과 이전 출하는 별도로 보존한다.
 [유지보수 동결](docs/maintenance.md)은 마지막 문서 commit의 CI와 최종 인계 완료 시 효력을 갖는다.
 
 The grammar covers the listed requirements and fixtures in the [registry](docs/specs/language-conformance.md).
@@ -25,8 +26,9 @@ Roku syntax or device compatibility. The [0.1.0 release record](docs/reports/0.1
 and [qualification history](docs/reports/0.1.0-integrated-qualification.md) preserve earlier failures and their disposition.
 No npm package, language binding or WASM artifact is shipped.
 
-No OS-specific compiled parser libraries are shipped. The three-OS CI checks
-registered parsing and robustness workloads; equal absolute latency across
+No OS-specific compiled parser libraries are shipped. A nonbinary evidence ZIP
+retains the six native qualification jobs. The three-OS CI checks registered
+parsing and robustness workloads; equal absolute latency across
 different machines is not claimed. The
 [Session 08 report](docs/reports/session-08-cross-platform-source-validation.md)
 preserves the earlier branch validation and initial macOS failure.

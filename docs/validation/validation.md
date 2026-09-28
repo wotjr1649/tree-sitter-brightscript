@@ -407,7 +407,8 @@ compiler and a private parser-library directory per checkout.
 
 ### v0.1.4 three-OS native candidate
 
-The active prospective contract is now **v6**, under the owner's explicit
+The qualified v0.1.4 contract is **v6**, with its observed results and limits
+in the [publication receipt](../reports/0.1.4-release.md), under the owner's explicit
 250 ms choice in [ADR-0011](../design/decisions/ADR-0011-background-response-contract.md)
 and normal-completion/cancellation distinction in
 [ADR-0012](../design/decisions/ADR-0012-cooperative-cancellation-contract.md).
