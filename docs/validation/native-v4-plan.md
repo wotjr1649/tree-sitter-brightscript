@@ -673,3 +673,25 @@ is independently reviewed, checked locally, preassigned by exact commit and
 explicitly dispatched. A new execution requires a material correction or new
 discriminating evidence; unchanged lucky retries and historical FAIL replacement
 remain prohibited. Diagnostic success alone does not release the parser.
+
+### Follow-up after same-job stock L-ANON reproduction
+
+The corrected `5b59373` diagnostic completed, with two stock L-ANON gaps above
+100 ms; its separate traced calls were below 100 ms. The
+[receipt](../reports/0.1.4-native-parity-candidate.md#corrected-etw-run-5b59373--diagnostic-complete-latency-reproduced)
+preserves both facts. An independent adversarial design review approved one
+new discriminating execution: retain the exact 5,833-run prefix, increase
+only the fixed L-ANON target count from two to twenty, and retain the other
+six targets. Before/traced/after each contain all 26 targets, totaling 5,911
+native executions. All records count; no warmups or outliers are discarded.
+
+Keep the existing 15-second measurement launch deadline, collector self-stop,
+60-second capture lifecycle reservation, 120-second cumulative session bound,
+30-minute job and 64 MiB buffer limit. Runtime duration estimates are not a
+guarantee. Deadline exhaustion remains FAIL, with no target reduction or cap
+increase. Preassign one exact candidate and first-attempt dispatch after
+implementation review. If a traced L-ANON gap exceeds 100 ms, interpret only
+that execution's gap. Non-reproduction or incomplete capture leaves the cause
+unresolved. Ordered stock/traced groups do not establish overhead or affinity
+causality. Historical failures, the earlier complete diagnostic and release
+HOLD remain preserved.

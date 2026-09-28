@@ -20,7 +20,9 @@ class EtwDiagnostic(unittest.TestCase):
         rows = d.prelude()
         self.assertEqual(len(rows), 5833)
         self.assertEqual(rows[-1], ["cand", "PARSE", "L-FOREACH-1MiB", 0, "rep3"])
-        self.assertEqual(len(d.TARGETS), 8)
+        self.assertEqual(d.TARGETS, ["L-ANON-1MiB"] * 20 + ["V-FLAT-1MiB"] * 2
+                         + ["V-LONGEXPR-1MiB"] * 2 + list(d.latency_diagnostic.WITNESSES))
+        self.assertEqual(len(d.TARGETS), 26)
 
     def test_interval_and_mutants(self):
         # scheduled 10..20, ready 20..30, scheduled 30..40,

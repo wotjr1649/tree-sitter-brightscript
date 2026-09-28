@@ -745,7 +745,7 @@ def etw_diagnosis(r, identity):
     metadata = json.loads((directory / "capture.json").read_text(encoding="utf-8"))
     events, trace_sha = etw.trace_rows(directory / "numeric-private.bin", metadata)
     observations = [etw.observation(rec, events, metadata, r.input(rec["case"]).stat().st_size) for rec in marked]
-    if len(observations) != 8 or len(refs) != 16:
+    if len(observations) != len(etw.TARGETS) or len(refs) != 2 * len(etw.TARGETS):
         raise RuntimeError("ETW registration incomplete")
     (lab.out / "etw-summary.json").write_text(json.dumps({"qualification": False, "observations_complete": True,
         "capture": metadata, "private_numeric_sha256": trace_sha, "lifecycle": receipts,

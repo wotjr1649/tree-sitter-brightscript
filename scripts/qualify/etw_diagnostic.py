@@ -14,7 +14,8 @@ import gates
 import latency_diagnostic
 
 PREFIX_SHA = "34c946cf775ee671d6b1c8fed0c474d82b887588f04a7bfc3a88c8e57dd5483d"
-TARGETS = [f"{name}-1MiB" for name in ("L-ANON", "V-FLAT", "V-LONGEXPR") for _ in range(2)]
+TARGETS = ["L-ANON-1MiB"] * 20
+TARGETS += [f"{name}-1MiB" for name in ("V-FLAT", "V-LONGEXPR") for _ in range(2)]
 TARGETS += list(latency_diagnostic.WITNESSES)
 ROW = struct.Struct("<QIIHBBI")
 
