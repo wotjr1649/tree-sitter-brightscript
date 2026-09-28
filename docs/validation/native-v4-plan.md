@@ -147,3 +147,48 @@ is dropped to fit. If `single15` fails, it does not automatically trigger more
 samples or replacement runs. v4 adoption still requires an independent review
 of all three cohorts and their performance verdicts. Existing `single5` FAILs
 remain failures.
+
+## Phase 3 result and phase 4 cancellation control
+
+[Phase 3, 36364118813](https://github.com/wotjr1649/tree-sitter-brightscript/actions/runs/36364118813)
+completed all nine jobs at `23a3c59`. All three records within each OS share
+runner image, compiler, product, probe, harness and input hashes; no record
+exceeded the 64 MiB raw limit. This is diagnostic completion, not PASS.
+
+- Windows: both profiles passed A/A in all three jobs, but PRINT cleanup
+  failed throughout. One `single15` profile also failed timed cancellation.
+- macOS: `single15` passed A/A in two jobs and failed in one. The failed
+  identical-binary NAV_CURSOR comparison on `A501J-k01000` measured medians
+  0.124 and 0.281 ms (2.266 ratio), with identical work signatures and all
+  16 records per side. A5 or VALID failures remained in every `single15` job.
+- Ubuntu: both profiles passed A/A and cost/valid/cancellation; the third job
+  failed MAX-CALLBACK-GAP in both profiles.
+
+No phase 3 condition is adopted for release. These observations do not prove
+that every failure is host noise or that the OS cannot meet the requirements.
+The next performance investigation must isolate a cause; it cannot be another
+unbounded sample-count or favourable-run search.
+
+Phase 4 executes only the separately reviewed first-callback cancellation
+control, with the frozen product, default scheduling and three jobs per OS
+(20-minute job timeout). It does not repeat phase 3 cost experiments. Each
+of the seven registered families gets one warmup, five plain executions and
+one allocator execution. All 49 process identities must be unique. Every run
+must return a null tree after exactly callback 1, report its own equal request
+and crossing timestamps, the entire registered source length, `has_error=-1`,
+zero allocator live bytes after cleanup, confirmed exit and no descendants.
+All plain runs, including warmup, must return within 100 ms of their own
+request and clean up within 100 ms. A null tree's `-1` deletion sentinel
+contributes zero time. The allocator run must observe less than 64 MiB growth
+from its own callback through completed parser cleanup; allocator timings
+are diagnostic only. Missing, non-finite, negative or contradictory records
+fail. Natural completion or no callback fails.
+
+The first implementation review found that temporary allocation during
+parser cleanup escaped the post-trigger peak. The correction retains tracking
+through cleanup only for this new control, publishes the cleanup peak and
+requires `parse peak <= cleanup peak <= overall peak`. A 128 MiB cleanup
+growth negative control rejects that defect. Independent static re-review
+closed the finding. Native confirmation on all three OS remains required.
+The existing v3 SAFETY/ACTUAL implementation and verdicts are unchanged;
+phase 4 does not promote its control into a v4 release gate.

@@ -9,7 +9,64 @@ from pathlib import Path
 import gates
 
 BASELINE = "b9eab178472c9a43914bd86eb9a14b8a16a9464e"  # peeled immutable v0.1.3
-SWEEP = ("SW-print20-f282a-eof", "SW-return20-7ba3a402a7d3c-nl", "SW-while20-25e2a-eof")
+
+
+def first_callback_record(rec, length, allocator):
+    """Judge one diagnostic run by its own trigger, return, cleanup and supervisor evidence."""
+    pe, cl = rec.get("events", {}).get("parse", {}), rec.get("events", {}).get("cleanup", {})
+    final, report = rec.get("final") or {}, rec.get("report", {})
+    times = [pe.get(k) for k in ("parse_ms", "request_ms", "budget_cross_ms")]
+    cleanup = cl.get("parser_delete_ms")
+    counts = [pe.get(k) for k in ("live_at_budget", "peak_after_budget", "live_at_return")]
+    counts += [final.get(k) for k in ("allocator_peak_live", "allocations", "allocator_live_after")]
+    counts.append(cl.get("peak_after_budget"))
+    valid = (rec.get("completed") is True and report.get("termination_reason") == "COMPLETED"
+             and report.get("exit_code_raw") == 0 and report.get("exit_confirmed") is True
+             and type(report.get("active_processes")) is int and report["active_processes"] == 0
+             and type(report.get("pid")) is int and report["pid"] > 0
+             and type(report.get("creation_filetime", report.get("creation_monotonic_ns"))) is int
+             and report.get("creation_filetime", report.get("creation_monotonic_ns")) > 0
+             and all(gates.number(t) is not None for t in times + [cleanup])
+             and all(type(c) is int and c >= 0 for c in counts)
+             and pe.get("cancelled") is True and pe.get("cross_at_callback") is True
+             and type(pe.get("callbacks")) is int and pe["callbacks"] == 1
+             and type(pe.get("callback_target")) is int and pe["callback_target"] == 1
+             and type(pe.get("budget_ms")) in (int, float) and pe["budget_ms"] == 0
+             and final.get("final") is True and final.get("op") == "CANCEL_FIRST"
+             and type(final.get("bytes")) is int and final["bytes"] == length
+             and final.get("cancelled") is True and type(final.get("has_error")) is int
+             and final["has_error"] == -1 and final.get("parse_ms") == times[0]
+             and cl.get("tree_delete_ms") == -1 and final.get("tree_delete_ms") == -1
+             and final.get("parser_delete_ms") == cleanup
+             and type(cl.get("allocator_live_after")) is int and cl["allocator_live_after"] == 0
+             and final.get("allocator_live_after") == 0)
+    if valid:
+        parse_ms, request, cross = times
+        live, peak, returned, overall, allocations, _, cleanup_peak = counts
+        valid = (0 <= request == cross <= parse_ms and peak >= max(live, returned)
+                 and overall >= cleanup_peak >= peak)
+        valid &= live > 0 and allocations > 0 if allocator else all(c == 0 for c in counts)
+    if not valid:
+        return {"pass": False, "status": "MEASUREMENT_INCONSISTENT"}
+    latency, growth = parse_ms - request, cleanup_peak - live
+    # The null tree sentinel is not negative cleanup time. Allocator timings are diagnostic only.
+    passed = growth < 64 * gates.MIB if allocator else latency <= 100 and cleanup <= 100
+    return {"pass": passed, "status": "PASS" if passed else "FAIL", "return_after_request_ms": latency,
+            "cleanup_ms": cleanup, "growth_after_request_bytes": growth}
+
+
+def first_callback_control(r):
+    points, all_ids = [], []
+    for case in gates.CANCEL_ACTUAL:
+        plain = [r.run("cand", "CANCEL_FIRST", case, 0, tag=f"first{i}") for i in range(6)]
+        alloc = r.run("cand-alloc", "CANCEL_FIRST", case, 0, tag="first-alloc")
+        judged = [first_callback_record(x, len(gates.cases.generate(case)), i == 6)
+                  for i, x in enumerate(plain + [alloc])]
+        ids = [gates.run_id(x) for x in plain + [alloc]]
+        all_ids.extend(ids)
+        points.append({"case": case, "source_sha": gates.cases.RECORDED["cases"][case], "run_ids": ids,
+                       "judged": judged, "pass": len(set(ids)) == 7 and all(x["pass"] for x in judged)})
+    return {"pass": len(set(all_ids)) == 49 and all(p["pass"] for p in points), "points": points}
 
 
 def same_binary_control(r, seed):
@@ -62,36 +119,18 @@ def same_binary_control(r, seed):
             "pass": all(p["pass"] for p in points), "points": points}
 
 
-def run(runners, identity, out, seed):
+def run(r, identity, out):
     trial = int(os.environ.get("TSQ_TRIAL", "1"))
     if trial not in (1, 2, 3):
         raise ValueError("TSQ_TRIAL must be 1, 2 or 3")
-    order = list(runners)
-    random.Random(seed + trial).shuffle(order)
     result = {"release_verdict": "HOLD", "complete": False, "purpose": "characterization-only", "identity": identity,
-              "trial": trial, "order": order, "profiles": {}}
-    for name in order:
-        r = runners[name]
-        control = same_binary_control(r, seed + trial)
-        results = []
-        for measure in (lambda: gates.a5_01_cost(r, seed), lambda: gates.valid_parse(r, seed),
-                        lambda: gates.gaps_and_cleanup(r), lambda: gates.cancel(r)):
-            measured = measure()
-            results.extend(measured if isinstance(measured, list) else [measured])
-            print(f"CHARACTERIZATION {name}: {results[-1]['gate']} {results[-1]['status']}", flush=True)
-        sweep = []
-        for family in SWEEP:
-            series = {k: gates.timed(r, "cand", "PARSE", f"{family}-k{k:05d}", r.cost_samples, gates.m_parse)
-                      for k in (100, 400, 4000, 20000)}
-            times = {k: gates.med(values) if values else None for k, (values, _) in series.items()}
-            sweep.append({"family": family, "median_ms": times})
-        result["profiles"][name] = {"measured_samples": r.cost_samples, "warmup": 1,
-                                    "same_binary_control": control, "v3_results": results, "sweep_diagnosis": sweep}
-        result["input_sha256"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-                                  for p in sorted((out / "inputs").glob("*.brs"))}
-        (out / "characterization.json").write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
+              "trial": trial, "first_callback_control": first_callback_control(r)}
+    result["input_sha256"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                              for p in sorted((out / "inputs").glob("*.brs"))}
+    (out / "characterization.json").write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
     if (out / "runs.jsonl").stat().st_size > 64 * 2**20:
         raise RuntimeError("characterization raw evidence exceeds 64 MiB; cohort incomplete")
     result["complete"] = True
     (out / "characterization.json").write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
     print("CHARACTERIZATION_RECORDED release=HOLD", flush=True)
+    return 0 if result["first_callback_control"]["pass"] else 1

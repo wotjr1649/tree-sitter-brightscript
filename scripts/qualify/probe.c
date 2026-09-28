@@ -9,9 +9,10 @@
  * the public ts_set_allocator hook; its timings are never used as timings).
  *
  *   probe RUN <op> <input> <query> <budget_ms>
- *       op: PARSE | LIFECYCLE | QUERY_ONLY | NAV_CURSOR | NAV_FIELD | NAV_INDEX
+ *       op: PARSE | LIFECYCLE | QUERY_ONLY | NAV_CURSOR | NAV_FIELD | NAV_INDEX | CANCEL_FIRST
  *       budget_ms > 0 installs a progress callback that asks to cancel once
- *       the budget has elapsed; 0 installs one that never cancels.
+ *       the budget has elapsed; 0 installs one that never cancels, except
+ *       CANCEL_FIRST (budget 0), which cancels at its first progress callback.
  *   probe DUMP <input>          preorder CST: N depth type field start end flags
  *   probe DUMPLIST <list>       DUMP for every path in the list file
  *   probe CAPTURES <input> <query>
@@ -102,6 +103,7 @@ static double clock_ms(void) {
 static uint64_t live_bytes, peak_bytes, total_bytes, allocations;
 static int parse_active;
 static double parse_start, budget_ms;
+static uint64_t callback_target;
 static double budget_cross_ms = -1;
 static int cross_at_callback;
 static uint64_t live_at_budget, peak_after_budget;
@@ -110,8 +112,8 @@ static uint64_t live_at_budget, peak_after_budget;
 typedef union { size_t size; max_align_t alignment; } Header;
 static void account(void) {
   if (live_bytes > peak_bytes) peak_bytes = live_bytes;
-  if (parse_active && budget_ms > 0) {
-    if (budget_cross_ms < 0 && clock_ms() - parse_start >= budget_ms) {
+  if (parse_active) {
+    if (budget_ms > 0 && budget_cross_ms < 0 && clock_ms() - parse_start >= budget_ms) {
       budget_cross_ms = clock_ms() - parse_start;
       live_at_budget = live_bytes;
       peak_after_budget = live_bytes;
@@ -262,7 +264,7 @@ static bool progress(TSParseState *state) {
   else if (t - last_callback > max_gap) max_gap = t - last_callback;
   last_callback = t;
   callbacks++;
-  if (budget_ms > 0 && t >= budget_ms) {
+  if ((callback_target && callbacks >= callback_target) || (budget_ms > 0 && t >= budget_ms)) {
     if (request_ms < 0) request_ms = t;
     /* The budget crossing is also taken here, so a parse that allocates nothing after the budget
        still has one. No allocation happened since the budget instant, so the live bytes here are at
@@ -292,6 +294,8 @@ static int run(const char *op, const char *input_path, const char *query_path, d
   char *source = read_file(input_path, &length);
   Input input = {source, length, 0};
   budget_ms = budget;
+  callback_target = !strcmp(op, "CANCEL_FIRST") ? 1 : 0;
+  if (callback_target && budget != 0) return 96;
   TSParser *parser = new_parser();
   SIZE_T ws_idle = 0, commit_idle = 0, ws_return = 0, commit_return = 0;
   memory_now(&ws_idle, &commit_idle);
@@ -304,7 +308,8 @@ static int run(const char *op, const char *input_path, const char *query_path, d
   parse_start = clock_ms();
   TSTree *tree = ts_parser_parse_with_options(parser, NULL, (TSInput){&input, read_input, TSInputEncodingUTF8, NULL}, options);
   double parse_ms = clock_ms() - parse_start;
-  parse_active = 0;
+  /* The deterministic control also observes allocation growth during parser cleanup. */
+  parse_active = callback_target && !tree;
   uint64_t live_at_return = live_bytes;
   memory_now(&ws_return, &commit_return);
   double head = first_callback >= 0 ? first_callback : parse_ms;
@@ -313,10 +318,11 @@ static int run(const char *op, const char *input_path, const char *query_path, d
   if (head > edges) edges = head;
   if (tail > edges) edges = tail;
   printf("{\"event\":\"parse\",\"parse_ms\":%.6f,\"cancelled\":%s,\"callbacks\":%llu,\"head_gap_ms\":%.6f,"
-         "\"max_gap_ms\":%.6f,\"tail_gap_ms\":%.6f,\"max_gap_incl_edges_ms\":%.6f,\"budget_ms\":%.6f,"
+         "\"max_gap_ms\":%.6f,\"tail_gap_ms\":%.6f,\"max_gap_incl_edges_ms\":%.6f,\"budget_ms\":%.6f,\"callback_target\":%llu,"
          "\"request_ms\":%.6f,\"budget_cross_ms\":%.6f,\"cross_at_callback\":%s,\"live_at_budget\":%llu,"
          "\"peak_after_budget\":%llu,\"live_at_return\":%llu,\"working_set_at_return\":%llu,\"commit_at_return\":%llu}\n",
          parse_ms, tree ? "false" : "true", (unsigned long long)callbacks, head, max_gap, tail, edges, budget,
+         (unsigned long long)callback_target,
          request_ms, budget_cross_ms, cross_at_callback ? "true" : "false", (unsigned long long)live_at_budget,
          (unsigned long long)peak_after_budget,
          (unsigned long long)live_at_return, (unsigned long long)ws_return, (unsigned long long)commit_return);
@@ -422,8 +428,11 @@ static int run(const char *op, const char *input_path, const char *query_path, d
   t = clock_ms();
   ts_parser_delete(parser);
   double parser_delete_ms = clock_ms() - t;
-  printf("{\"event\":\"cleanup\",\"tree_delete_ms\":%.6f,\"parser_delete_ms\":%.6f,\"allocator_live_after\":%llu}\n",
-         tree ? tree_delete_ms : -1.0, parser_delete_ms, (unsigned long long)live_bytes);
+  parse_active = 0;
+  printf("{\"event\":\"cleanup\",\"tree_delete_ms\":%.6f,\"parser_delete_ms\":%.6f,\"allocator_live_after\":%llu,"
+         "\"peak_after_budget\":%llu}\n",
+         tree ? tree_delete_ms : -1.0, parser_delete_ms, (unsigned long long)live_bytes,
+         (unsigned long long)peak_after_budget);
   printf("{\"final\":true,\"op\":\"%s\",\"bytes\":%u,\"parse_ms\":%.6f,\"cancelled\":%s,\"has_error\":%d,\"nodes\":%llu,"
          "\"errors\":%llu,\"missing\":%llu,\"max_depth\":%u,\"query_ms\":%.6f,\"captures\":%llu,\"navigation_ms\":%.6f,"
          "\"tree_delete_ms\":%.6f,\"parser_delete_ms\":%.6f,\"allocator_peak_live\":%llu,\"allocator_total\":%llu,"

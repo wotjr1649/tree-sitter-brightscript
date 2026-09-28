@@ -613,10 +613,10 @@ def main():
     refs = {n: reference_grammar(lab, n) for n in ("h", "bp")}
     ref_objs = {n: grammar_objects(n, d / "src") for n, d in refs.items()}
     query = ROOT / "queries/highlights.scm"
-    probes = {"cand": (probe("cand", cand, rt, args.runtime, scheduled=args.characterize), query),
-              "cand-alloc": (probe("cand-alloc", cand, rt, args.runtime, alloc=True, scheduled=args.characterize), query),
-              "h": (probe("h", ref_objs["h"], rt, args.runtime, scheduled=args.characterize), refs["h"] / "queries/highlights.scm"),
-              "bp": (probe("bp", ref_objs["bp"], rt, args.runtime, scheduled=args.characterize), refs["bp"] / "queries/highlights.scm")}
+    probes = {"cand": (probe("cand", cand, rt, args.runtime), query),
+              "cand-alloc": (probe("cand-alloc", cand, rt, args.runtime, alloc=True), query),
+              "h": (probe("h", ref_objs["h"], rt, args.runtime), refs["h"] / "queries/highlights.scm"),
+              "bp": (probe("bp", ref_objs["bp"], rt, args.runtime), refs["bp"] / "queries/highlights.scm")}
     support_versions = []
     for spec in args.support:
         version, root = spec.split("=", 1)
@@ -654,15 +654,13 @@ def main():
                                   check=True, timeout=60).stdout
             if hashlib.sha256(data).hexdigest() != digest:
                 raise RuntimeError(f"characterization requires frozen v0.1.3 product: {rel}")
-        identity.update(characterization_baseline=baseline, characterization_phase=3,
-                        profiles={"single5": {"measured_samples": 5, "warmup": 1},
-                                  "single15": {"measured_samples": 15, "warmup": 1}})
+        identity.update(characterization_baseline=baseline, characterization_phase=4,
+                        control={"op": "CANCEL_FIRST", "budget_ms": 0, "callback_target": 1,
+                                 "warmup": 1, "plain_samples": 5, "allocator_samples": 1,
+                                 "allocation_window": "first callback through parser cleanup",
+                                 "scheduling": "default"})
         (lab.out / "identity.json").write_text(json.dumps(identity, indent=1), encoding="utf-8")
-        r.runtime_build, r.cost_samples = "separate-scheduled-single5", 5
-        ar = Runner(lab, dict(probes), query, roots=r.roots, runtime_build="separate-scheduled-single15")
-        ar.cost_samples = 15
-        characterize.run({"single5": r, "single15": ar}, identity, lab.out, args.seed)
-        return 0
+        return characterize.run(r, identity, lab.out)
     results = []
     plan = {"B5-01-MEMORY": lambda: gates.b5_01_memory(r), "B5-02-LIFECYCLE": lambda: gates.b5_02_lifecycle(r),
             "A5-01-COST": lambda: gates.a5_01_cost(r, args.seed), "CANCEL": lambda: gates.cancel(r),
