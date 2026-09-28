@@ -1,6 +1,6 @@
 {
   "name": "tree-sitter-brightscript",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Independent, specification-driven Tree-sitter grammar for Roku BrightScript",
   "private": true,
   "license": "MIT",

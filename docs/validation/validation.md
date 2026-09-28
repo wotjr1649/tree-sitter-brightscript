@@ -461,6 +461,11 @@ first attempts, the registered native job name, equal per-OS compiler, CLI,
 probe and supervisor hashes, and different raw run files. The release check
 must also match these IDs against the preassigned GitHub runs and their
 successful job conclusions; local JSON identity alone is not hosted attestation.
+Before this workflow reaches `main`, the preassigned pair uses pushes of the
+same commit to `session/10-v014-native-parity` and
+`session/10-v014-native-parity-confirm`. GitHub documents that
+[`workflow_dispatch` requires the default branch](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+Both branch pushes must be registered before either result is inspected.
 
 The POSIX supervisor uses a private environment, a process group, a watchdog
 and bounded output, with a preflight that exercises a descendant which keeps

@@ -3,7 +3,7 @@ name: Three-OS native qualification
 on:
   workflow_dispatch:
   push:
-    branches: [main, session/10-v014-native-parity]
+    branches: [main, session/10-v014-native-parity, session/10-v014-native-parity-confirm]
 
 permissions:
   contents: read
