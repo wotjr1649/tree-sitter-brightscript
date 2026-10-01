@@ -172,11 +172,9 @@ Use one verified work unit per commit. Do not mix unrelated grammar, documentati
 
 Record the validation that was run, and what was not run, in the commit body.
 
-Merge a session branch into `main` locally with `--no-ff` only after its session gate (defined in `docs/validation/validation.md`) is met and only when the session's task authorizes the merge; otherwise stop at the branch and hand off.
+Merge a session branch into `main` locally with `--no-ff` only after its session gate (defined in `docs/validation/validation.md`) is met; otherwise stop at the branch and hand off.
 
-Do not rewrite unrelated history or discard user work.
-
-Do not push, tag, publish packages, create releases, or perform other remote writes unless the current task explicitly authorizes them.
+Do not tag, publish packages, or create releases unless the current task explicitly authorizes them.
 
 ## Session naming
 
@@ -197,5 +195,3 @@ Complete the authorized lifecycle:
 research → requirement traceability → implementation → generation → focused validation → regression validation → review → canonical documentation update → scoped commit → handoff → explicit verdict.
 
 Do not report a syntax feature as supported until its required evidence exists.
-
-If a blocker is external or the language specification is genuinely ambiguous, preserve that state explicitly instead of guessing.
